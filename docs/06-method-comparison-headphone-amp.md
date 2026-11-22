@@ -9,7 +9,8 @@ basic headphone amplifier for 16–32 Ω headphones. Shared requirements:
 - it must verify the circuit by whatever means its method allows
 - final report covers files, circuit, verification, and problems
 
-Topology, supply, and mono or stereo were each agent's choice.
+Topology, supply, and mono or stereo were each agent's choice. Full prompt, verbatim:
+[`comparisons/headphone_amp/PROMPT.md`](../comparisons/headphone_amp/PROMPT.md).
 
 | | Agent A: `HpAmpKicadIpc` | Agent B: `HpAmpOther` |
 |---|---|---|
