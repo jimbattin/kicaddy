@@ -55,7 +55,7 @@ Package `kiapi.common.commands` · `api/proto/common/commands/editor_commands.pr
 
 | Request | Response | Needs | Headless | Live | Notes |
 |---|---|---|---|---|---|
-| `BeginCommit` | `BeginCommitResponse` | sch, pcb, sym, fp | yes | ✔ | Returns a commit id; later edits are staged until `EndCommit`. |
+| `BeginCommit` | `BeginCommitResponse` | sch, pcb, sym, fp | yes | ✔ | Returns a commit id; later edits are staged until `EndCommit`. One commit opened with the root sheet's header covers calls on child sheets. Items placed or created inside it do not exist until it ends ([02](02-ipc-protocol.md#commits)). |
 | `EndCommit` | `EndCommitResponse` | sch, pcb, sym, fp | yes | ✔ | `CMA_COMMIT` or `CMA_DROP`. |
 | `CreateItems` | `CreateItemsResponse` | sch, pcb, sym, fp | yes | ✔ | Items are `Any`; optional `container` = existing symbol/footprint id. |
 | `UpdateItems` | `UpdateItemsResponse` | sch, pcb, sym, fp | yes | ✔ | Whole-item replace; `field_mask` is ignored. |
@@ -66,7 +66,7 @@ Package `kiapi.common.commands` · `api/proto/common/commands/editor_commands.pr
 | `SetTitleBlockInfo` | `Empty` | sch, pcb, sym, fp | yes | ✔ |  |
 | `GetOpenDocuments` | `GetOpenDocumentsResponse` | sch, pcb, sym, fp | yes | ✔ | `AS_UNHANDLED` when no document of that type is open, and always for `DOCTYPE_PROJECT`. |
 | `SaveCopyOfDocument` | `Empty` | sch, pcb, sym, fp | yes |  | Parent directory must already exist. |
-| `RevertDocument` | `Empty` | sch, pcb, sym, fp | yes; **no** for fp | ✔ | Reload from disk. |
+| `RevertDocument` | `Empty` | sch, pcb, sym, fp | yes; **no** for fp | ✔ | Reload from disk. The reloaded schematic items are not byte-identical to the API-built ones ([02](02-ipc-protocol.md#commits)). |
 | `SaveDocumentAs` | `Empty` | sch, pcb | yes |  | Headless only. Save and switch to the new path/project. |
 | `SaveDocumentToString` | `SavedDocumentResponse` | sch, pcb, fp | yes | ✔ | Full s-expression text of the document. |
 | `SaveSelectionToString` | `SavedSelectionResponse` | sch, pcb, fp | **no** |  |  |

@@ -162,6 +162,9 @@ Observed in headless mode:
 
 - **One project per server.** Opening a file from another project fails with
   `cannot open a document from project 'X' because project 'Y' is already open`. Close everything first.
+  After `CloseAllDocuments(force=True)`, a new schematic created in the same directory built, saved, and gave a
+  correct netlist on the same server (M6 probe), so a rebuild does not need a restart. With unsaved changes open,
+  `CreateDocument` fails with `The current schematic has unsaved changes; save or revert it first`.
 - **At most one schematic and one board.** A second `OpenDocument` of the same type fails with
   `a document of this type is already open`.
 - **Library items.** `OpenDocument` with `DOCTYPE_SYMBOL` or `DOCTYPE_FOOTPRINT` takes a `Library:Item` string as

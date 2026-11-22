@@ -345,6 +345,8 @@ coordinates, ignored `field_mask`, closing without saving, shutdown leftovers) a
 | Placement races the library load | `symbol 'Timer:NE555P' not found` right after start | `LoadAllLibraries`, then poll `GetLibraryStatuses` until the needed rows are `LLS_LOADED` |
 | Library field positions come from the symbol and can collide with pins | `Device:R_Potentiometer` value `100k log` overlapped the pin-3 number | Move the field: set `value_field.text.position` (absolute) on an `UpdateItems`; kicaddy's `s.field(ref, "Value", at=...)` (tested in M3) |
 | Junctions that depend on a pin vanish when the symbol was only placed | A junction where a pin meets a wire's middle, created after `PlaceSymbolFromLibrary` without an `UpdateItems` of that symbol, is deleted by the commit's cleanup (all 5 in a probe; 2 of 7 in the old NE555 build); after one `UpdateItems` of every symbol all survive | Send every placed symbol through `UpdateItems` before creating junctions |
+| A symbol placed inside an open commit cannot be updated in that commit | `UpdateItems` of it fails `ISC_NONEXISTENT`; `GetItems` does not list it until `EndCommit` (M6 probe) | Commit the placements first, then send `UpdateItems` and `CreateItems` in a second commit; to undo the first, `DeleteItems` the placed symbols (kicaddy's edit batches) |
+| A reverted document's items differ from the API-built ones | After `RevertDocument`, sheet-field text has `multiline: true` and a KIID inside a symbol definition changed, though the content matches (M6 probe) | Do not compare `GetItems` output across a revert |
 | MOSFET gates in `Device:Q_NMOS` / `Q_PMOS` are input pins | ERC `Input pin not driven` on word lines driven only by gates | Drive such nets from an output or passive pin, e.g. a connector |
 | The stock `Device:Q_NMOS` / `Q_PMOS` have three pins, D, G, S | No bulk pin in the library | Bulk is implicit; note the assumption |
 
@@ -362,7 +364,7 @@ Not provided by the API in this build, headless:
 | Library authoring | Whole-symbol create and update rejected **[src]** | Write the `.kicad_sym` file (`kicaddy symbol`); child-item edits on an existing symbol or footprint (not exercised) |
 | Selection and view | Selection, focus, visible and active layer, appearance: `AS_UNIMPLEMENTED` | None; they are GUI concepts |
 | Tool actions | `RunAction` unavailable headless, and never registered for the schematic | Dedicated commands only |
-| Undo | No undo or redo | Commit drop before `EndCommit`; `RevertDocument` |
+| Undo | No undo or redo | Commit drop before `EndCommit`; `DeleteItems` of added items and `UpdateItems` with the old item; `RevertDocument` |
 | Events | No notifications or subscriptions | Poll |
 | Simulation | No ngspice control | SPICE netlist export formats |
 

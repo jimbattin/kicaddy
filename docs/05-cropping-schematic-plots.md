@@ -4,8 +4,9 @@ Turning a KiCad schematic plot into an image showing the circuit at readable siz
 page frame, title block, or empty paper.
 
 Implementation: [`plugin/engine/kicaddy/crop.py`](../plugin/engine/kicaddy/crop.py) (Pillow), called by
-`Schematic.plot_cropped()` in [`plugin/engine/kicaddy/schematic.py`](../plugin/engine/kicaddy/schematic.py). Every
-design built with `kicaddy.schematic.run()` writes `<name>_crop.png`, or tiles `<name>_crop_r<row>c<col>.png`.
+`plot_cropped()` in [`plugin/engine/kicaddy/schematic.py`](../plugin/engine/kicaddy/schematic.py). Every
+design built with `kicaddy.schematic.run()` (or the extension's `kicaddy_build`) writes `<name>_crop.png`, or tiles
+`<name>_crop_r<row>c<col>.png`; the extension's `kicaddy_render` writes them again and returns them as images.
 
 ## Problem
 
