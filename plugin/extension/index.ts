@@ -22,6 +22,7 @@ interface ToolDef<P> {
 	label: string;
 	description: string;
 	parameters: unknown;
+	approval?: "read" | "write" | "exec"; // omp approval tier (default exec); pi ignores it
 	execute: (id: string, params: P, signal: AbortSignal | undefined, onUpdate: unknown, ctx: HostCtx) => Promise<{
 		content: Content[];
 		details?: unknown;
@@ -58,6 +59,7 @@ interface Response {
 
 const BIN = fileURLToPath(new URL("../bin/kicaddy", import.meta.url));
 const STDERR_LINES = 40;
+const ABORT_GRACE_MS = 5_000;
 
 // Files held open by every daemon in this process (main session and subagents), for the edit/write guard.
 const HELD = new Map<object, State>();
@@ -79,6 +81,7 @@ class Daemon {
 	private nextId = 1;
 	private stderrTail: string[] = [];
 	private exitText = "";
+	private aborted = false; // stopped by request(): an aborted call was still running
 	exited = false;
 
 	constructor(cwd: string, private onState: (state: State | undefined) => void) {
@@ -109,25 +112,39 @@ class Daemon {
 	private finish(what: string): void {
 		if (this.exited) return;
 		this.exited = true;
-		this.exitText = `${what}\n${this.stderrTail.join("\n")}\nIf it asks for doctor: run /kicaddy doctor.`.replace(/\n+/g, "\n");
+		const lines = this.aborted
+			? ["kicaddy daemon stopped: an aborted call was still running; build or open the project again"]
+			: [what, ...this.stderrTail, "If it names a doctor command, run it (or /kicaddy doctor), then retry."];
+		this.exitText = lines.join("\n");
 		this.onState(undefined);
 		for (const waiter of this.pending.values()) waiter.reject(new Error(this.exitText));
 		this.pending.clear();
 	}
 
-	request(op: string, params: Record<string, unknown> = {}): Promise<Response> {
+	/** One request in flight. A build or batch runs design code, so one the host aborted that is still running
+	 * ABORT_GRACE_MS later takes the daemon down with it; the next call starts a new one. */
+	request(op: string, params: Record<string, unknown> = {}, signal?: AbortSignal): Promise<Response> {
 		const send = () => {
 			const { promise, resolve: done, reject } = Promise.withResolvers<Response>();
-			if (this.exited) {
-				reject(new Error(this.exitText));
+			if (this.exited || signal?.aborted) {
+				reject(new Error(this.exited ? this.exitText : "aborted"));
 				return promise;
 			}
 			const id = this.nextId++;
 			this.pending.set(id, { resolve: done, reject });
 			this.child.stdin!.write(`${JSON.stringify({ id, op, ...params })}\n`);
+			const onAbort = () => {
+				const timer = setTimeout(() => {
+					this.aborted = true;
+					this.child.kill("SIGTERM");
+				}, ABORT_GRACE_MS);
+				promise.finally(() => clearTimeout(timer)).catch(() => {});
+			};
+			signal?.addEventListener("abort", onAbort, { once: true });
+			promise.finally(() => signal?.removeEventListener("abort", onAbort)).catch(() => {});
 			return promise;
 		};
-		const result = this.chain.then(send, send); // one request in flight
+		const result = this.chain.then(send, send);
 		this.chain = result.catch(() => {});
 		return result;
 	}
@@ -192,9 +209,9 @@ export default function kicaddy(pi: HostAPI): void {
 		setState(undefined);
 	}
 
-	async function call(ctx: HostCtx, op: string, params: Record<string, unknown>) {
+	async function call(ctx: HostCtx, signal: AbortSignal | undefined, op: string, params: Record<string, unknown>) {
 		const d = await ensureDaemon(ctx);
-		const response = await d.request(op, params);
+		const response = await d.request(op, params, signal);
 		if (!response.ok) throw new Error(response.output);
 		const content: Content[] = [{ type: "text", text: response.output }];
 		for (const path of response.images ?? []) {
@@ -224,17 +241,22 @@ export default function kicaddy(pi: HostAPI): void {
 		}
 	});
 
-	pi.registerTool<{ script: string; args?: string[] }>({
+	// The first line of a description is the whole catalog entry where the host lists tools by name (omp).
+	pi.registerTool<{ script: string; out?: string }>({
 		name: "kicaddy_build",
 		label: "kicaddy build",
 		description:
-			"Run a kicaddy design build.py (same output and files as `kicaddy run SCRIPT ARGS`) on this session's warm KiCad server; keeps the project open for kicaddy_query, kicaddy_render, kicaddy_edit. Discards earlier kicaddy_edit batches.",
+			"Run a design build.py on this session's warm KiCad server (same output and files as `kicaddy run`) and keep the project open for kicaddy_query, kicaddy_render, kicaddy_edit.\nDiscards earlier kicaddy_edit batches.",
 		parameters: Type.Object({
 			script: Type.String({ description: "path to the design's build.py" }),
-			args: Type.Optional(Type.Array(Type.String(), { description: "script arguments, e.g. [\"--out\", \"DIR\"]" })),
+			out: Type.Optional(Type.String({ description: "output directory; default the script's directory" })),
 		}),
-		execute: (_id, params, _signal, _onUpdate, ctx) =>
-			call(ctx, "build", { script: resolve(ctx.cwd, params.script), args: params.args ?? [], cwd: ctx.cwd }),
+		execute: (_id, params, signal, _onUpdate, ctx) =>
+			call(ctx, signal, "build", {
+				script: resolve(ctx.cwd, params.script),
+				cwd: ctx.cwd,
+				...(params.out ? { out: resolve(ctx.cwd, params.out) } : {}),
+			}),
 	});
 
 	pi.registerTool<{ path: string }>({
@@ -243,19 +265,25 @@ export default function kicaddy(pi: HostAPI): void {
 		description:
 			"Open an existing KiCad project (directory, .kicad_pro, or root .kicad_sch) for kicaddy_query, kicaddy_render, and kicaddy_edit.",
 		parameters: Type.Object({ path: Type.String({ description: "project directory, .kicad_pro, or root .kicad_sch" }) }),
-		execute: (_id, params, _signal, _onUpdate, ctx) => call(ctx, "open", { path: resolve(ctx.cwd, params.path) }),
+		approval: "read",
+		execute: (_id, params, signal, _onUpdate, ctx) => call(ctx, signal, "open", { path: resolve(ctx.cwd, params.path) }),
 	});
 
-	pi.registerTool<{ what: string; lib_ids?: string[] }>({
+	pi.registerTool<{ what: string; lib_ids?: string[]; refs?: string[] }>({
 		name: "kicaddy_query",
 		label: "kicaddy query",
 		description:
-			"Query the open project: placed symbols, nets as REF.PIN sets, ERC, or library pin offsets in grid units (lib_ids, like `kicaddy pins`).",
+			"Query the open project (placed symbols, pin points of `refs`, nets as REF.PIN sets, ERC) or library pin offsets in grid units (`lib_ids`, like `kicaddy pins`; no open project needed).",
 		parameters: Type.Object({
 			what: Type.Union([Type.Literal("symbols"), Type.Literal("nets"), Type.Literal("erc"), Type.Literal("pins")]),
 			lib_ids: Type.Optional(Type.Array(Type.String(), { description: "Library:Symbol ids, for what=pins" })),
+			refs: Type.Optional(
+				Type.Array(Type.String(), { description: "for what=symbols: only these references, each with its pin points" }),
+			),
 		}),
-		execute: (_id, params, _signal, _onUpdate, ctx) => call(ctx, "query", { what: params.what, lib_ids: params.lib_ids ?? [] }),
+		approval: "read",
+		execute: (_id, params, signal, _onUpdate, ctx) =>
+			call(ctx, signal, "query", { what: params.what, lib_ids: params.lib_ids ?? [], refs: params.refs ?? [] }),
 	});
 
 	pi.registerTool<{ sheet?: string }>({
@@ -263,7 +291,8 @@ export default function kicaddy(pi: HostAPI): void {
 		label: "kicaddy render",
 		description: "Plot cropped PNGs of every sheet of the open project (or the sheet with this file stem) and return them as images.",
 		parameters: Type.Object({ sheet: Type.Optional(Type.String({ description: "sheet file stem; default every sheet" })) }),
-		execute: (_id, params, _signal, _onUpdate, ctx) => call(ctx, "render", params.sheet ? { sheet: params.sheet } : {}),
+		approval: "write",
+		execute: (_id, params, signal, _onUpdate, ctx) => call(ctx, signal, "render", params.sheet ? { sheet: params.sheet } : {}),
 	});
 
 	const pins = (description: string) => Type.Record(Type.String(), Type.String(), { description });
@@ -272,7 +301,7 @@ export default function kicaddy(pi: HostAPI): void {
 		name: "kicaddy_edit",
 		label: "kicaddy edit",
 		description:
-			"Run Python builder calls as one batch on the open project, from kicaddy_build or kicaddy_open: `s` is the sheet (file stem `sheet`, default the root), `sheets` maps file stems to sheets, `project` is the project. Besides the build.py methods (s.symbol, s.wire, s.label, s.power, s.no_connect, ...), items already in the document can be changed: s.move(ref, at) (wires follow), s.remove(ref), s.remove_wire(a, b), s.remove_label(text, at=None), s.remove_no_connect(at), s.field(ref, name, text=...), project.rename_net(full_name, new_label_text). Reports the netlist change, new ERC and LINT issues. `expect` declares the netlist change; it is required for opened projects ({} for none), and a batch whose change differs is dropped. Any exception drops the whole batch and leaves the document unchanged. Saves the schematic files: for a built project copy every change you keep into build.py, since a rebuild discards batches. s.sheet, s.net_class, and commit() are not available.",
+			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), project.rename_net): the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
 		parameters: Type.Object({
 			code: Type.String({ description: "Python, e.g. s.symbol(\"R5\", \"Device:R\", (60, 30), value=\"1k\")" }),
 			sheet: Type.Optional(Type.String({ description: "sheet file stem; default the root sheet" })),
@@ -292,8 +321,8 @@ export default function kicaddy(pi: HostAPI): void {
 				),
 			),
 		}),
-		execute: (_id, params, _signal, _onUpdate, ctx) =>
-			call(ctx, "edit", {
+		execute: (_id, params, signal, _onUpdate, ctx) =>
+			call(ctx, signal, "edit", {
 				code: params.code,
 				...(params.sheet ? { sheet: params.sheet } : {}),
 				...(params.expect !== undefined ? { expect: params.expect } : {}),

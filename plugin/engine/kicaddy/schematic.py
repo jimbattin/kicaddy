@@ -545,7 +545,16 @@ class Schematic:
         return _proto.types.Vector2(x_nm=round(x * GRID_MM * 1e6), y_nm=round(y * GRID_MM * 1e6))
 
     def at(self, point):
-        return self.pins[point] if isinstance(point, str) else point
+        """A grid point as given, or the connection point of "REF.PIN" (or "<sheet>.<LABEL>")."""
+        if not isinstance(point, str):
+            return point
+        if point in self.pins:
+            return self.pins[point]
+        ref, _, pin = point.partition(".")
+        pins = sorted(k[len(ref) + 1:] for k in self.pins if k.startswith(f"{ref}."))
+        if pins:
+            raise ValueError(f"{ref} has no pin {pin!r} on sheet {self.hier_path}; its pins here: {' '.join(pins)}")
+        raise ValueError(f"no {point!r}: {ref} is not placed on sheet {self.hier_path}")
 
     # -- symbols ----------------------------------------------------------------------------------
     def symbol(self, ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None,
@@ -1076,10 +1085,20 @@ class Schematic:
         """Box (x0, y0, x1, y1) in nm of a Text at its position, rotated by its angle: KiCad's text box
         (EDA_TEXT::GetTextBox), or with `ink` that box less its stroke-font padding: KiCad inflates the
         glyph box by 1.5 pen widths where the ink reaches 0.5, then adds 17 % of that height. Stock
-        symbols stack Reference and Value so that the padded boxes overlap with no ink touching."""
-        box = self.api(_proto.base.GetTextExtents(text=text))
-        x0, y0 = box.position.x_nm, box.position.y_nm
-        x1, y1 = x0 + box.size.x_nm, y0 + box.size.y_nm
+        symbols stack Reference and Value so that the padded boxes overlap with no ink touching.
+        The server takes about 10 ms per text and the box only shifts with the position, so each distinct
+        text and attribute set is asked once per server, at the origin."""
+        probe = _proto.types.Text()
+        probe.CopyFrom(text)
+        probe.ClearField("position")
+        key = probe.SerializeToString(deterministic=True)
+        box = self.api.text_boxes.get(key)
+        if box is None:
+            answer = self.api(_proto.base.GetTextExtents(text=probe))
+            box = self.api.text_boxes[key] = (answer.position.x_nm, answer.position.y_nm,
+                                              answer.size.x_nm, answer.size.y_nm)
+        x0, y0 = text.position.x_nm + box[0], text.position.y_nm + box[1]
+        x1, y1 = x0 + box[2], y0 + box[3]
         if not ink:
             return (x0, y0, x1, y1)
         a = text.attributes
@@ -1224,8 +1243,15 @@ def plot_cropped(api, document, output):
 
 
 def print_nets(nets):
+    """One line per net; the single-pin nets KiCad names `unconnected-(...)` share one `unconnected:` line."""
+    loose = []
     for net, members in nets:
-        print(f"net {net:28s} {' '.join(sorted(members))}")
+        if len(members) == 1 and net.startswith("unconnected-("):
+            loose += members
+        else:
+            print(f"net {net:28s} {' '.join(sorted(members))}")
+    if loose:
+        print(f"unconnected: {' '.join(sorted(loose))}")
 
 
 def format_violation(v):
@@ -1252,14 +1278,23 @@ def print_lint(issues):
 
 def print_library_pins(api, document, lib_ids):
     """Print pin offsets (grid units, Y down, rotation 0) of library symbols, looked up through `document`'s
-    library tables. Returns the "lib:name" ids printed."""
+    library tables, then one `not found:` line per id that is not there, with the names it may have meant.
+    Returns the "lib:name" ids printed."""
     lt = _proto.library_types
-    runtime.wait_for_symbol_libraries(api, {i.split(":", 1)[0] for i in lib_ids})
-    ids = [_proto.types.LibraryIdentifier(library_nickname=i.split(":", 1)[0], entry_name=i.split(":", 1)[1])
-           for i in lib_ids]
-    response = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=document, item_ids=ids))
+    libraries = runtime.symbol_libraries(api)
+    wanted = [i for i in lib_ids if ":" in i and i.split(":", 1)[0] in libraries]
+    items = []
+    if wanted:
+        runtime.wait_for_symbol_libraries(api, {i.split(":", 1)[0] for i in wanted})
+        ids = [_proto.types.LibraryIdentifier(library_nickname=i.split(":", 1)[0], entry_name=i.split(":", 1)[1])
+               for i in wanted]
+        try:
+            items = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=document, item_ids=ids)).items
+        except RuntimeError as e:  # the request fails only when every id is missing
+            if "none of the requested items were found" not in str(e):
+                raise
     found = set()
-    for item in response.items:  # not in request order
+    for item in items:  # not in request order
         symbol = _proto.sch.SchematicSymbol()
         item.Unpack(symbol)
         found.add(f"{symbol.id.library_nickname}:{symbol.id.entry_name}")
@@ -1272,6 +1307,22 @@ def print_library_pins(api, document, lib_ids):
                 print(f"  unit {unit}  pin {pin.number:>3} {pin.name:12s} "
                       f"({pin.position.x_nm / 1e6 / GRID_MM:g}, {pin.position.y_nm / 1e6 / GRID_MM:g})  "
                       f"{_proto.types.ElectricalPinType.Name(pin.electrical_type)}")
+    names = {}  # library -> its symbol names, for the hints
+    for lib_id in lib_ids:
+        if lib_id in found:
+            continue
+        library, colon, entry = lib_id.partition(":")
+        if not colon:
+            hint = "use Library:Symbol"
+        elif library not in libraries:
+            hint = runtime.unknown_library(library, libraries)
+        else:
+            if library not in names:
+                listed = api(_proto.library.GetLibraryItems(type=lt.LT_SYMBOL, nickname=[library])).items
+                names[library] = [i.entry_name for i in listed]
+            close = runtime.close_names(entry, names[library])
+            hint = f"{library} has {', '.join(close)}" if close else f"nothing like it in {library}"
+        print(f"not found: {lib_id} ({hint})")
     return found
 
 
@@ -1368,7 +1419,12 @@ if __name__ == "__main__":
     if command == "pins":
         args = _arguments(lambda p: (p.add_argument("lib_ids", nargs="+", help="Library:Symbol"),
                                      p.add_argument("--dir", type=Path, help="project directory")))
-        probe_pins(args.lib_ids, args.dir)
+        try:
+            found = probe_pins(args.lib_ids, args.dir)
+        except RuntimeError as e:  # no runtime, a busy project, a library that does not load
+            print(f"error: {e}")
+            sys.exit(1)
+        sys.exit(0 if found >= set(args.lib_ids) else 1)
     elif command == "symbol":
         args = _arguments(lambda p: (p.add_argument("tables", nargs="+", type=Path, help="pin table JSON"),
                                      p.add_argument("--dir", type=Path, required=True, help="project directory")))

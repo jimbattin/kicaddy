@@ -5,6 +5,7 @@ Needs the venv created by `kicaddy doctor` (pynng, protobuf).
 
 import argparse
 import contextlib
+import difflib
 import fcntl
 import hashlib
 import importlib
@@ -21,6 +22,7 @@ from pathlib import Path
 from . import bootstrap
 
 _proto = None  # namespace of generated modules, filled by load_bindings()
+_bindings = None  # the directory they were loaded from
 
 
 class ProjectBusyError(RuntimeError):
@@ -28,8 +30,10 @@ class ProjectBusyError(RuntimeError):
 
 
 def load_bindings(path):
-    global _proto
+    global _proto, _bindings
     path = Path(path).expanduser().resolve()
+    if path == _bindings:
+        return _proto
     sys.path.insert(0, str(path))
     for module in sorted(path.rglob("*_pb2.py")):  # registers every kiapi type for response unpacking
         importlib.import_module(".".join(module.relative_to(path).with_suffix("").parts))
@@ -47,6 +51,7 @@ def load_bindings(path):
         sch_cmd=schematic_commands_pb2, sch_jobs=schematic_jobs_pb2, sch_tasks=schematic_tasks_pb2,
         sch=schematic_types_pb2,
     )
+    _bindings = path
     return _proto
 
 
@@ -60,6 +65,7 @@ class Api:
         self.symbols = symbol_database.Default()
         self.deadline = deadline
         self.client_name = client_name
+        self.text_boxes = {}  # GetTextExtents answers by text and attributes (schematic.Schematic._extents)
         self.sock = pynng.Req0(dial=f"ipc://{socket_path}", send_timeout=60000, recv_timeout=60000)
 
     def __call__(self, request):
@@ -154,19 +160,45 @@ def server(launcher, config_home, project_dir=None, paths=()):
             lock.close()
 
 
+def symbol_libraries(api):
+    """{nickname: LibraryLoadStatus} of every symbol library row. Global rows exist from server start,
+    project rows once the document is open."""
+    lt = _proto.library_types
+    rows = api(_proto.library.GetLibraryStatuses(types=[lt.LT_SYMBOL], scope=lt.LTS_BOTH)).libraries
+    return {row.entry.nickname: row.status for row in rows}
+
+
+def close_names(name, names, n=5):
+    """Up to `n` of `names` that `name` was probably meant to be: near spellings, then names containing it."""
+    found = difflib.get_close_matches(name, names, n=n, cutoff=0.6)
+    found += [c for c in sorted(names) if name.lower() in c.lower() and c not in found]
+    return found[:n]
+
+
+def unknown_library(nickname, known):
+    """Message for a symbol library that is in no library table."""
+    close = close_names(nickname, known, 3)
+    return f"no symbol library {nickname!r}" + (f"; did you mean {', '.join(close)}?" if close else "")
+
+
 def wait_for_symbol_libraries(api, nicknames, timeout=60):
     """PlaceSymbolFromLibrary does not wait for the background library load. Rows report
-    LLS_INVALID until their load starts, so only LLS_ERROR counts as a failure."""
+    LLS_INVALID until their load starts, so only LLS_ERROR counts as a failure. A nickname without a row
+    fails at once: no load will add it."""
     lt = _proto.library_types
     deadline = time.monotonic() + timeout
     api(_proto.library.LoadAllLibraries(type=[lt.LT_SYMBOL]))
     while True:
-        rows = api(_proto.library.GetLibraryStatuses(types=[lt.LT_SYMBOL], scope=lt.LTS_BOTH)).libraries
-        states = {row.entry.nickname: row.status for row in rows if row.entry.nickname in nicknames}
-        if nicknames <= states.keys() and all(s == lt.LLS_LOADED for s in states.values()):
+        rows = symbol_libraries(api)
+        unknown = sorted(nicknames - rows.keys())
+        if unknown:
+            raise RuntimeError(unknown_library(unknown[0], rows))
+        states = {n: rows[n] for n in nicknames}
+        if all(s == lt.LLS_LOADED for s in states.values()):
             return
         if any(s == lt.LLS_ERROR for s in states.values()) or time.monotonic() > deadline:
-            raise RuntimeError(f"symbol libraries not loaded: {states}")
+            names = {n: lt.LibraryLoadStatus.Name(s) for n, s in states.items()}
+            raise RuntimeError(f"symbol libraries not loaded: {names}")
         time.sleep(0.1)
 
 

@@ -1,24 +1,25 @@
 ---
 name: kicaddy
-description: Create KiCad projects (.kicad_pro, .kicad_sch, hierarchical sheets) from a Python build script, headless through KiCad's IPC API - place library symbols, generate custom symbols from a pin table, wire by pin, split a design into sheets, check the netlist against declared intent and ERC, render cropped PNGs; with the kicaddy tools, also edit an existing schematic (add, move, remove parts, change values, rename nets) with the netlist change checked. Use to draw, design, build, or edit a schematic; not for reviewing or analyzing one.
+description: Draw, build, or edit KiCad schematics headless from Python (not for reviewing or analyzing one) - a build script places library symbols and wires them by pin through KiCad's IPC API, with hierarchical sheets and custom symbols from a pin table; the netlist is checked against declared intent, with ERC, a layout lint, and cropped PNG renders. With the kicaddy tools, also edit an existing schematic (add, move, remove parts, change values, rename nets) with the netlist change checked.
 ---
 
 # kicaddy: headless KiCad schematics from a build script
 
 ## Setup
 
-Run once per session:
+`kicaddy` below is this command line (outside omp, replace `$(realpath skill://kicaddy)` with the directory
+containing this file):
 
 ```sh
-python3 "$(realpath skill://kicaddy)/../../bin/kicaddy" doctor
+python3 "$(realpath skill://kicaddy)/../../bin/kicaddy"
 ```
 
-Outside omp, replace `$(realpath skill://kicaddy)` with the directory containing this file.
+- With the kicaddy tools (next section) there is no setup step. A tool that cannot start names the command to
+  run (`python3 /…/bin/kicaddy doctor`): run it, then call the tool again.
+- Without them, run `kicaddy doctor` once per session. On success its last line is
+  `cli:   python3 /…/bin/kicaddy`, the same command line with the path resolved; reuse it verbatim.
 
-On success the last line is `cli:   python3 /…/bin/kicaddy`. That command line is `kicaddy` everywhere below;
-reuse it verbatim for the rest of the session.
-
-On a `FAIL` line:
+On a `FAIL` line from `doctor`:
 
 - `kicad` or `api-server`: kicaddy needs a KiCad 10.99 nightly or later (stable 10.0.x has no headless API
   server). Ask the user which KiCad to use: an AppImage, a `kicad-cli` binary, an install directory, an app
@@ -29,16 +30,21 @@ On a `FAIL` line:
 
 ## kicaddy tools (omp extension)
 
-When the `kicaddy_build` tool is available, the plugin's extension keeps one KiCad server warm for the session.
-`doctor` is still the first step. Then:
+When the `kicaddy_build` tool is available, the plugin's extension keeps one KiCad server warm for the session:
 
-- **Build** with `kicaddy_build` (`script`, optional `args` such as `["--out", "DIR"]`) instead of
+- **Build** with `kicaddy_build` (`script`, optional `out`: the output directory) instead of
   `kicaddy run`: same output, files, and exit line (`exit: 0`), without a server start per build.
 - **Review** with `kicaddy_render` (optional `sheet`: a file stem) instead of reading `<stem>_crop.png`: it
   plots the crops again and returns them as images.
-- **Query** with `kicaddy_query`: `what` = `symbols`, `nets` (`REF.PIN` sets), `erc`, or `pins` with `lib_ids`
-  (as `kicaddy pins`). `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root
-  `.kicad_sch`) for query, render, and edit.
+- **Query** with `kicaddy_query`, `what` =
+  - `pins` with `lib_ids`: library pin offsets, as `kicaddy pins`; works before any project is open.
+  - `symbols`: one line per placed symbol (sheet, reference, library id, value, origin, `rot`/`mirror` when
+    set). With `refs` (a list of references), only those, each followed by its pin points on the sheet: look
+    there before wiring to a part of an opened project.
+  - `nets` (`REF.PIN` sets) and `erc`.
+
+  `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root `.kicad_sch`) for query, render,
+  and edit.
 - **Edit** with `kicaddy_edit`: `code` is Python run as one batch against the open project, `s` the sheet
   (`sheet`: file stem, default the root), `sheets` maps stems to sheets, `project` the project. Before the batch
   the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. The builder
@@ -80,9 +86,10 @@ Without the tools, the CLI workflow below is unchanged.
 
 1. **Pin offsets.** `kicaddy pins Lib:Sym …` (e.g. `kicaddy pins Device:R Timer:NE555P`) prints each pin's
    unit, number, name, offset from the symbol origin in grid units at rotation 0, and electrical type.
-   Look up every symbol you will place, in one call, before laying anything out. Symbols that do not exist are
-   left out of the output; when none exist it fails with `none of the requested items were found`. The library
-   files are not searchable on disk; these IDs exist in the stock libraries:
+   Look up every symbol you will place, in one call, before laying anything out. An id that does not exist
+   gets a line `not found: Timer:NE555 (Timer has NE555P, NE555D, …)` with the closest names in that library
+   (or the closest library names), and the exit status is 1: pick from that line instead of guessing again.
+   The library files are not searchable on disk; these IDs exist in the stock libraries:
    - `Device:` `R`, `C`, `C_Polarized`, `L`, `D`, `LED`, `R_Potentiometer`, `R_Potentiometer_Dual`, `Q_NPN`,
      `Q_PNP`, `Q_NMOS`, `Q_PMOS`, `Battery`, `Battery_Cell`, `Speaker`
    - `Amplifier_Operational:` `NE5532`, `TL072`, `LM358`, `NJM4556A` (dual, 70 mA output);
@@ -121,9 +128,10 @@ Without the tools, the CLI workflow below is unchanged.
    orthogonal wires between them (see Geometry and Rules). Put everything the drawing needs in this first
    `build.py`: the note right next to the circuit (not at a far edge of the page), and any section titles.
 5. **Build.** Write `build.py` in the user's project directory, then run `kicaddy run build.py [--out DIR]`. It
-   prints every net, the ERC violations with positions, `LINT: n issue(s)` with one line per layout issue, and
-   the output paths. Exit 0 only when the netlist matches the declared nets, ERC reports 0 violations, and
-   LINT reports 0 issues; on `NETLIST MISMATCH` it lists missing and unexpected nets. An ERC line ends in
+   prints every net (`net <name> <pins>`; pins connected to nothing share one `unconnected:` line), the ERC
+   violations with positions, `LINT: n issue(s)` with one line per layout issue, and the output paths. Exit 0
+   only when the netlist matches the declared nets, ERC reports 0 violations, and LINT reports 0 issues; on
+   `NETLIST MISMATCH` it lists missing and unexpected nets. An ERC line ends in
    `on <sheet path>` (`/` for the root, `/amp/` for child sheet `amp`). A LINT line reads
    `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of the clash); kinds:
    - `body-body`: two symbol bodies (or sheet boxes) overlap.

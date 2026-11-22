@@ -38,6 +38,27 @@ class OpError(Exception):
     """An expected failure: the message is the op's whole output."""
 
 
+class _Stop(BaseException):
+    """SIGTERM or SIGHUP. Not SystemExit, which op_build takes as the design script's own exit."""
+
+
+def _stop(*_):
+    raise _Stop
+
+
+def _trace(first):
+    """The traceback of the exception being handled, from the first frame in file `first` (the design script,
+    or "<batch>") on: the daemon and runpy frames above it say nothing about the design. Code that does not
+    compile has no such frame, and its SyntaxError names the line."""
+    kind, error, tb = sys.exc_info()
+    start = tb
+    while start is not None and start.tb_frame.f_code.co_filename != first:
+        start = start.tb_next
+    if start is None and not isinstance(error, SyntaxError):
+        start = tb
+    return "".join(traceback.format_exception(kind, error, start))
+
+
 def _capture(fn, *args):
     """(result, printed text) of fn(*args)."""
     buf = io.StringIO()
@@ -55,6 +76,9 @@ class Session:
         self.project = None  # schematic.Project: built this session (run() adopts it) or opened
         self.built = False  # the project was built this session by kicaddy_build
         self.batches = 0
+        # The plot jobs draw the files as they were at the first plot after the document was opened, whatever
+        # was committed and saved since (docs/02-ipc-protocol.md#export-jobs): reopen before plotting again.
+        self.plots_stale = False
         self.notes = []  # lines put before the current op's output
 
     # -- server and documents ------------------------------------------------------------------
@@ -64,7 +88,8 @@ class Session:
     def _check_server(self):
         """A server found dead: drop it and the document state, and say so."""
         if self.api is not None and not self._server_alive():
-            self.notes.append(f"KiCad server exited (code {self.api.process.returncode}); restarted")
+            self.notes.append(f"KiCad server exited (code {self.api.process.returncode}): the open project is "
+                              "closed; build or open it again")
             self.close()
 
     def ensure_server(self, directory):
@@ -89,6 +114,7 @@ class Session:
         self.project = None
         self.built = False
         self.batches = 0
+        self.plots_stale = False
 
     @contextlib.contextmanager
     def attach(self, out):
@@ -114,6 +140,7 @@ class Session:
         self.api = self.directory = self.project = None
         self.built = False
         self.batches = 0
+        self.plots_stale = False
         if stack is not None:
             stack.close()
 
@@ -169,15 +196,6 @@ class Session:
                 "project_dir": str(Path(root).parent) if root else None, "root": root, "files": self.files(),
                 "built": self.built, "batches": self.batches, "kicad": self.current["full_version"]}
 
-    def _instances(self, spec):
-        p = schematic._proto
-        items = self.api(p.editor.GetItems(header=p.types.ItemHeader(document=spec),
-                                           types=[p.enums.KOT_SCH_SYMBOL])).items
-        for item in items:
-            instance = p.sch.SchematicSymbolInstance()
-            item.Unpack(instance)
-            yield instance
-
     # -- ops ------------------------------------------------------------------------------------
     def op_status(self, request):
         self._check_server()
@@ -231,7 +249,8 @@ class Session:
         buf = io.StringIO()
         code = 0
         try:
-            sys.argv = [str(script), *request.get("args", [])]
+            out = request.get("out")
+            sys.argv = [str(script), *(["--out", out] if out else [])]
             sys.path.insert(0, str(script.parent))
             os.chdir(request.get("cwd") or script.parent)
             with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
@@ -247,7 +266,7 @@ class Session:
                         code = 1
         except Exception:
             self.reset_documents()
-            raise OpError(f"{buf.getvalue()}{traceback.format_exc()}") from None
+            raise OpError(f"{buf.getvalue()}{_trace(str(script))}") from None
         finally:
             sys.argv = saved_argv
             sys.path[:] = saved_path
@@ -259,36 +278,43 @@ class Session:
         return {"output": f"{buf.getvalue()}exit: {code}"}
 
     def op_query(self, request):
-        self.require_document()
         what = request.get("what")
-        _, document = self.root()
+        if what == "pins":
+            lib_ids = request.get("lib_ids") or []
+            if not lib_ids:
+                raise OpError('pins needs lib_ids, e.g. ["Device:R"]')
+            self._check_server()
+            if self.project is None:  # nothing open yet: a short-lived server, as `kicaddy pins` uses
+                return {"output": _capture(schematic.probe_pins, lib_ids)[1].rstrip()}
+            return {"output": _capture(schematic.print_library_pins, self.api, self.root()[1], lib_ids)[1].rstrip()}
+        self.require_document()
         if what == "symbols":
-            lines = []
-            for _, hier, spec, _ in self.sheets():
-                for i in self._instances(spec):
-                    ref = i.reference_field.text.text
-                    if ref.startswith("#"):
+            refs = set(request.get("refs") or [])
+            lines, seen = [], set()
+            for s in self.project.sheets:
+                for p in s.placements.values():
+                    if p.ref.startswith("#") or (refs and p.ref not in refs):
                         continue
-                    lib = i.definition.id
-                    lines.append(f"{hier} {ref} unit {i.unit.unit or 1}  {lib.library_nickname}:{lib.entry_name}  "
-                                 f"{i.value_field.text.text}  @ ({i.position.x_nm / GRID_NM:g}, "
-                                 f"{i.position.y_nm / GRID_NM:g})")
+                    seen.add(p.ref)
+                    lib = p.definition.id
+                    unit = f" unit {p.unit}" if p.definition.unit_count > 1 else ""
+                    turn = (f" rot {p.rotation}" if p.rotation else "") + (f" mirror {p.mirror}" if p.mirror else "")
+                    lines.append(f"{s.hier_path} {p.ref}{unit}  {lib.library_nickname}:{lib.entry_name}  "
+                                 f"{p.instance.value_field.text.text}  @ ({p.origin[0]:g}, {p.origin[1]:g}){turn}")
+                    if refs:
+                        lines.append("  pins: " + "  ".join(f"{n} ({x:g}, {y:g})" for n, (x, y) in p.pins.items()))
+            lines += [f"not found: {ref}" for ref in sorted(refs - seen)]
             return {"output": "\n".join(lines) or "no symbols"}
         if what == "nets":
             return {"output": _capture(schematic.print_nets, self.project.netlist())[1].rstrip() or "no nets"}
         if what == "erc":
-            return {"output": _capture(schematic.print_erc, schematic.run_erc(self.api, document))[1].rstrip()}
-        if what == "pins":
-            lib_ids = request.get("lib_ids") or []
-            if not lib_ids or not all(":" in i for i in lib_ids):
-                raise OpError("pins needs lib_ids as Library:Symbol")
-            found, text = _capture(schematic.print_library_pins, self.api, document, lib_ids)
-            text += "".join(f"not found: {i}\n" for i in lib_ids if i not in found)
-            return {"output": text.rstrip()}
+            return {"output": _capture(schematic.print_erc, self.project.erc())[1].rstrip()}
         raise OpError(f"what must be symbols, nets, erc, or pins, not {what!r}")
 
     def op_render(self, request):
         self.require_document()
+        if self.plots_stale:
+            self.reopen()
         sheets = self.sheets()
         wanted = request.get("sheet")
         if wanted:
@@ -353,7 +379,7 @@ class Session:
             api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message=f"kicaddy batch {number}", header=header))
             commit = None
         except Exception:
-            error = traceback.format_exc()
+            error = _trace("<batch>")
             project.in_batch = False
             if commit is not None:
                 with contextlib.suppress(Exception):
@@ -389,6 +415,7 @@ class Session:
 
         api(schematic._proto.project.SaveDocument(document=project.root.document))
         self.batches = number
+        self.plots_stale = True
         lines += [f"batch {number} committed (sheet {target.hier_path})", *report,
                   "expect: matched" if expect is not None else "expect: not given"]
         violations = project.erc()
@@ -429,8 +456,6 @@ class Session:
 def main():
     with contextlib.suppress(OSError):
         os.setsid()  # terminal signals aimed at omp's process group reach neither the daemon nor its server
-    for sig in (signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, lambda *_: sys.exit(0))
     protocol = os.fdopen(os.dup(1), "w", buffering=1)
     os.dup2(2, 1)  # stray prints and C-level writes go to stderr
     try:
@@ -442,6 +467,8 @@ def main():
     session = Session(current)
     schematic._live = session
     try:
+        for sig in (signal.SIGTERM, signal.SIGHUP):
+            signal.signal(sig, _stop)
         while line := sys.stdin.readline():
             if not line.strip():
                 continue
@@ -461,6 +488,8 @@ def main():
                 break
             if request.get("op") == "shutdown":
                 break
+    except _Stop:
+        pass
     finally:
         session.close()
     return 0

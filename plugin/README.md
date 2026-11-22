@@ -117,7 +117,7 @@ Locations:
 | `kicaddy doctor [--kicad CHOICE] [--refresh]` | set up and check the runtime |
 | `kicaddy config kicad [CHOICE]` | show the KiCad choice and its source, or validate and save one |
 | `kicaddy run SCRIPT [ARGS…]` | run a Python script (a design `build.py`) on the runtime's venv, with the engine importable |
-| `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets (grid units, Y down) of library symbols; `--dir` adds the project's `sym-lib-table` |
+| `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets (grid units, Y down) of library symbols; `--dir` adds the project's `sym-lib-table`. An id that does not exist gets a `not found:` line with the closest names, and the exit status is 1 |
 | `kicaddy symbol TABLE.json… --dir PROJECT` | write pin-table JSON files into a project symbol library, register it in `sym-lib-table`, and print the pin offsets |
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
 | `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched; the first launch shows KiCad's startup wizard once) |
@@ -127,23 +127,28 @@ Locations:
 
 ## Using the skill
 
-Ask the agent to draw or build a schematic; the `kicaddy` skill tells it to run `doctor`, look up pin offsets, write
-a pin table and run `kicaddy symbol` for any part the stock libraries lack, write `build.py` in your project
-directory, build it with `kicaddy run build.py` until the netlist matches and ERC is clean, and review each sheet's
-cropped PNG. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad nightly to use and saves your
-answer with `kicaddy config kicad`.
+Ask the agent to draw or build a schematic; the `kicaddy` skill tells it to look up pin offsets, write a pin table
+and run `kicaddy symbol` for any part the stock libraries lack, write `build.py` in your project directory, build it
+until the netlist matches and ERC and the layout lint are clean, and review each sheet's cropped PNG. With the
+extension it does this through the tools below; without it, it runs `kicaddy doctor` first and builds with
+`kicaddy run build.py`. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad nightly to use and
+saves your answer with `kicaddy config kicad`.
 
 ## omp extension
 
 With the plugin linked into omp (or installed in pi), each session gets a daemon (`kicaddy daemon`, started on the
 first tool call) that keeps one `kicad-cli api-server` running for the session's project, and stops it when the
 session ends or omp exits. A session start also runs `kicaddy sweep`, which stops servers left by a killed session.
+A tool call the user aborts that is still running 5 s later stops the daemon; the next call starts a new one.
+
+omp lists these tools as commands of its `bash` tool (`kicaddy_build build.py --out DIR`, `kicaddy_edit -j '{…}'`);
+pi exposes them as tools.
 
 | Tool | What it does |
 |---|---|
-| `kicaddy_build` | run a design `build.py` on the warm server: same output and files as `kicaddy run` |
+| `kicaddy_build` | run a design `build.py` (`script`, optional `out` directory) on the warm server: same output and files as `kicaddy run` |
 | `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query, render, and edit |
-| `kicaddy_query` | placed symbols, nets, ERC, or library pin offsets of the open project |
+| `kicaddy_query` | placed symbols (with `refs`: those symbols and their pin points), nets, or ERC of the open project; library pin offsets (`lib_ids`), with or without an open project |
 | `kicaddy_render` | cropped PNGs of every sheet (or one), returned as images |
 | `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
 
