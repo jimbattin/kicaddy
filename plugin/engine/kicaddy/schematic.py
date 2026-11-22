@@ -30,6 +30,7 @@ Requires the runtime set up by `kicaddy doctor`; run a design script with `kicad
 """
 
 import argparse
+import copy
 import math
 import re
 import sys
@@ -45,6 +46,12 @@ PLOT_DPI = 300  # source resolution for the cropped PNG; crop downsamples to fit
 SHEET_DPI = 200  # full-sheet PNG
 
 _proto = None  # namespace of generated modules, filled by bind()
+_live = None  # the omp extension's session daemon (daemon.Session): run() builds on its warm server
+
+PROJECT_STATE = ("pin_ids", "units", "auto", "libraries_ready", "net_classes", "files")  # edit-batch rollback
+SHEET_STATE = ("pins", "placements", "_items", "_wires", "_labels", "_notes", "_sheets", "_junctions",
+               "_junctions_created")
+BATCH_ERROR = "{} is not available in an edit batch; add it to build.py and rebuild"
 
 
 def bind(bindings):
@@ -149,6 +156,30 @@ def _check(results, request_status, what):
             raise RuntimeError(f"{what}: {r.status}")
 
 
+def get_netlist(api, document, pin_ids):
+    """[(net name, {"REF.PIN", ...})] over the whole hierarchy of `document`; pins missing from `pin_ids`
+    (KIID -> "REF.PIN"), power-symbol and flag pins dropped."""
+    response = api(_proto.sch_cmd.GetSchematicNetlist(document=document, types=[_proto.enums.KOT_SCH_PIN]))
+    nets = []
+    for net in response.nets:
+        members = {pin_ids[i.value] for s in net.sheets for i in s.items if i.value in pin_ids}
+        members = {m for m in members if not m.startswith("#")}
+        if members:
+            nets.append((net.name, members))
+    return sorted(nets, key=lambda n: n[0])
+
+
+def run_erc(api, document):
+    """ERC violations over every sheet of `document`'s hierarchy."""
+    tasks = _proto.tasks
+    token = api(_proto.sch_tasks.StartErcTask(document=document)).token
+    while (status := api(tasks.GetTaskStatus(token=token))).state == tasks.TS_RUNNING:
+        time.sleep(0.05)
+    if status.state != tasks.TS_COMPLETED:
+        raise RuntimeError(f"ERC task: {tasks.TaskState.Name(status.state)} {status.error_message}")
+    return list(api(_proto.sch_tasks.GetErcTaskResult(token=token)).violations)
+
+
 class Project:
     """One KiCad project in `directory`: the root sheet `root` (a Schematic), its child sheets, and what they
     share: references, power-symbol numbering, net classes, the title block, and the board file."""
@@ -175,6 +206,7 @@ class Project:
         self.net_classes = []  # (NetClass proto, [net-name patterns])
         self.sheets = []  # every Schematic, root first, in creation order
         self.files = {name}  # sheet file stems in use
+        self.in_batch = False  # set by the daemon while an edit batch runs
         self.title_block = (time.strftime("%Y-%m-%d"), "1", tuple(comments[:4]))
         doc = api(_proto.project.CreateDocument(type=t.DOCTYPE_SCHEMATIC, path=str(path))).document
         root = api(_proto.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0].path
@@ -183,6 +215,8 @@ class Project:
 
     def commit(self):
         """Create every sheet's pending items, send the net classes, create the board once, and save."""
+        if self.in_batch:
+            raise ValueError("commit() runs when the batch ends; do not call it in an edit batch")
         t = _proto.types
         for s in self.sheets:
             s.commit()
@@ -202,25 +236,25 @@ class Project:
 
     def netlist(self):
         """[(net name, {"REF.PIN", ...})] over the whole hierarchy; power-symbol and flag pins dropped."""
-        response = self.api(_proto.sch_cmd.GetSchematicNetlist(document=self.root.document,
-                                                                types=[_proto.enums.KOT_SCH_PIN]))
-        nets = []
-        for net in response.nets:
-            members = {self.pin_ids[i.value] for s in net.sheets for i in s.items if i.value in self.pin_ids}
-            members = {m for m in members if not m.startswith("#")}
-            if members:
-                nets.append((net.name, members))
-        return sorted(nets, key=lambda n: n[0])
+        return get_netlist(self.api, self.root.document, self.pin_ids)
 
     def erc(self):
         """ERC violations over every sheet."""
-        tasks = _proto.tasks
-        token = self.api(_proto.sch_tasks.StartErcTask(document=self.root.document)).token
-        while (status := self.api(tasks.GetTaskStatus(token=token))).state == tasks.TS_RUNNING:
-            time.sleep(0.05)
-        if status.state != tasks.TS_COMPLETED:
-            raise RuntimeError(f"ERC task: {tasks.TaskState.Name(status.state)} {status.error_message}")
-        return list(self.api(_proto.sch_tasks.GetErcTaskResult(token=token)).violations)
+        return run_erc(self.api, self.root.document)
+
+    def snapshot(self):
+        """Copy of the builder state an edit batch changes, for restore()."""
+        return copy.deepcopy(({k: getattr(self, k) for k in PROJECT_STATE},
+                              [{k: getattr(s, k) for k in SHEET_STATE} for s in self.sheets]))
+
+    def restore(self, snapshot):
+        """Put back the state of snapshot(); the sheet list is unchanged (sheet() is refused in a batch)."""
+        project, sheets = copy.deepcopy(snapshot)
+        for k, v in project.items():
+            setattr(self, k, v)
+        for s, state in zip(self.sheets, sheets):
+            for k, v in state.items():
+                setattr(s, k, v)
 
 
 class Schematic:
@@ -438,6 +472,8 @@ class Schematic:
         the child's hierarchical labels: automatic (outputs on the right, the rest on the left, 2 units apart
         from the top in label order) or `pins={label: (side, offset)}`, offset from the top (left, right) or
         left (top, bottom) edge. Returns {label: (x, y)}; each pin is also "<name>.<label>"."""
+        if self.project.in_batch:
+            raise ValueError(BATCH_ERROR.format("sheet()"))
         sch, t, e, enums = _proto.sch, _proto.types, _proto.editor, _proto.enums
         if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
             raise ValueError(f"sheet name {name!r}: letters, digits, _ and - only")
@@ -544,6 +580,8 @@ class Schematic:
     def net_class(self, name, nets, track_width=None, clearance=None):
         """Project net class `name` for the net-name patterns `nets` (full names: "+9V", "/amp/OUT_L", "*"
         wildcards); `track_width`, `clearance` in mm, unset ones inherit from Default."""
+        if self.project.in_batch:
+            raise ValueError(BATCH_ERROR.format("net_class()"))
         classes = self.project.net_classes
         if name == "Default" or any(c.name == name for c, _ in classes):
             raise ValueError(f"net class {name!r} is already defined")
@@ -557,8 +595,11 @@ class Schematic:
         classes.append((net_class, list(nets)))
 
     # -- finishing --------------------------------------------------------------------------------
-    def commit(self):
-        """Send this sheet's pending field updates, items, and junctions; the project saves."""
+    def commit(self, staged=False):
+        """Send this sheet's pending field updates, items, and junctions; the project saves. `staged`: no
+        commit of its own, the caller (an edit batch) holds one."""
+        if self.project.in_batch:
+            raise ValueError("commit() runs when the batch ends; do not call it in an edit batch")
         e = _proto.editor
         dirty = [p for p in self.placements.values() if p.dirty]
         if dirty:
@@ -575,7 +616,10 @@ class Schematic:
         for point in sorted(points - self._junctions_created):
             self._items.append(_proto.sch.Junction(position=self.mm(point)))
         self._junctions_created |= points
-        if self._items:
+        if self._items and staged:
+            result = self.api(e.CreateItems(header=self.header, items=[_pack(i) for i in self._items]))
+            _check(result.created_items, result.status, "CreateItems")
+        elif self._items:
             commit = self.api(e.BeginCommit(header=self.header))
             result = self.api(e.CreateItems(header=self.header, items=[_pack(i) for i in self._items]))
             _check(result.created_items, result.status, "CreateItems")
@@ -704,45 +748,67 @@ class Schematic:
             texts.append(g.TextBox(f"note ({at[0]:g}, {at[1]:g})", box, None, None))
         return g.lint(bodies, texts, pin_lines, self._wires)
 
-    def plot(self, kind, output, drawing_sheet=True, dpi=None, all_sheets=False):
-        """Plot this sheet, or with `all_sheets` (from the root) every sheet: one page each in a PDF."""
-        sj = _proto.sch_jobs
-        job = {"png": sj.RunSchematicJobExportPng, "svg": sj.RunSchematicJobExportSvg,
-               "pdf": sj.RunSchematicJobExportPdf}[kind]()
-        job.plot_settings.CopyFrom(sj.SchematicPlotSettings(
-            plot_drawing_sheet=drawing_sheet, page_size=sj.SJPS_AUTO,
-            sheet_mode=sj.SJSM_ALL_SHEETS if all_sheets else sj.SJSM_SINGLE_SHEET))
-        job.job_settings.CopyFrom(_proto.jobs.RunJobSettings(document=self.document, output_path=str(output)))
-        if kind == "png":
-            job.dpi = dpi or SHEET_DPI
-            job.plot_background_color = True
-        result = self.api(job)
-        if result.status != _proto.jobs.JS_SUCCESS:
-            raise RuntimeError(f"{type(job).__name__}: {_proto.jobs.JobStatus.Name(result.status)} {result.message}")
-        return Path(output)
 
-    def plot_cropped(self, output):
-        """Crop heuristic, docs/05-cropping-schematic-plots.md: plot without the drawing sheet at
-        PLOT_DPI, trim to ink, pad, downsample to fit, or tile when that would make text illegible."""
-        from PIL import Image
-
-        with tempfile.TemporaryDirectory(dir=self.path.parent, prefix=".crop-") as tmp:
-            raw = self.plot("png", Path(tmp) / "raw.png", drawing_sheet=False, dpi=PLOT_DPI)
-            with Image.open(raw) as image:
-                return crop.save(crop.crop(image, PLOT_DPI), output)
+def plot(api, document, kind, output, drawing_sheet=True, dpi=None, all_sheets=False):
+    """Plot the sheet `document`, or with `all_sheets` (the root) every sheet: one page each in a PDF."""
+    sj = _proto.sch_jobs
+    job = {"png": sj.RunSchematicJobExportPng, "svg": sj.RunSchematicJobExportSvg,
+           "pdf": sj.RunSchematicJobExportPdf}[kind]()
+    job.plot_settings.CopyFrom(sj.SchematicPlotSettings(
+        plot_drawing_sheet=drawing_sheet, page_size=sj.SJPS_AUTO,
+        sheet_mode=sj.SJSM_ALL_SHEETS if all_sheets else sj.SJSM_SINGLE_SHEET))
+    job.job_settings.CopyFrom(_proto.jobs.RunJobSettings(document=document, output_path=str(output)))
+    if kind == "png":
+        job.dpi = dpi or SHEET_DPI
+        job.plot_background_color = True
+    result = api(job)
+    if result.status != _proto.jobs.JS_SUCCESS:
+        raise RuntimeError(f"{type(job).__name__}: {_proto.jobs.JobStatus.Name(result.status)} {result.message}")
+    return Path(output)
 
 
-def pins_command(api, lib_ids, directory):
-    """Print pin offsets (grid units, Y down, rotation 0) of library symbols; the library lookup needs a
-    document, created as `directory`/probe.kicad_sch (the server's project directory), before the libraries
-    load so the project's sym-lib-table rows exist. Returns the "lib:name" ids printed."""
+def plot_cropped(api, document, output):
+    """Crop heuristic, docs/05-cropping-schematic-plots.md: plot without the drawing sheet at
+    PLOT_DPI, trim to ink, pad, downsample to fit, or tile when that would make text illegible."""
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(dir=Path(output).parent, prefix=".crop-") as tmp:
+        raw = plot(api, document, "png", Path(tmp) / "raw.png", drawing_sheet=False, dpi=PLOT_DPI)
+        with Image.open(raw) as image:
+            return crop.save(crop.crop(image, PLOT_DPI), output)
+
+
+def print_nets(nets):
+    for net, members in nets:
+        print(f"net {net:28s} {' '.join(sorted(members))}")
+
+
+def print_erc(violations):
+    print(f"ERC: {len(violations)} violation(s)")
+    for v in violations:
+        print(f"  {_proto.types.RuleSeverity.Name(v.severity)} {v.description} @ "
+              f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g}) "
+              f"on {v.sheet_specific_path.path_human_readable or '/'}")
+
+
+def lint_issues(project):
+    return [f"{s.hier_path} {i}" for s in project.sheets for i in s.lint()]
+
+
+def print_lint(issues):
+    print(f"LINT: {len(issues)} issue(s)")
+    for issue in issues:
+        print(f"  {issue}")
+
+
+def print_library_pins(api, document, lib_ids):
+    """Print pin offsets (grid units, Y down, rotation 0) of library symbols, looked up through `document`'s
+    library tables. Returns the "lib:name" ids printed."""
     lt = _proto.library_types
-    doc = api(_proto.project.CreateDocument(type=_proto.types.DOCTYPE_SCHEMATIC,
-                                            path=str(Path(directory) / "probe.kicad_sch"))).document
     runtime.wait_for_symbol_libraries(api, {i.split(":", 1)[0] for i in lib_ids})
     ids = [_proto.types.LibraryIdentifier(library_nickname=i.split(":", 1)[0], entry_name=i.split(":", 1)[1])
            for i in lib_ids]
-    response = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=doc, item_ids=ids))
+    response = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=document, item_ids=ids))
     found = set()
     for item in response.items:  # not in request order
         symbol = _proto.sch.SchematicSymbol()
@@ -758,6 +824,14 @@ def pins_command(api, lib_ids, directory):
                       f"({pin.position.x_nm / 1e6 / GRID_MM:g}, {pin.position.y_nm / 1e6 / GRID_MM:g})  "
                       f"{_proto.types.ElectricalPinType.Name(pin.electrical_type)}")
     return found
+
+
+def pins_command(api, lib_ids, directory):
+    """print_library_pins through a document created as `directory`/probe.kicad_sch (the server's project
+    directory) before the libraries load, so the project's sym-lib-table rows exist."""
+    doc = api(_proto.project.CreateDocument(type=_proto.types.DOCTYPE_SCHEMATIC,
+                                            path=str(Path(directory) / "probe.kicad_sch"))).document
+    return print_library_pins(api, doc, lib_ids)
 
 
 def probe_pins(lib_ids, project_dir=None):
@@ -809,14 +883,16 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
     args = _arguments(lambda p: p.add_argument("--out", default=out_dir, help="output directory"))
     out = Path(args.out or Path(sys.argv[0]).resolve().parent).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    with _server(out) as api:
+    server = _live.attach(out) if _live is not None else _server(out)
+    with server as api:
         project = Project(api, out, name, page=page, title=title, comments=comments)
         expected = build(project.root)
         project.commit()
+        if _live is not None:
+            _live.adopt(project)
 
         actual = project.netlist()
-        for net, members in actual:
-            print(f"net {net:28s} {' '.join(sorted(members))}")
+        print_nets(actual)
         got, want = {frozenset(m) for _, m in actual}, {frozenset(n) for n in expected}
         ok = got == want
         if not ok:
@@ -824,24 +900,17 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
                   f"  unexpected: {[sorted(n) for n in got - want]}")
 
         violations = project.erc()
-        print(f"ERC: {len(violations)} violation(s)")
-        for v in violations:
-            print(f"  {_proto.types.RuleSeverity.Name(v.severity)} {v.description} @ "
-                  f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g}) "
-                  f"on {v.sheet_specific_path.path_human_readable or '/'}")
-
-        issues = [f"{s.hier_path} {i}" for s in project.sheets for i in s.lint()]
-        print(f"LINT: {len(issues)} issue(s)")
-        for issue in issues:
-            print(f"  {issue}")
+        print_erc(violations)
+        issues = lint_issues(project)
+        print_lint(issues)
 
         for s in project.sheets:
             stem = s.path.stem
             for kind in ("png", "svg"):
-                print(f"{kind}: {s.plot(kind, out / f'{stem}.{kind}')}")
-            for path in s.plot_cropped(out / f"{stem}_crop.png"):
+                print(f"{kind}: {plot(api, s.document, kind, out / f'{stem}.{kind}')}")
+            for path in plot_cropped(api, s.document, out / f"{stem}_crop.png"):
                 print(f"crop: {path}")
-        print(f"pdf: {project.root.plot('pdf', out / f'{name}.pdf', all_sheets=True)}")
+        print(f"pdf: {plot(api, project.root.document, 'pdf', out / f'{name}.pdf', all_sheets=True)}")
     return 0 if ok and not violations and not issues else 1
 
 

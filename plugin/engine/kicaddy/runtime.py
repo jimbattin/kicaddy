@@ -8,6 +8,7 @@ import contextlib
 import fcntl
 import hashlib
 import importlib
+import json
 import os
 import secrets
 import shutil
@@ -115,8 +116,11 @@ def server(launcher, config_home, project_dir=None, paths=()):
         key, lock = f"anon-{os.getpid()}-{secrets.token_hex(4)}", None
     sock_dir = root / key
     try:
-        shutil.rmtree(sock_dir, ignore_errors=True)  # leftover from a killed run; ours while we hold the lock
+        _stop_servers(sock_dir)  # a killed run's server may still be running there; ours while we hold the lock
+        shutil.rmtree(sock_dir, ignore_errors=True)
         sock_dir.mkdir(mode=0o700)
+        owner = {"pid": os.getpid(), "project": str(Path(project_dir).resolve()) if project_dir is not None else None}
+        (sock_dir / "owner.json").write_text(json.dumps(owner))
         socket_path = sock_dir / "api.sock"
         log_path = sock_dir / "server.log"
         with open(log_path, "wb") as log:
@@ -134,7 +138,9 @@ def server(launcher, config_home, project_dir=None, paths=()):
                         tail = "\n".join(log_path.read_text(errors="replace").splitlines()[-20:])
                         raise RuntimeError(f"{what}\n{tail}".rstrip())
                     time.sleep(0.05)
-                yield Api(socket_path, deadline)
+                api = Api(socket_path, deadline)
+                api.process = process
+                yield api
             finally:
                 process.send_signal(signal.SIGINT)
                 try:
@@ -148,16 +154,85 @@ def server(launcher, config_home, project_dir=None, paths=()):
             lock.close()
 
 
-def wait_for_symbol_libraries(api, nicknames):
+def wait_for_symbol_libraries(api, nicknames, timeout=60):
     """PlaceSymbolFromLibrary does not wait for the background library load. Rows report
     LLS_INVALID until their load starts, so only LLS_ERROR counts as a failure."""
     lt = _proto.library_types
+    deadline = time.monotonic() + timeout
     api(_proto.library.LoadAllLibraries(type=[lt.LT_SYMBOL]))
     while True:
         rows = api(_proto.library.GetLibraryStatuses(types=[lt.LT_SYMBOL], scope=lt.LTS_BOTH)).libraries
         states = {row.entry.nickname: row.status for row in rows if row.entry.nickname in nicknames}
         if nicknames <= states.keys() and all(s == lt.LLS_LOADED for s in states.values()):
             return
-        if any(s == lt.LLS_ERROR for s in states.values()) or time.monotonic() > api.deadline:
+        if any(s == lt.LLS_ERROR for s in states.values()) or time.monotonic() > deadline:
             raise RuntimeError(f"symbol libraries not loaded: {states}")
         time.sleep(0.1)
+
+
+# -- orphan servers: stdlib only, Python 3.9 (bin/kicaddy imports this module on the system python3) ---------
+def _processes():
+    """[(pid, args)] of every process."""
+    lines = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True).stdout.splitlines()
+    out = []
+    for line in lines:
+        pid, _, args = line.strip().partition(" ")
+        if pid.isdigit():
+            out.append((int(pid), args))
+    return out
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _stop_servers(sock_dir):
+    """SIGINT every process serving `sock_dir`/api.sock (the AppImage runtime, its kicad-cli child, Flatpak's
+    bwrap), SIGKILL what is left after 5 s; return the pids signalled."""
+    socket_path = str(Path(sock_dir) / "api.sock")
+    pids = [pid for pid, args in _processes() if socket_path in args and pid != os.getpid()]
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGINT)
+        except OSError:  # gone, or not ours
+            pass
+    deadline = time.monotonic() + 5
+    while any(_alive(p) for p in pids) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    return pids
+
+
+def sweep():
+    """Stop servers and remove socket directories whose owner process is gone; return one line per directory."""
+    lines = []
+    for directory in sorted(bootstrap.runtime_root().iterdir()):
+        if not directory.is_dir() or directory.name == "locks":
+            continue
+        record = directory / "owner.json"
+        try:
+            pid = json.loads(record.read_text())["pid"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pid = None
+        if pid is not None and _alive(pid):
+            continue
+        if pid is None and not record.exists():
+            try:
+                if time.time() - directory.stat().st_mtime < 10:  # a server() between mkdir and the record
+                    continue
+            except FileNotFoundError:
+                continue
+        pids = _stop_servers(directory)
+        shutil.rmtree(directory, ignore_errors=True)
+        lines.append(f"{directory.name}: stopped {pids}" if pids else f"{directory.name}: removed")
+    return lines

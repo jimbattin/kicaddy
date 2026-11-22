@@ -153,6 +153,27 @@ def kicad_command(launcher: list, args: list, config_home: Path, paths=()) -> tu
     return [str(a) for a in argv], env
 
 
+def gui_command(launcher: list, tool: str, args: list, config_home: Path) -> tuple[list, dict]:
+    """(argv, env) to start the KiCad GUI program `tool` (eeschema, ...) on the isolated config, with the display
+    kept, so the user's own KiCad settings stay untouched."""
+    env = dict(os.environ)
+    env["KICAD_CONFIG_HOME"] = str(config_home)
+    if Path(launcher[0]).name == "flatpak":
+        mounts = [f"--filesystem={_flatpak_fs(Path(a).parent)}" for a in args]
+        argv = [launcher[0], "run", f"--command={tool}", f"--env=KICAD_CONFIG_HOME={config_home}",
+                f"--filesystem={_flatpak_fs(config_home)}", *mounts, launcher[-1], *args]
+    elif len(launcher) == 2 and launcher[1] == "kicad-cli":  # AppImage: AppRun dispatches on the first argument
+        argv = [launcher[0], tool, *args]
+    else:
+        cli = Path(launcher[0])
+        candidates = (cli.with_name(tool), cli.parent.parent / "Applications" / f"{tool}.app" / "Contents" / "MacOS" / tool)
+        found = next((c for c in candidates if _executable(c)), None)
+        if found is None:
+            raise SetupError(f"no {tool} next to {cli}")
+        argv = [found, *args]
+    return [str(a) for a in argv], env
+
+
 def _tail(text: str, lines: int = 20) -> str:
     return "\n".join((text or "").strip().splitlines()[-lines:])
 

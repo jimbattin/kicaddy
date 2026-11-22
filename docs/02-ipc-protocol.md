@@ -215,8 +215,16 @@ Items are protobuf messages packed in `Any`: `kiapi.schematic.types.*` for schem
 - `BeginCommit` returns an id; following mutations are staged. `EndCommit` with `CMA_COMMIT` applies them as one
   change with an optional message; `CMA_DROP` discards them. After a drop, three placed symbols were gone.
 - A sheet created inside an open commit did not appear in `GetSchematicHierarchy` until the commit ended.
+- Items placed or created inside an open commit are not in the document until it ends: `GetItems` does not list a
+  symbol from `PlaceSymbolFromLibrary`, and an `UpdateItems` of that symbol fails with `ISC_NONEXISTENT`. Updates of
+  existing items inside a commit apply at once (`GetItems` shows them).
+- One commit opened with the root sheet's header also stages calls addressed to a child sheet: `CMA_DROP` undid a
+  placement and a wire on the child as well (M6 probe).
 - No undo or redo command. Headless `RunAction` is unavailable, so a committed change can only be reversed by
-  another edit, `RevertDocument`, or closing without saving.
+  another edit, `DeleteItems` of what was added, `RevertDocument`, or closing without saving.
+- `RevertDocument` reloads the saved file, but the reloaded items differ from the ones the API built: sheet-field
+  text gains `multiline: true`, and a KIID inside a symbol's library definition changed (pin KIIDs were kept). A
+  comparison of `GetItems` before and after a revert therefore fails even though the content matches (M6 probe).
 
 ## Tasks
 

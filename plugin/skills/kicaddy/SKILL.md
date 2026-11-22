@@ -27,6 +27,29 @@ On a `FAIL` line:
 - `bindings`: needs `git` and network access (first run per KiCad build).
 - `server`: show the user the message.
 
+## kicaddy tools (omp extension)
+
+When the `kicaddy_build` tool is available, the plugin's extension keeps one KiCad server warm for the session.
+`doctor` is still the first step. Then:
+
+- **Build** with `kicaddy_build` (`script`, optional `args` such as `["--out", "DIR"]`) instead of
+  `kicaddy run`: same output, files, and exit line (`exit: 0`), without a server start per build.
+- **Review** with `kicaddy_render` (optional `sheet`: a file stem) instead of reading `<stem>_crop.png`: it
+  plots the crops again and returns them as images.
+- **Query** with `kicaddy_query`: `what` = `symbols`, `nets` (`REF.PIN` sets), `erc`, or `pins` with `lib_ids`
+  (as `kicaddy pins`). `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root
+  `.kicad_sch`) for query and render only.
+- **Small follow-up changes** with `kicaddy_edit`: `code` is Python run against the project built this session,
+  `s` the sheet (`sheet`: file stem, default the root), `sheets` maps stems to sheets. The builder methods work as
+  in `build.py` (`s.symbol`, `s.wire`, `s.field`, ...), except `s.sheet`, `s.net_class`, and `commit()`. Any
+  exception drops the whole batch and leaves the document unchanged; a committed batch saves the files and
+  reports the net changes, ERC, and LINT. A rebuild discards batches, so copy every change you keep into
+  `build.py` (the source of truth), then rebuild once at the end.
+- While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
+  same directory fails as busy: use the tools.
+
+Without the tools, the CLI workflow below is unchanged.
+
 ## Workflow
 
 1. **Pin offsets.** `kicaddy pins Lib:Sym …` (e.g. `kicaddy pins Device:R Timer:NE555P`) prints each pin's

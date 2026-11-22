@@ -13,7 +13,9 @@ The plugin ships:
 
 - `bin/kicaddy`: the command line (stdlib Python; the runtime it sets up lives in its own venv).
 - `engine/kicaddy/`: the engine (runtime bootstrap, IPC client, schematic builder, schematic geometry and lint,
-  pin-table symbol generator, crop tool).
+  pin-table symbol generator, crop tool, and the session daemon behind the extension).
+- `extension/index.ts`: the omp / pi extension: tools on a KiCad server kept warm per session, a guard on the
+  schematic files it holds open, and `/kicaddy`.
 - `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`), a worked example design, and an example pin table.
 
 ## Prerequisites
@@ -95,8 +97,8 @@ the choice and writes it there. `--kicad` and `KICADDY_KICAD` override it for on
 | `server` | starts the headless server, checks version, settings directory, and libraries, and builds, saves, and reads back the netlist of a two-resistor schematic |
 
 `--refresh` rebuilds the venv and bindings even if cached. On success doctor records the runtime and prints the
-`cli:` line to use. Afterwards, `run`, `pins`, `symbol`, and `env` refuse to start if the KiCad file (or Flatpak
-commit) changed, or if the config file's `kicad` changed, until doctor runs again.
+`cli:` line to use. Afterwards, `run`, `pins`, `symbol`, `view`, and `env` refuse to start if the KiCad file (or
+Flatpak commit) changed, or if the config file's `kicad` changed, until doctor runs again.
 
 Locations:
 
@@ -116,6 +118,8 @@ Locations:
 | `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets (grid units, Y down) of library symbols; `--dir` adds the project's `sym-lib-table` |
 | `kicaddy symbol TABLE.json… --dir PROJECT` | write pin-table JSON files into a project symbol library, register it in `sym-lib-table`, and print the pin offsets |
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
+| `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched) |
+| `kicaddy sweep` | stop `api-server`s whose kicaddy process was killed, and remove their socket directories |
 
 `kicaddy` here means `python3 <clone>/plugin/bin/kicaddy`.
 
@@ -126,3 +130,26 @@ a pin table and run `kicaddy symbol` for any part the stock libraries lack, writ
 directory, build it with `kicaddy run build.py` until the netlist matches and ERC is clean, and review each sheet's
 cropped PNG. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad nightly to use and saves your
 answer with `kicaddy config kicad`.
+
+## omp extension
+
+With the plugin linked into omp (or installed in pi), each session gets a daemon (`kicaddy daemon`, started on the
+first tool call) that keeps one `kicad-cli api-server` running for the session's project, and stops it when the
+session ends or omp exits. A session start also runs `kicaddy sweep`, which stops servers left by a killed session.
+
+| Tool | What it does |
+|---|---|
+| `kicaddy_build` | run a design `build.py` on the warm server: same output and files as `kicaddy run` |
+| `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query and render |
+| `kicaddy_query` | placed symbols, nets, ERC, or library pin offsets of the open project |
+| `kicaddy_render` | cropped PNGs of every sheet (or one), returned as images |
+| `kicaddy_edit` | builder calls on the project built this session, as one batch: any exception drops the batch and leaves the document unchanged; a committed batch is saved (not into `build.py`; a rebuild discards it) |
+
+While a project is open, the agent's `edit`/`write` calls on its `.kicad_sch`/`.kicad_pro` files are blocked.
+
+| Command | What it does |
+|---|---|
+| `/kicaddy config [CHOICE]` | show the KiCad choice, or set it and run `doctor` |
+| `/kicaddy doctor` | stop the session's server and run `doctor` |
+| `/kicaddy status` | daemon and server pids, open project, edit batches, KiCad version |
+| `/kicaddy view [FILE]` | open the file (default: the open project's root sheet) in eeschema |

@@ -6,7 +6,9 @@ import argparse
 import json
 import os
 import shlex
+import subprocess
 import sys
+from pathlib import Path
 
 from . import bootstrap, config
 
@@ -42,6 +44,27 @@ def _config(value: str | None) -> int:
     return 0
 
 
+def _view(file: str) -> int:
+    try:
+        current = bootstrap.load_current()
+    except bootstrap.SetupError as e:
+        print(e, file=sys.stderr)
+        return 1
+    path = Path(file).resolve()
+    if not path.exists():
+        print(f"error: no such file: {path}", file=sys.stderr)
+        return 1
+    try:
+        argv, env = bootstrap.gui_command(current["launcher"], "eeschema", [str(path)], Path(current["config_home"]))
+    except bootstrap.SetupError as e:
+        print(e, file=sys.stderr)
+        return 1
+    process = subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, start_new_session=True)
+    print(f"eeschema started (pid {process.pid}): {path}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="kicaddy")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -69,8 +92,12 @@ def main(argv=None) -> int:
     symbol.add_argument("--dir", required=True, help="project directory (where kicaddy run writes the design)")
 
     commands.add_parser("env", help="print shell exports for the runtime recorded by doctor")
+    commands.add_parser("sweep", help="stop api-servers left by killed kicaddy processes")
+    view = commands.add_parser("view", help="open a schematic in eeschema (isolated KiCad config)")
+    view.add_argument("file")
+    commands.add_parser("daemon")  # no help: internal (the omp extension's session daemon)
 
-    smoke = commands.add_parser("_smoke", help=argparse.SUPPRESS)
+    smoke = commands.add_parser("_smoke")
     smoke.add_argument("--launcher", required=True, help="JSON list")
     smoke.add_argument("--bindings", required=True)
     smoke.add_argument("--config-home", required=True)
@@ -98,6 +125,16 @@ def main(argv=None) -> int:
         for name, key in ENV_KEYS:
             print(f"export {name}={shlex.quote(str(current[key]))}")
         return 0
+    if args.command == "sweep":
+        from . import runtime
+
+        for line in runtime.sweep() or ["nothing to sweep"]:
+            print(line)
+        return 0
+    if args.command == "view":
+        return _view(args.file)
+    if args.command == "daemon":
+        return _exec_venv(["-m", "kicaddy.daemon"])
     try:
         from . import smoke as smoke_test
 
