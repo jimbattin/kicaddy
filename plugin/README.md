@@ -118,7 +118,7 @@ Locations:
 | `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets (grid units, Y down) of library symbols; `--dir` adds the project's `sym-lib-table` |
 | `kicaddy symbol TABLE.json… --dir PROJECT` | write pin-table JSON files into a project symbol library, register it in `sym-lib-table`, and print the pin offsets |
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
-| `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched) |
+| `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched; the first launch shows KiCad's startup wizard once) |
 | `kicaddy sweep` | stop `api-server`s whose kicaddy process was killed, and remove their socket directories |
 
 `kicaddy` here means `python3 <clone>/plugin/bin/kicaddy`.
