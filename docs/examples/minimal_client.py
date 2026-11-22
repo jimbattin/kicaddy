@@ -7,6 +7,11 @@ Requires `pynng`, `protobuf`, and Python bindings generated from the KiCad
 `api/proto` tree of the matching commit (see docs/02-ipc-protocol.md, "Client bindings").
 
     python minimal_client.py --bindings <gen-dir> [PROJECT_OR_FILE]
+
+With the runtime from `python3 engine/kicad-agent doctor` (the M1 acceptance check):
+
+    eval "$(python3 engine/kicad-agent env)"
+    "$KICAD_AGENT_PYTHON" docs/examples/minimal_client.py --kicad "$KICAD_AGENT_KICAD" --bindings "$KICAD_API_BINDINGS"
 """
 
 import argparse

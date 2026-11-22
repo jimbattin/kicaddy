@@ -5,7 +5,8 @@ Everything here ran on the headless server of build `10.99.0-6860-gbdd2930d2b`, 
 three-part board built from scratch via the API. The schematic recipes are packaged as a reusable builder in
 [`schematics/kicad_sch_ipc.py`](../schematics/kicad_sch_ipc.py): grid snapping, pin lookup, library-load waiting,
 netlist check, ERC, plots, cropping ([05](05-cropping-schematic-plots.md)). It built five designs of 7 to 100
-components each (power and flag symbols not counted).
+components each (power and flag symbols not counted). It runs on the runtime from
+[`engine/kicad-agent doctor`](../engine/kicad_agent/bootstrap.py): bindings, venv, isolated config, locked server.
 
 Snippets assume `call(request)`, which wraps the request in an `ApiRequest`, checks status, and returns the unpacked
 response (see [examples/minimal_client.py](examples/minimal_client.py)); `pack(msg)`, which wraps a message in
@@ -340,9 +341,10 @@ Not provided by the API in this build, headless:
 | Events | No notifications or subscriptions | Poll |
 | Simulation | No ngspice control | SPICE netlist export formats |
 
-Client-layer work (all but the board items done by `schematics/kicad_sch_ipc.py`):
+Client-layer work, all done except the board items: server and bindings by
+[`engine/kicad_agent`](../engine/kicad_agent/), the rest by `schematics/kicad_sch_ipc.py`.
 
-- Start, health-check, and stop the server; one server per project.
+- Start, health-check, and stop the server; one server per project (enforced by an advisory lock).
 - Wait for the libraries to load before placing symbols.
 - Check three status levels on item calls: envelope, request, per item.
 - Snap schematic coordinates to the 1.27 mm grid and compute pin endpoints from library pin offsets and the

@@ -33,6 +33,7 @@ and no selection, view, or `RunAction` commands in headless mode. See [04-workfl
 | [05-cropping-schematic-plots.md](05-cropping-schematic-plots.md) | Heuristic for cropping schematic plots to readable images (fit or tile), with results on four example designs |
 | [06-method-comparison-headphone-amp.md](06-method-comparison-headphone-amp.md) | Time and token cost of the KiCad IPC method against a free-choice method, on the same headphone-amp task |
 | [examples/minimal_client.py](examples/minimal_client.py) | Self-contained client: starts the headless server, reads a document, shuts down |
+| [../engine/](../engine/) | Runtime: `kicad-agent doctor` sets up KiCad discovery, cached bindings, pinned venv, isolated config; `kicad_agent/runtime.py` runs the locked headless server |
 | [../schematics/](../schematics/) | Schematic builder on the API (`kicad_sch_ipc.py`), crop tool (`crop_plot.py`), example designs: NE555 blinker, buzzer, AM radio, 16-bit SRAM |
 
 ## Evidence labels

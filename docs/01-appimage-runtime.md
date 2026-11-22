@@ -30,7 +30,7 @@ Two ways to run:
 
 | Mode | Command | Notes |
 |---|---|---|
-| FUSE mount | `kicad-nightly kicad-cli …` | Mounts at `/tmp/.mount_kicad…`, unmounts on exit. First launch this session: 7 s; later about 1 s. |
+| FUSE mount | `kicad-nightly kicad-cli …` | Mounts at `/tmp/.mount_kicad…`, unmounts on exit. First launch this session: 7 s; later about 1 s. After the tool exits, a cleanup process with the same command line lingers about 6 s. |
 | Extracted | `kicad-nightly --appimage-extract`, then `AppDir/bin/kicad-cli …` | 3.8 GB on disk, no FUSE, about 0.5 s to start. Extracts into `./AppDir`. |
 
 `bin/*` are hard links to the `sharun` launcher, which loads the environment from `AppDir/.env` and runs the real
@@ -92,6 +92,10 @@ Global library tables are read from the settings directory. A fresh `KICAD_CONFI
 knows only project-local libraries: `OpenDocument` for `Device:R` failed with `Symbol not found` until the tables
 were added. The server does not create them. The existing `~/.config/kicad/10.99/` already has both.
 
+`engine/kicad-agent doctor` gives the agent its own `KICAD_CONFIG_HOME`, `~/.cache/kicad-agent/config`, and writes
+the two files below there when they are missing. The agent never reads or writes the GUI's `~/.config/kicad/10.99/`:
+its file checksums were unchanged across `doctor`, design builds, and server runs.
+
 An isolated settings directory needs these two files in `<dir>/10.99/`, each chaining to the stock table shipped in
 the AppImage:
 
@@ -112,6 +116,7 @@ the AppImage:
 ```
 
 With these, the server reported 224 symbol and 156 footprint libraries, all `LLS_LOADED`. First library query after
-start: 5.7 s; later ones about 10 ms.
+start: 5.7 s; later ones about 10 ms. On the `doctor` directory, `GetLibraryStatuses` returned 223 symbol and 155
+footprint rows.
 
 Project-local tables (`sym-lib-table`, `fp-lib-table` next to the `.kicad_pro`) are picked up when the project opens.
