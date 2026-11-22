@@ -1,4 +1,4 @@
-"""Headless schematic builder on the KiCad IPC API, shared by the designs in this directory.
+"""Headless schematic builder on the KiCad IPC API: the engine behind a design's `build.py`.
 
 A design script defines `build(sch)` that places symbols and wires on a grid, and returns the nets it
 expects; `run()` does the rest: headless server, save, connectivity check, ERC, plots, cropped PNG.
@@ -13,11 +13,10 @@ expects; `run()` does the rest: headless server, save, connectivity check, ERC, 
         sys.exit(run(build, "my_design", page="A4", title="My design"))
 
 Coordinates are in units of the 1.27 mm connection grid, Y down. A point given as "REF.PIN" resolves
-to that pin's connection point (pin number, not name). `python kicad_sch_ipc.py pins Lib:Sym ...`
-prints pin offsets in grid units for planning a layout.
+to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...` prints pin offsets
+in grid units for planning a layout.
 
-Requires the runtime set up by `python3 engine/kicad-agent doctor`; run design scripts with the python it records
-(`eval "$(python3 engine/kicad-agent env)"`, then `"$KICAD_AGENT_PYTHON" build.py`).
+Requires the runtime set up by `kicaddy doctor`; run a design script with `kicaddy run build.py [--out DIR]`.
 """
 
 import argparse
@@ -26,24 +25,26 @@ import tempfile
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import crop_plot  # noqa: E402
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
-from kicad_agent import bootstrap, runtime  # noqa: E402
+from . import bootstrap, crop, runtime
 
 GRID_MM = 1.27
-PLOT_DPI = 300  # source resolution for the cropped PNG; crop_plot downsamples to fit
+PLOT_DPI = 300  # source resolution for the cropped PNG; crop downsamples to fit
 SHEET_DPI = 200  # full-sheet PNG
 
-_proto = None  # namespace of generated modules, filled by _server()
+_proto = None  # namespace of generated modules, filled by bind()
+
+
+def bind(bindings):
+    """Load the generated bindings at `bindings` for this module."""
+    global _proto
+    _proto = runtime.load_bindings(bindings)
+    return _proto
 
 
 def _server(project_dir=None):
-    """Load bindings recorded by `engine/kicad-agent doctor` and start a locked server."""
-    global _proto
+    """Load bindings recorded by `kicaddy doctor` and start a locked server."""
     current = bootstrap.load_current()
-    _proto = runtime.load_bindings(current["bindings"])
+    bind(current["bindings"])
     return runtime.server(current["launcher"], Path(current["config_home"]), project_dir)
 
 
@@ -255,19 +256,19 @@ class Schematic:
         with tempfile.TemporaryDirectory(dir=self.path.parent, prefix=".crop-") as tmp:
             raw = self.plot("png", Path(tmp) / "raw.png", drawing_sheet=False, dpi=PLOT_DPI)
             with Image.open(raw) as image:
-                return crop_plot.save(crop_plot.crop(image, PLOT_DPI), output)
+                return crop.save(crop.crop(image, PLOT_DPI), output)
 
 
-def pins_command(api, lib_ids):
-    """Print pin offsets (grid units, Y down, rotation 0) of library symbols."""
+def pins_command(api, lib_ids, directory):
+    """Print pin offsets (grid units, Y down, rotation 0) of library symbols; the library lookup needs a
+    document, created as `directory`/probe.kicad_sch (the server's project directory)."""
     lt = _proto.library_types
     runtime.wait_for_symbol_libraries(api, {i.split(":", 1)[0] for i in lib_ids})
     ids = [_proto.types.LibraryIdentifier(library_nickname=i.split(":", 1)[0], entry_name=i.split(":", 1)[1])
            for i in lib_ids]
-    with tempfile.TemporaryDirectory() as tmp:
-        doc = api(_proto.project.CreateDocument(type=_proto.types.DOCTYPE_SCHEMATIC,
-                                                path=f"{tmp}/probe.kicad_sch")).document
-        response = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=doc, item_ids=ids))
+    doc = api(_proto.project.CreateDocument(type=_proto.types.DOCTYPE_SCHEMATIC,
+                                            path=str(Path(directory) / "probe.kicad_sch"))).document
+    response = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=doc, item_ids=ids))
     for item in response.items:  # not in request order
         symbol = _proto.sch.SchematicSymbol()
         item.Unpack(symbol)
@@ -325,7 +326,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "pins":
         sys.argv.pop(1)
         args = _arguments(lambda p: p.add_argument("lib_ids", nargs="+", help="Library:Symbol"))
-        with _server() as api:
-            pins_command(api, args.lib_ids)
+        with tempfile.TemporaryDirectory(prefix="kicaddy-pins-") as tmp, _server(Path(tmp)) as api:
+            pins_command(api, args.lib_ids, Path(tmp))
     else:
         print(__doc__)

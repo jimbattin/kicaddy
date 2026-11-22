@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+"""kicaddy command line; runs on any python3 >= 3.9 (the runtime it sets up lives in its own venv)."""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
+
+from kicaddy.cli import main  # noqa: E402
+
+sys.exit(main())

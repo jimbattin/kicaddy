@@ -6,12 +6,12 @@ Verified against KiCad 10.99.0-6860-gbdd2930d2b (nightly AppImage).
 Requires `pynng`, `protobuf`, and Python bindings generated from the KiCad
 `api/proto` tree of the matching commit (see docs/02-ipc-protocol.md, "Client bindings").
 
-    python minimal_client.py --bindings <gen-dir> [PROJECT_OR_FILE]
+    python minimal_client.py --kicad <kicad> --bindings <gen-dir> [PROJECT_OR_FILE]
 
-With the runtime from `python3 engine/kicad-agent doctor` (the M1 acceptance check):
+With the runtime from `python3 plugin/bin/kicaddy doctor`:
 
-    eval "$(python3 engine/kicad-agent env)"
-    "$KICAD_AGENT_PYTHON" docs/examples/minimal_client.py --kicad "$KICAD_AGENT_KICAD" --bindings "$KICAD_API_BINDINGS"
+    eval "$(python3 plugin/bin/kicaddy env)"
+    "$KICADDY_PYTHON" docs/examples/minimal_client.py --kicad "$KICADDY_KICAD_PATH" --bindings "$KICAD_API_BINDINGS"
 """
 
 import argparse
@@ -29,8 +29,7 @@ DOC_TYPES = {".kicad_sch": "DOCTYPE_SCHEMATIC", ".kicad_pcb": "DOCTYPE_PCB"}
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--kicad", default=str(Path.home() / ".local/bin/kicad-nightly"),
-                        help="KiCad AppImage, or a kicad-cli binary")
+    parser.add_argument("--kicad", required=True, help="KiCad AppImage, or a kicad-cli binary")
     parser.add_argument("--bindings", required=True, help="directory holding the generated *_pb2.py tree")
     parser.add_argument("file", nargs="?", help=".kicad_sch or .kicad_pcb to pre-load")
     args = parser.parse_args()

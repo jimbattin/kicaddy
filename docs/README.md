@@ -15,7 +15,7 @@ The build is a workable base for headless, agent-driven schematic and PCB work u
   STEP, position, and raytraced render output. API DRC results matched `kicad-cli pcb drc` on the saved file.
 - The legacy SWIG `pcbnew` Python module is not in this build: no legacy fallback.
 - API-drawn schematics come out readable with little layout work. A small builder
-  (`schematics/kicad_sch_ipc.py`) and a crop heuristic ([05](05-cropping-schematic-plots.md)) produced five
+  (`plugin/engine/kicaddy/schematic.py`) and a crop heuristic ([05](05-cropping-schematic-plots.md)) produced five
   ERC-clean designs whose netlists matched their scripts' intent. In a head-to-head test it cost 1.7× fewer
   tokens and 1.8× less time than an agent free to draw any other way ([06](06-method-comparison-headphone-amp.md)).
 
@@ -33,8 +33,8 @@ and no selection, view, or `RunAction` commands in headless mode. See [04-workfl
 | [05-cropping-schematic-plots.md](05-cropping-schematic-plots.md) | Heuristic for cropping schematic plots to readable images (fit or tile), with results on four example designs |
 | [06-method-comparison-headphone-amp.md](06-method-comparison-headphone-amp.md) | Time and token cost of the KiCad IPC method against a free-choice method, on the same headphone-amp task |
 | [examples/minimal_client.py](examples/minimal_client.py) | Self-contained client: starts the headless server, reads a document, shuts down |
-| [../engine/](../engine/) | Runtime: `kicad-agent doctor` sets up KiCad discovery, cached bindings, pinned venv, isolated config; `kicad_agent/runtime.py` runs the locked headless server |
-| [../schematics/](../schematics/) | Schematic builder on the API (`kicad_sch_ipc.py`), crop tool (`crop_plot.py`), example designs: NE555 blinker, buzzer, AM radio, 16-bit SRAM |
+| [../plugin/](../plugin/) | The `kicaddy` plugin: `bin/kicaddy` (`doctor` resolves the chosen KiCad and sets up cached bindings, pinned venv, isolated config; `run`, `pins`, `config`), the engine (`engine/kicaddy/`: runtime, schematic builder `schematic.py`, crop tool `crop.py`), and the `kicaddy` skill |
+| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM |
 
 ## Evidence labels
 
@@ -59,6 +59,6 @@ Unlabelled statements in the protocol and workflow documents are **[live]**.
 Working data left in `~/.cache/kicad-ipc/` (3.8 GB, mostly the extracted `AppDir/`): extracted AppImage,
 sparse source checkout, probe scripts, test projects, the generated Python bindings (`gen/`), and a venv with
 `pynng`, `protobuf`, and `Pillow` (`venv/`). The docs do not depend on it. The `schematics/` scripts do not use it
-either: they run on the runtime set up by `python3 engine/kicad-agent doctor` (KiCad located, bindings generated and
-cached by KiCad commit, pinned venv, isolated `KICAD_CONFIG_HOME`, all under `~/.cache/kicad-agent/`); run them with
-`eval "$(python3 engine/kicad-agent env)"`, then `"$KICAD_AGENT_PYTHON" schematics/<design>/build.py`.
+either: they run on the runtime set up by `python3 plugin/bin/kicaddy doctor` (chosen KiCad resolved, bindings
+generated and cached per KiCad build, pinned venv, isolated `KICAD_CONFIG_HOME`, all under `~/.cache/kicaddy/`);
+run them with `python3 plugin/bin/kicaddy run schematics/<design>/build.py`.

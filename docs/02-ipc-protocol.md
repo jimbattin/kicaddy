@@ -72,10 +72,10 @@ Startup and shutdown:
 - **Pre-load argument.** A `.kicad_pro` opens only the project: no schematic or board handler is registered until
   the client opens one. A `.kicad_sch` or `.kicad_pcb` opens that document and its project.
 
-`server()` in [`engine/kicad_agent/runtime.py`](../engine/kicad_agent/runtime.py) applies these rules. It puts the
-socket and `server.log` in `$XDG_RUNTIME_DIR/kicad-agent/<key>/`, polls for the socket, retries `AS_NOT_READY`, and
+`server()` in [`plugin/engine/kicaddy/runtime.py`](../plugin/engine/kicaddy/runtime.py) applies these rules. It puts the
+socket and `server.log` in `$XDG_RUNTIME_DIR/kicaddy/<key>/`, polls for the socket, retries `AS_NOT_READY`, and
 stops the server with `SIGINT`. Given a project directory, it also takes an exclusive `flock` on
-`$XDG_RUNTIME_DIR/kicad-agent/locks/<key>.lock`, so a second agent server on that project fails with
+`$XDG_RUNTIME_DIR/kicaddy/locks/<key>.lock`, so a second agent server on that project fails with
 `ProjectBusyError`. KiCad's own project lock is no guard: a stale one did not stop the next server (see above).
 
 ## Envelope
@@ -281,9 +281,9 @@ The AppImage ships no `.proto` files and no client library. Two options:
 
 ### Generate bindings from the matching source
 
-Verified from an empty directory; `examples/minimal_client.py` ran against the result. `engine/kicad-agent doctor`
+Verified from an empty directory; `examples/minimal_client.py` ran against the result. `kicaddy doctor`
 runs the same recipe with the versions listed below pinned (plus `Pillow` 13.0.0) and caches the output in
-`~/.cache/kicad-agent/bindings/<sha>/gen`, next to a `manifest.json`.
+`~/.cache/kicaddy/bindings/<sha>/gen` (`tag-<version>` for a release build that reports no commit), next to a `manifest.json`.
 
 ```sh
 SHA=$(kicad-nightly kicad-cli version --format commit)
@@ -311,7 +311,7 @@ mkdir gen
   and `google.protobuf.empty_pb2`. Otherwise commands returning `Empty` fail with
   `Couldn't find message google.protobuf.Empty`.
 - Protos change between nightlies. Regenerate whenever the AppImage is updated: `doctor` builds a new cache entry
-  when the SHA changes, and `kicad-agent env` and the builder refuse to run if the KiCad file changed since the last
+  when the SHA changes, and `kicaddy env`/`run` and the builder refuse to run if the KiCad file changed since the last
   `doctor`.
 
 ### `kicad-python` (`kipy`)

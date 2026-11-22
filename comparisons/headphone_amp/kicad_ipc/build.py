@@ -11,8 +11,7 @@ Per channel, non-inverting op-amp stage on a single supply with a buffered-by-ca
 
 import sys
 
-sys.path.insert(0, "<repo>/schematics")
-from kicad_sch_ipc import run  # noqa: E402
+from kicaddy.schematic import run
 
 
 def build(s):

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Crop KiCad schematic plots to their drawn content. Heuristic described in docs/05-cropping-schematic-plots.md.
 
-    crop_plot.py plot.png out.png            # plot made without the drawing sheet: trim, pad, fit
-    crop_plot.py --framed plot.png out.png   # plot with the default frame and title block: mask them first
+    kicaddy run <engine>/kicaddy/crop.py plot.png out.png           # plot without the drawing sheet: trim, pad, fit
+    kicaddy run <engine>/kicaddy/crop.py --framed plot.png out.png  # with frame and title block: mask them first
 
 Needs Pillow.
 """

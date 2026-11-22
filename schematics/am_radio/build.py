@@ -24,10 +24,8 @@ Output: C8 = 220 uF to an 8 ohm speaker, f_c = 1 / (2 pi 8 x 220 uF) = 90 Hz; Zo
 """
 
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from kicad_sch_ipc import run  # noqa: E402
+from kicaddy.schematic import run
 
 DX, DY = 34, 16  # layout drawn around (70, 45); shifted to centre it above the A4 title block
 

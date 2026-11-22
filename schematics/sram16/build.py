@@ -14,10 +14,8 @@ Sizing (W/L relative to the minimum device), pull-down > access > pull-up:
 """
 
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from kicad_sch_ipc import run  # noqa: E402
+from kicaddy.schematic import run
 
 ROWS, COLS = 4, 4
 X0, Y0 = 60, 40  # inverter-1 channel / storage-node level of cell (0, 0)

@@ -1,0 +1,10 @@
+{
+  "name": "kicaddy",
+  "version": "0.2.0",
+  "description": "Headless KiCad schematic building for pi / oh-my-pi agents: a Python engine on KiCad's IPC API and the kicaddy skill",
+  "private": true,
+  "keywords": ["pi-package", "kicad"],
+  "files": ["bin", "engine", "skills", "README.md"],
+  "omp": { "extensions": [] },
+  "pi": { "extensions": [], "skills": ["./skills"] }
+}

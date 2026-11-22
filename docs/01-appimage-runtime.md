@@ -92,7 +92,7 @@ Global library tables are read from the settings directory. A fresh `KICAD_CONFI
 knows only project-local libraries: `OpenDocument` for `Device:R` failed with `Symbol not found` until the tables
 were added. The server does not create them. The existing `~/.config/kicad/10.99/` already has both.
 
-`engine/kicad-agent doctor` gives the agent its own `KICAD_CONFIG_HOME`, `~/.cache/kicad-agent/config`, and writes
+`kicaddy doctor` (`plugin/bin/kicaddy`) gives the agent its own `KICAD_CONFIG_HOME`, `~/.cache/kicaddy/config`, and writes
 the two files below there when they are missing. The agent never reads or writes the GUI's `~/.config/kicad/10.99/`:
 its file checksums were unchanged across `doctor`, design builds, and server runs.
 

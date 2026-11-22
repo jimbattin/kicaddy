@@ -1,6 +1,6 @@
 """KiCad IPC runtime: generated bindings, the NNG client, and a locked private-socket `api-server`.
 
-Needs the venv created by `kicad-agent doctor` (pynng, protobuf).
+Needs the venv created by `kicaddy doctor` (pynng, protobuf).
 """
 
 import argparse
@@ -51,7 +51,7 @@ def load_bindings(path):
 class Api:
     """One NNG REQ socket; call(request) returns the unpacked response or raises."""
 
-    def __init__(self, socket_path, deadline, client_name="kicad-agent"):
+    def __init__(self, socket_path, deadline, client_name="kicaddy"):
         import pynng
         from google.protobuf import empty_pb2, symbol_database  # noqa: F401  (empty_pb2 registers Empty)
 
@@ -96,7 +96,7 @@ def _lock(root, project_dir):
         handle.seek(0)
         pid = (handle.readline().split() or ["?"])[0]
         handle.close()
-        raise ProjectBusyError(f"{project_dir} is in use by another kicad-agent server (pid {pid})") from None
+        raise ProjectBusyError(f"{project_dir} is in use by another kicaddy server (pid {pid})") from None
     handle.truncate(0)
     handle.write(f"{os.getpid()} {project_dir.resolve()}\n")
     handle.flush()
@@ -119,8 +119,10 @@ def server(launcher, config_home, project_dir=None):
         socket_path = sock_dir / "api.sock"
         log_path = sock_dir / "server.log"
         with open(log_path, "wb") as log:
-            process = subprocess.Popen([*launcher, "api-server", "--socket", str(socket_path)],
-                                       env=bootstrap.kicad_env(config_home), stdout=log, stderr=subprocess.STDOUT)
+            paths = [sock_dir] + ([Path(project_dir)] if project_dir is not None else [])
+            argv, env = bootstrap.kicad_command(launcher, ["api-server", "--socket", str(socket_path)],
+                                                config_home, paths)
+            process = subprocess.Popen(argv, env=env, stdout=log, stderr=subprocess.STDOUT)
             try:
                 deadline = time.monotonic() + 90
                 while not socket_path.exists():
@@ -158,21 +160,3 @@ def wait_for_symbol_libraries(api, nicknames):
         if any(s == lt.LLS_ERROR for s in states.values()) or time.monotonic() > api.deadline:
             raise RuntimeError(f"symbol libraries not loaded: {states}")
         time.sleep(0.1)
-
-
-def smoke(kicad, bindings, config_home, expect_version):
-    """doctor's `server` check: version handshake and library tables on the isolated config."""
-    load_bindings(bindings)
-    lt = _proto.library_types
-    t0 = time.monotonic()
-    with server(bootstrap.launcher_for(kicad), Path(config_home)) as api:
-        version = api(_proto.base.GetVersion()).version.full_version
-        if version.split(",")[0].strip() != expect_version.split(",")[0].strip():
-            raise RuntimeError(f"server reports {version}, kicad-cli reports {expect_version}")
-        wait_for_symbol_libraries(api, {"Device", "power"})
-        n_sym = len(api(_proto.library.GetLibraryStatuses(types=[lt.LT_SYMBOL], scope=lt.LTS_BOTH)).libraries)
-        n_fp = len(api(_proto.library.GetLibraryStatuses(types=[lt.LT_FOOTPRINT], scope=lt.LTS_BOTH)).libraries)
-    if not n_sym:
-        raise RuntimeError("no symbol libraries in the library tables")
-    return {"full_version": version, "symbol_libraries": n_sym, "footprint_libraries": n_fp,
-            "seconds": round(time.monotonic() - t0, 1)}

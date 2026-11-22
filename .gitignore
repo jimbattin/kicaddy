@@ -10,5 +10,5 @@ _autosave-*
 *-backups/
 fp-info-cache
 
-# Leftover crop scratch dirs from an interrupted build (kicad_sch_ipc.Schematic.plot_cropped)
+# Leftover crop scratch dirs from an interrupted build (kicaddy.schematic.Schematic.plot_cropped)
 .crop-*/

@@ -5,7 +5,7 @@ tool call in omp session `01a2002e-2b88-731f-97c8-631c0892c897` (2026-11-21T22:5
 shared context plus their own task; neither saw the other's task.
 
 Paths are as they were then: the `/tmp/hpamp-*` output directories, and the old `~/.cache/kicad-ipc` bindings and
-venv, which the builder no longer uses (it now runs on `engine/kicad-agent doctor`). For the M2 benchmark, keep the
+venv, which the builder no longer uses (it now runs on `plugin/bin/kicaddy doctor`). For the M2 benchmark, keep the
 shared context and replace agent A's `# Method (required)` section with use of the `kicaddy` plugin.
 
 ## Shared context

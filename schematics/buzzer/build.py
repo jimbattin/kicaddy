@@ -10,10 +10,8 @@ turn-off spike to V+ + 0.7 V.
 """
 
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from kicad_sch_ipc import run  # noqa: E402
+from kicaddy.schematic import run
 
 DX, DY = 10, -8
 

@@ -3,10 +3,10 @@
 Everything here ran on the headless server of build `10.99.0-6860-gbdd2930d2b`, no display, unless marked
 **[src]**. Test designs: the bundled `pic_programmer` demo (2 sheets, 124 symbols, 63 footprints, 370 tracks) and a
 three-part board built from scratch via the API. The schematic recipes are packaged as a reusable builder in
-[`schematics/kicad_sch_ipc.py`](../schematics/kicad_sch_ipc.py): grid snapping, pin lookup, library-load waiting,
+[`plugin/engine/kicaddy/schematic.py`](../plugin/engine/kicaddy/schematic.py): grid snapping, pin lookup, library-load waiting,
 netlist check, ERC, plots, cropping ([05](05-cropping-schematic-plots.md)). It built five designs of 7 to 100
 components each (power and flag symbols not counted). It runs on the runtime from
-[`engine/kicad-agent doctor`](../engine/kicad_agent/bootstrap.py): bindings, venv, isolated config, locked server.
+[`kicaddy doctor`](../plugin/engine/kicaddy/bootstrap.py): bindings, venv, isolated config, locked server.
 
 Snippets assume `call(request)`, which wraps the request in an `ApiRequest`, checks status, and returns the unpacked
 response (see [examples/minimal_client.py](examples/minimal_client.py)); `pack(msg)`, which wraps a message in
@@ -89,8 +89,7 @@ The returned instance carries the full library definition. Pins are `SchematicPi
 | `Connector_Generic:Conn_01x02` | 1 | (−4, 0) |
 | `Connector_Generic:Conn_01x02` | 2 | (−4, +2) |
 
-For pin offsets of any symbol, run `"$KICAD_AGENT_PYTHON" schematics/kicad_sch_ipc.py pins Lib:Symbol …` (after
-`eval "$(python3 engine/kicad-agent env)"`).
+For pin offsets of any symbol, run `python3 plugin/bin/kicaddy pins Lib:Symbol …`.
 
 Connection point = `symbol.position + T(pin.position)`. `orientation` rotates counter-clockwise on screen. In grid
 units, Y down:
@@ -342,7 +341,7 @@ Not provided by the API in this build, headless:
 | Simulation | No ngspice control | SPICE netlist export formats |
 
 Client-layer work, all done except the board items: server and bindings by
-[`engine/kicad_agent`](../engine/kicad_agent/), the rest by `schematics/kicad_sch_ipc.py`.
+[`plugin/engine/kicaddy`](../plugin/engine/kicaddy/) (bootstrap, runtime), the rest by `schematic.py` there.
 
 - Start, health-check, and stop the server; one server per project (enforced by an advisory lock).
 - Wait for the libraries to load before placing symbols.

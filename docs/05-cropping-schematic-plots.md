@@ -3,9 +3,9 @@
 Turning a KiCad schematic plot into an image showing the circuit at readable size in a terminal or chat view, without
 page frame, title block, or empty paper.
 
-Implementation: [`schematics/crop_plot.py`](../schematics/crop_plot.py) (Pillow), called by
-`Schematic.plot_cropped()` in [`schematics/kicad_sch_ipc.py`](../schematics/kicad_sch_ipc.py). Every design built
-with `kicad_sch_ipc.run()` writes `<name>_crop.png`, or tiles `<name>_crop_r<row>c<col>.png`.
+Implementation: [`plugin/engine/kicaddy/crop.py`](../plugin/engine/kicaddy/crop.py) (Pillow), called by
+`Schematic.plot_cropped()` in [`plugin/engine/kicaddy/schematic.py`](../plugin/engine/kicaddy/schematic.py). Every
+design built with `kicaddy.schematic.run()` writes `<name>_crop.png`, or tiles `<name>_crop_r<row>c<col>.png`.
 
 ## Problem
 
@@ -83,7 +83,7 @@ not page-size tables, then continues at step 2 with that region masked:
   edge). Mask the rectangle from (x₀, top) to the bottom-right corner.
 - Padding reaching back into frame or title block is painted with the background colour.
 
-Pass the plot's dpi: `crop_plot.py --framed --dpi 200 plot.png out.png`. KiCad PNGs carry no dpi; the CLI
+Pass the plot's dpi: `crop.py --framed --dpi 200 plot.png out.png`. KiCad PNGs carry no dpi; the CLI
 otherwise assumes 300.
 
 ## Results
@@ -122,20 +122,19 @@ hard constraint.
 - **Very large designs.** Produce many tiles. Plot hierarchical sheets one at a time (`plot_pages`,
   `SJSM_ALL_SHEETS`) rather than cramming one page.
 - **Terminal-specific numbers.** 1600 × 1200 and 150 dpi are tuned for this session's viewer. Change `MAX_SIZE` and
-  `MIN_DPI` in `crop_plot.py` for another viewer.
+  `MIN_DPI` in `crop.py` for another viewer.
 
 ## Usage
 
 ```sh
-# Part of a design build (writes <name>_crop.png or tiles next to the plots); runtime from engine/kicad-agent doctor
-eval "$(python3 engine/kicad-agent env)"
-"$KICAD_AGENT_PYTHON" schematics/<design>/build.py
+# Part of a design build (writes <name>_crop.png or tiles next to the plots); runtime from kicaddy doctor
+python3 plugin/bin/kicaddy run schematics/<design>/build.py
 
 # Standalone, on a PNG plotted without the drawing sheet at 300 dpi
-python schematics/crop_plot.py --dpi 300 plot.png out.png
+python3 plugin/bin/kicaddy run plugin/engine/kicaddy/crop.py --dpi 300 plot.png out.png
 
 # Standalone, on a full-sheet plot
-python schematics/crop_plot.py --framed --dpi 200 sheet.png out.png
+python3 plugin/bin/kicaddy run plugin/engine/kicaddy/crop.py --framed --dpi 200 sheet.png out.png
 ```
 
 With tiles, the CLI prints one path per tile, row by row.
