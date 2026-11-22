@@ -105,9 +105,9 @@ def _lock(root, project_dir):
 
 
 @contextlib.contextmanager
-def server(launcher, config_home, project_dir=None):
+def server(launcher, config_home, project_dir=None, paths=()):
     """Start `kicad-cli api-server` on a private socket under the runtime dir, with an advisory lock
-    per project directory; yield an Api; stop it with SIGINT."""
+    per project directory; yield an Api; stop it with SIGINT. `paths`: more directories the server reads."""
     root = bootstrap.runtime_root()
     if project_dir is not None:
         key, lock = _lock(root, Path(project_dir))
@@ -120,7 +120,7 @@ def server(launcher, config_home, project_dir=None):
         socket_path = sock_dir / "api.sock"
         log_path = sock_dir / "server.log"
         with open(log_path, "wb") as log:
-            paths = [sock_dir] + ([Path(project_dir)] if project_dir is not None else [])
+            paths = [sock_dir] + ([Path(project_dir)] if project_dir is not None else []) + [Path(p) for p in paths]
             argv, env = bootstrap.kicad_command(launcher, ["api-server", "--socket", str(socket_path)],
                                                 config_home, paths)
             process = subprocess.Popen(argv, env=env, stdout=log, stderr=subprocess.STDOUT)

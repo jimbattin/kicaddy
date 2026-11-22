@@ -61,6 +61,12 @@ def main(argv=None) -> int:
 
     pins = commands.add_parser("pins", help="print pin offsets (grid units, Y down) of library symbols")
     pins.add_argument("lib_ids", nargs="+", metavar="LIB:SYM")
+    pins.add_argument("--dir", help="project directory whose sym-lib-table to use (custom symbols)")
+
+    symbol = commands.add_parser("symbol", help="write pin-table JSON files into a project symbol library and "
+                                                "print their pin offsets")
+    symbol.add_argument("tables", nargs="+", metavar="TABLE.json")
+    symbol.add_argument("--dir", required=True, help="project directory (where kicaddy run writes the design)")
 
     commands.add_parser("env", help="print shell exports for the runtime recorded by doctor")
 
@@ -79,7 +85,10 @@ def main(argv=None) -> int:
     if args.command == "run":
         return _exec_venv([args.script, *args.args])
     if args.command == "pins":
-        return _exec_venv(["-m", "kicaddy.schematic", "pins", *args.lib_ids])
+        extra = ["--dir", args.dir] if args.dir else []
+        return _exec_venv(["-m", "kicaddy.schematic", "pins", *args.lib_ids, *extra])
+    if args.command == "symbol":
+        return _exec_venv(["-m", "kicaddy.schematic", "symbol", *args.tables, "--dir", args.dir])
     if args.command == "env":
         try:
             current = bootstrap.load_current()

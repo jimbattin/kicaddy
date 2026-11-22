@@ -355,8 +355,8 @@ Not provided by the API in this build, headless:
 | Schematic → board sync | No one-step update, no back-annotation | Netlist export job, then `ImportNetlist` |
 | Annotation | No "annotate schematic" command | `reference` on `PlaceSymbolFromLibrary`; editing `reference_field` (not exercised) |
 | Stackup | `UpdateBoardStackup` has no handler | `GetBoardStackup`, `SetBoardEnabledLayers`, design-rule and netclass setters |
-| Library tables | No list, add, update, delete, or search | Edit the table files; `ReloadLibrary`, `GetLibraryItems` |
-| Library authoring | Whole-symbol create and update rejected **[src]** | Child-item edits on an existing symbol or footprint (not exercised) |
+| Library tables | No list, add, update, delete, or search | Edit the table files before `CreateDocument` (project rows are read only when the document opens; `ReloadLibrary` does not add them); `GetLibraryItems` |
+| Library authoring | Whole-symbol create and update rejected **[src]** | Write the `.kicad_sym` file (`kicaddy symbol`); child-item edits on an existing symbol or footprint (not exercised) |
 | Selection and view | Selection, focus, visible and active layer, appearance: `AS_UNIMPLEMENTED` | None; they are GUI concepts |
 | Tool actions | `RunAction` unavailable headless, and never registered for the schematic | Dedicated commands only |
 | Undo | No undo or redo | Commit drop before `EndCommit`; `RevertDocument` |

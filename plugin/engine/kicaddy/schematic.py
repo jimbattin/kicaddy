@@ -14,7 +14,8 @@ expects; `run()` does the rest: headless server, save, connectivity check, ERC, 
 
 Coordinates are in units of the 1.27 mm connection grid, Y down. A point given as "REF.PIN" resolves
 to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...` prints pin offsets
-in grid units for planning a layout.
+in grid units for planning a layout; `kicaddy symbol TABLE.json --dir DIR` writes a custom symbol from a
+pin table into the project's library (symbols.py) and prints its offsets.
 
 Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move
 or show a field), `power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction`
@@ -37,7 +38,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import bootstrap, crop, runtime, sch_geometry
+from . import bootstrap, crop, runtime, sch_geometry, symbols
 
 GRID_MM = 1.27
 PLOT_DPI = 300  # source resolution for the cropped PNG; crop downsamples to fit
@@ -53,11 +54,12 @@ def bind(bindings):
     return _proto
 
 
-def _server(project_dir=None):
-    """Load bindings recorded by `kicaddy doctor` and start a locked server."""
+def _server(project_dir=None, paths=()):
+    """Load bindings recorded by `kicaddy doctor` and start a locked server; `paths` are more directories the
+    server reads (mounted under Flatpak)."""
     current = bootstrap.load_current()
     bind(current["bindings"])
-    return runtime.server(current["launcher"], Path(current["config_home"]), project_dir)
+    return runtime.server(current["launcher"], Path(current["config_home"]), project_dir, paths)
 
 
 def _pins(definition, unit):
@@ -732,17 +734,20 @@ class Schematic:
 
 def pins_command(api, lib_ids, directory):
     """Print pin offsets (grid units, Y down, rotation 0) of library symbols; the library lookup needs a
-    document, created as `directory`/probe.kicad_sch (the server's project directory)."""
+    document, created as `directory`/probe.kicad_sch (the server's project directory), before the libraries
+    load so the project's sym-lib-table rows exist. Returns the "lib:name" ids printed."""
     lt = _proto.library_types
+    doc = api(_proto.project.CreateDocument(type=_proto.types.DOCTYPE_SCHEMATIC,
+                                            path=str(Path(directory) / "probe.kicad_sch"))).document
     runtime.wait_for_symbol_libraries(api, {i.split(":", 1)[0] for i in lib_ids})
     ids = [_proto.types.LibraryIdentifier(library_nickname=i.split(":", 1)[0], entry_name=i.split(":", 1)[1])
            for i in lib_ids]
-    doc = api(_proto.project.CreateDocument(type=_proto.types.DOCTYPE_SCHEMATIC,
-                                            path=str(Path(directory) / "probe.kicad_sch"))).document
     response = api(_proto.library.GetItemsFromLibrary(type=lt.LT_SYMBOL, document=doc, item_ids=ids))
+    found = set()
     for item in response.items:  # not in request order
         symbol = _proto.sch.SchematicSymbol()
         item.Unpack(symbol)
+        found.add(f"{symbol.id.library_nickname}:{symbol.id.entry_name}")
         print(f"{symbol.id.library_nickname}:{symbol.id.entry_name}  units={symbol.unit_count or 1}")
         for child in symbol.items:
             if child.item.Is(_proto.sch.SchematicPin.DESCRIPTOR):
@@ -752,6 +757,43 @@ def pins_command(api, lib_ids, directory):
                 print(f"  unit {unit}  pin {pin.number:>3} {pin.name:12s} "
                       f"({pin.position.x_nm / 1e6 / GRID_MM:g}, {pin.position.y_nm / 1e6 / GRID_MM:g})  "
                       f"{_proto.types.ElectricalPinType.Name(pin.electrical_type)}")
+    return found
+
+
+def probe_pins(lib_ids, project_dir=None):
+    """pins_command on a server in a temporary directory (the project stays unlocked and free of probe
+    files), with `project_dir`'s sym-lib-table rows made absolute."""
+    with tempfile.TemporaryDirectory(prefix="kicaddy-pins-") as tmp:
+        paths = ()
+        if project_dir is not None:
+            project_dir = Path(project_dir).resolve()
+            symbols.probe_table(project_dir, Path(tmp))
+            paths = (project_dir,)
+        with _server(Path(tmp), paths) as api:
+            return pins_command(api, lib_ids, Path(tmp))
+
+
+def symbol_command(tables, directory):
+    """`kicaddy symbol`: write pin tables into project libraries, then load them through KiCad and print
+    their pin offsets. Exit status 1 on a bad table or a library KiCad does not load."""
+    try:
+        specs = [symbols.load(t) for t in tables]
+        for line in symbols.write(Path(directory).resolve(), specs):
+            print(line)
+    except ValueError as e:
+        print(f"error: {e}")
+        return 1
+    ids = [f"{s.library}:{s.name}" for s in specs]
+    try:
+        found = probe_pins(ids, directory)
+    except RuntimeError as e:
+        print(f"KiCad could not load the library: {e}")
+        return 1
+    missing = [i for i in ids if i not in found]
+    if missing:
+        print(f"KiCad did not load: {' '.join(missing)}")
+        return 1
+    return 0
 
 
 def _arguments(extra=None):
@@ -804,10 +846,14 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "pins":
-        sys.argv.pop(1)
-        args = _arguments(lambda p: p.add_argument("lib_ids", nargs="+", help="Library:Symbol"))
-        with tempfile.TemporaryDirectory(prefix="kicaddy-pins-") as tmp, _server(Path(tmp)) as api:
-            pins_command(api, args.lib_ids, Path(tmp))
+    command = sys.argv.pop(1) if len(sys.argv) > 1 else None
+    if command == "pins":
+        args = _arguments(lambda p: (p.add_argument("lib_ids", nargs="+", help="Library:Symbol"),
+                                     p.add_argument("--dir", type=Path, help="project directory")))
+        probe_pins(args.lib_ids, args.dir)
+    elif command == "symbol":
+        args = _arguments(lambda p: (p.add_argument("tables", nargs="+", type=Path, help="pin table JSON"),
+                                     p.add_argument("--dir", type=Path, required=True, help="project directory")))
+        sys.exit(symbol_command(args.tables, args.dir))
     else:
         print(__doc__)

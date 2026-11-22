@@ -112,7 +112,8 @@ Locations:
 | `kicaddy doctor [--kicad CHOICE] [--refresh]` | set up and check the runtime |
 | `kicaddy config kicad [CHOICE]` | show the KiCad choice and its source, or validate and save one |
 | `kicaddy run SCRIPT [ARGS…]` | run a Python script (a design `build.py`) on the runtime's venv, with the engine importable |
-| `kicaddy pins LIB:SYM…` | print pin offsets (grid units, Y down) of library symbols |
+| `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets (grid units, Y down) of library symbols; `--dir` adds the project's `sym-lib-table` |
+| `kicaddy symbol TABLE.json… --dir PROJECT` | write pin-table JSON files into a project symbol library, register it in `sym-lib-table`, and print the pin offsets |
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
 
 `kicaddy` here means `python3 <clone>/plugin/bin/kicaddy`.

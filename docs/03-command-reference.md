@@ -92,7 +92,7 @@ Package `kiapi.common.commands` · `api/proto/common/commands/library_commands.p
 |---|---|---|---|---|---|
 | `GetLibraryItems` | `LibraryItemsResponse` | — | yes | ✔ | LIB_IDs in the named libraries. Answered `AS_UNHANDLED` until a document was open. |
 | `GetLibraryStatuses` | `LibraryStatusResponse` | — | yes | ✔ | Per-library load state and table row. `scope` is required. |
-| `ReloadLibrary` | `LibraryCommandStatus` | — | yes |  | Asynchronous. |
+| `ReloadLibrary` | `LibraryCommandStatus` | — | yes | ✔ | Asynchronous. Reloads existing rows only: a project row added after the document opened returns `LCS_NOT_FOUND`. Rewritten files of loaded rows are picked up without it. |
 | `GetItemsFromLibrary` | `GetItemsResponse` | — | yes | ✔ | Full `SchematicSymbol`/`Footprint` definitions by LIB_ID, not in request order. Answered `AS_UNHANDLED` until a document was open. |
 | `LoadAllLibraries` | `LibraryCommandStatus` | — | yes | ✔ | Headless only. Asynchronous preload; poll `GetLibraryStatuses`. |
 

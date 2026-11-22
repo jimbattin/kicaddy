@@ -1,6 +1,6 @@
 ---
 name: kicaddy
-description: Create KiCad projects (.kicad_pro, .kicad_sch, hierarchical sheets) from a Python build script, headless through KiCad's IPC API - place library symbols, wire by pin, split a design into sheets, check the netlist against declared intent and ERC, render cropped PNGs. Use to draw, design, or build a new schematic; not for reviewing or analyzing an existing one.
+description: Create KiCad projects (.kicad_pro, .kicad_sch, hierarchical sheets) from a Python build script, headless through KiCad's IPC API - place library symbols, generate custom symbols from a pin table, wire by pin, split a design into sheets, check the netlist against declared intent and ERC, render cropped PNGs. Use to draw, design, or build a new schematic; not for reviewing or analyzing an existing one.
 ---
 
 # kicaddy: headless KiCad schematics from a build script
@@ -42,12 +42,32 @@ On a `FAIL` line:
    - `Connector_Audio:AudioJack3`, `Connector:Barrel_Jack`, `Connector_Generic:Conn_01x02` (`…x03`, …),
      `Switch:SW_SPST`, `Switch:SW_Push`
    - `power:` `GND`, `+5V`, `+9V`, `+12V`, `VCC`, `PWR_FLAG` (through `s.power`)
-2. **Net intent.** Write down the expected nets (sets of `"REF.PIN"`) before any layout. This list is what
+2. **Custom symbols.** For a part that `kicaddy pins` leaves out, write a pin table (one symbol per JSON file;
+   example: `skill://kicaddy/examples/daisy_seed3.json`, a 40-pin module) and run
+   `kicaddy symbol table.json … --dir <project dir>`, where the project dir is the `build.py` directory or its
+   `--out` dir. It merges the symbol into `<library>.kicad_sym` there, adds the library to that directory's
+   `sym-lib-table`, loads it through KiCad, and prints its pin offsets as `kicaddy pins` does. Place it as
+   `library:name`; `kicaddy pins --dir <project dir> library:name` reprints the offsets later. Table keys:
+   - `library`, `name` (required): letters, digits, `_ . + -`. A library name already in `sym-lib-table`
+     with another file is refused.
+   - `reference` (default `U`), `value` (default `name`), `footprint`, `datasheet`, `description`, and
+     `fields` (extra hidden fields, e.g. `{"Manufacturer": "..."}`; not the five mandatory names).
+   - `pins` (required): objects `{"numbers": ["1"], "name": "D0", "type": "bidirectional"}` (or
+     `"number": 1`); `base.pinout` from a `datasheets/extracted/<MPN>.json` can be pasted as is. Names have no
+     spaces (`""` for none). Types: `input`, `output`, `bidirectional`, `tri_state`, `passive`,
+     `open_collector`, `open_emitter`, `power_in`, `power_out`, `unspecified`, `free`, `no_connect`
+     (or `not_connected`). Each object is placed at its first number; further numbers are stacked on it,
+     hidden (the same net).
+   - `sides` (optional): `{"top": [...], "bottom": [...], "left": [...], "right": [...]}` of first numbers,
+     each pin object exactly once; `left`/`right` run top to bottom, `top`/`bottom` left to right. Without it
+     the layout is DIP: the first half down the left, the rest up the right (pin 1 top left, the last pin top
+     right). Group by function: power on top, grounds on the bottom, inputs left, outputs right.
+3. **Net intent.** Write down the expected nets (sets of `"REF.PIN"`) before any layout. This list is what
    `build()` returns and what the build checks against.
-3. **Layout on the grid.** Pick a page, place symbols so that the pins you connect line up on X or Y, and route
+4. **Layout on the grid.** Pick a page, place symbols so that the pins you connect line up on X or Y, and route
    orthogonal wires between them (see Geometry and Rules). Put everything the drawing needs in this first
    `build.py`: the note right next to the circuit (not at a far edge of the page), and any section titles.
-4. **Build.** Write `build.py` in the user's project directory, then run `kicaddy run build.py [--out DIR]`. It
+5. **Build.** Write `build.py` in the user's project directory, then run `kicaddy run build.py [--out DIR]`. It
    prints every net, the ERC violations with positions, `LINT: n issue(s)` with one line per layout issue, and
    the output paths. Exit 0 only when the netlist matches the declared nets, ERC reports 0 violations, and
    LINT reports 0 issues; on `NETLIST MISMATCH` it lists missing and unexpected nets. An ERC line ends in
@@ -64,7 +84,7 @@ On a `FAIL` line:
    Names in LINT lines: `R1.Value` (a field), `label 'X'`, `global 'X'`, `hier 'X'` (labels), `note (x, y)`,
    `sheet <name>` (a child sheet's box), `sheet <name>.Sheetname` / `.Sheetfile` (its fields), and
    `sheet pin <name>.<label>`.
-5. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
+6. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
    wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read each sheet's
    `<stem>_crop.png` (or the tiles `<stem>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
    no overlaps; the review looks only for what LINT cannot see: text that sits closer to the wrong part than to
@@ -111,7 +131,9 @@ pin's connection point (pin number, not name).
   - `<name>.kicad_pro`, `<name>.kicad_sch` (root sheet), and one `<sheet>.kicad_sch` per child sheet,
     rewritten on every build.
   - `<name>.kicad_pcb`: an empty board, created on the first build and never overwritten.
-  - `sym-lib-table`, `fp-lib-table`: empty project-local library tables, created only if absent.
+  - `sym-lib-table`, `fp-lib-table`: project-local library tables, created empty only if absent;
+    `sym-lib-table` keeps the rows `kicaddy symbol` added.
+  - `<library>.kicad_sym`: written only by `kicaddy symbol`, kept by `kicaddy run`.
   - `datasheets/`, `analysis/`: empty directories for kicad-happy.
   - Per sheet (`<stem>` = `<name>` for the root, the sheet name for a child): `<stem>.png`, `<stem>.svg`, and
     the crop `<stem>_crop.png` (or tiles).
