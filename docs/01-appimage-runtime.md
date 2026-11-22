@@ -93,8 +93,10 @@ knows only project-local libraries: `OpenDocument` for `Device:R` failed with `S
 were added. The server does not create them. The existing `~/.config/kicad/10.99/` already has both.
 
 `kicaddy doctor` (`plugin/bin/kicaddy`) gives the agent its own `KICAD_CONFIG_HOME`, `~/.cache/kicaddy/config`, and writes
-the two files below there when they are missing. The agent never reads or writes the GUI's `~/.config/kicad/10.99/`:
-its file checksums were unchanged across `doctor`, design builds, and server runs.
+the two files below there when they are missing, in `<major.minor>/` with the `KICAD<major>_` prefix taken from the
+probed version. Its smoke test checks that the server's `GetPaths` `PATH_USER_SETTINGS` is that directory. The agent
+never reads or writes the GUI's `~/.config/kicad/10.99/`: its file checksums were unchanged across `doctor`, design
+builds, and server runs.
 
 An isolated settings directory needs these two files in `<dir>/10.99/`, each chaining to the stock table shipped in
 the AppImage:

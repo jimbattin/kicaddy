@@ -14,7 +14,7 @@ Topology, supply, and mono or stereo were each agent's choice. Full prompt, verb
 
 | | Agent A: `HpAmpKicadIpc` | Agent B: `HpAmpOther` |
 |---|---|---|
-| Method | Required: the repo's KiCad IPC builder (`schematics/kicad_sch_ipc.py`) and the crop heuristic ([05](05-cropping-schematic-plots.md)) | Forbidden: the KiCad IPC API, this repo, and `~/.cache/kicad-ipc`. Free to use anything else. |
+| Method | Required: the repo's KiCad IPC builder (`schematics/kicad_sch_ipc.py`, since M2 `plugin/engine/kicaddy/schematic.py`) and the crop heuristic ([05](05-cropping-schematic-plots.md)) | Forbidden: the KiCad IPC API, this repo, and `~/.cache/kicad-ipc`. Free to use anything else. |
 | Chose | KiCad symbols, placed and wired through the API | `schemdraw` (Python drawing library) in its own venv |
 
 ## Isolation
