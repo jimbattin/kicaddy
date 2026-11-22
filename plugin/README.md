@@ -131,7 +131,7 @@ Locations:
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
 | `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched; the first launch shows KiCad's startup wizard once) |
 | `kicaddy sweep` | stop `api-server`s whose kicaddy process was killed, and remove their socket directories |
-| `kicaddy bom PROJECT [-o FILE]` | write a grouped BOM CSV (Reference, Value, Footprint, Qty, MPN, Manufacturer, Datasheet, DNP; one row per Value, Footprint, and MPN) of a saved project (directory, `.kicad_pro`, or root `.kicad_sch`) with `kicad-cli sch export bom`; default `<root stem>_bom.csv` next to the root sheet |
+| `kicaddy bom PROJECT [-o FILE]` | write a grouped BOM CSV (Reference, Value, Footprint, Qty, MPN, Manufacturer, Datasheet, DNP; one row per Value, Footprint, MPN, and DNP state) of a saved project (directory, `.kicad_pro`, or root `.kicad_sch`) with `kicad-cli sch export bom`; default `<root stem>_bom.csv` next to the root sheet |
 
 `kicaddy` here means `python3 <clone>/plugin/bin/kicaddy`.
 
@@ -157,12 +157,14 @@ pi exposes them as tools.
 | Tool | What it does |
 |---|---|
 | `kicaddy_build` | run a design `build.py` (`script`, optional `out` directory) on the warm server: same output and files as `kicaddy run` |
-| `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query, render, and edit |
+| `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query, render, and edit; a project saved by another KiCad release opens for query and render only, until `upgrade: true` is passed |
 | `kicaddy_query` | placed symbols (with `refs`: those symbols and their pin points), nets, or ERC of the open project; library pin offsets (`lib_ids`), with or without an open project; `dir` (or, with nothing open, the session directory) supplies the project's `sym-lib-table` for `lib_ids` |
 | `kicaddy_render` | cropped PNGs of every sheet (or one), returned as images |
-| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception, or `exit()`, drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
+| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `s.flags`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception, or `exit()`, drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
 
 While a project is open, the agent's `edit`/`write` calls on its `.kicad_sch`/`.kicad_pro` files are blocked.
+
+KiCad saves only its own file format. A project last saved by another release (stable 10.0, say) opens for `kicaddy_query` and `kicaddy_render`, which change nothing; `kicaddy_open` prints a `file format:` line and `kicaddy_edit` is refused. With `upgrade: true` the first committed batch rewrites every sheet in the nightly's format, which the earlier release can no longer open: work on a copy or a branch if the project must stay usable there.
 
 | Command | What it does |
 |---|---|

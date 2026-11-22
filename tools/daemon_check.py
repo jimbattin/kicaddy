@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""Check the session daemon (`kicaddy daemon`, behind the omp extension) on the configured KiCad: library pins
+through `cwd` and `dir`, build, query, render, edit batches with `expect`, `exit()` in a batch, part flags and the
+BOM, the crossing hint, LINT text boxes, and the file-format gate of `open`. Everything is written to a temporary
+directory; one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
+
+    python3 tools/daemon_check.py
+
+Stdlib only. Not shipped with the plugin. Run it with tools/corpus.py before a release.
+"""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+BIN = REPO / "plugin/bin/kicaddy"
+EXAMPLES = REPO / "plugin/skills/kicaddy/examples"
+DAISY = "daisy:Daisy_Seed3"
+
+# An empty root sheet as stable KiCad 10.0 saves it: the fixture for the file-format gate.
+STABLE_SHEET = "\n".join([
+    "(kicad_sch", "\t(version 20260306)", '\t(generator "eeschema")', '\t(generator_version "10.0")',
+    '\t(uuid "5b0b2c6e-6c1e-4b7e-9a57-2f1d1c0e7a01")', '\t(paper "A4")', "\t(lib_symbols)", "\t(sheet_instances",
+    '\t\t(path "/"', '\t\t\t(page "1")', "\t\t)", "\t)", "\t(embedded_fonts no)", ")", ""])
+STABLE_PROJECT = '{\n  "meta": {\n    "filename": "stable.kicad_pro",\n    "version": 3\n  }\n}\n'
+STABLE_BATCH = """s.symbol("R1", "Device:R", (40, 40), rotation=90, value="102k 0.1%")
+s.symbol("U1", "Amplifier_Operational:TL072", (40, 60), unit=1, value="TL072", dnp=True)
+s.symbol("U1", "Amplifier_Operational:TL072", (70, 60), unit=2, value="TL072")
+s.symbol("U1", "Amplifier_Operational:TL072", (100, 60), unit=3, value="TL072")
+s.symbol("H1", "Mechanical:MountingHole", (130, 40), value="MountingHole")
+s.symbol("H2", "Mechanical:MountingHole", (140, 40), value="MountingHole", exclude_from_bom=False)
+"""
+STABLE_EXPECT = {"add": {"R1": "102k 0.1%", "U1": "TL072", "H1": "MountingHole", "H2": "MountingHole"}}
+
+# Two wire ends meeting on the middle of a third wire: a crossing, unless the junction is set.
+CROSS = '''import sys
+
+from kicaddy.schematic import run
+
+
+def build(s):
+    s.symbol("R1", "Device:R", (40, 20))
+    s.symbol("R4", "Device:R", (40, 60))
+    s.symbol("R2", "Device:R", (30, 40), rotation=90)
+    s.symbol("R3", "Device:R", (50, 40), rotation=90)
+    s.wire("R1.2", "R4.1")
+    s.wire("R2.2", (40, 40))
+    s.wire("R3.1", (40, 40))
+    for pin in ("R1.1", "R2.1", "R3.2", "R4.2"):
+        s.no_connect(pin)
+    JUNCTION
+    return [{"R1.2", "R4.1", "R2.2", "R3.1"}, {"R1.1"}, {"R2.1"}, {"R3.2"}, {"R4.2"}]
+
+
+if __name__ == "__main__":
+    sys.exit(run(build, "cross", page="A4", title="cross"))
+'''
+HINT = "hint: wire ends meet on a crossing at ({0}, {1}) on /: s.junction(({0}, {1})) joins all four"
+TEXT_BOX = (r"text-pin: R1\.Value / pin R1\.1 @ \([^)]*\); "
+            r"R1\.Value box \([\d.]+, [\d.]+\)-\([\d.]+, [\d.]+\) horizontal")
+
+RESULTS = []
+
+
+class Failure(Exception):
+    pass
+
+
+class Daemon:
+    """JSON-lines client of `kicaddy daemon`."""
+
+    def __init__(self, cwd):
+        self.process = subprocess.Popen([sys.executable, str(BIN), "daemon"], cwd=cwd, stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        self.next_id = 0
+
+    def request(self, op, **fields):
+        self.next_id += 1
+        self.process.stdin.write(json.dumps({"id": self.next_id, "op": op, **fields}) + "\n")
+        line = self.process.stdout.readline()
+        if not line:
+            raise Failure(f"{op}: the daemon exited")
+        return json.loads(line)
+
+    def close(self):
+        try:
+            if self.process.poll() is None:
+                self.request("shutdown")
+        except (Failure, OSError):
+            pass
+        finally:
+            self.process.stdin.close()
+            self.process.wait(timeout=60)
+
+
+def check(name, passed, detail=""):
+    RESULTS.append(bool(passed))
+    print(f"{'ok  ' if passed else 'FAIL'}  {name}", flush=True)
+    if not passed and detail:
+        print("      " + str(detail).strip().replace("\n", "\n      "), flush=True)
+
+
+def kicaddy(*args):
+    result = subprocess.run([sys.executable, str(BIN), *map(str, args)], capture_output=True, text=True, timeout=300)
+    return result.returncode, result.stdout + result.stderr
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def symbol_lines(output):
+    """{ref: its line} of `query symbols` output (the last unit's for a multi-unit symbol)."""
+    return {line.split()[1]: line for line in output.splitlines() if line.startswith("/ ")}
+
+
+def pins(d, tmp):
+    lib, other = tmp / "lib", tmp / "other"
+    for directory in (lib, other):
+        directory.mkdir()
+    code, out = kicaddy("symbol", EXAMPLES / "daisy_seed3.json", "--dir", lib)
+    check("symbol: project library written", code == 0 and f"{DAISY}  units=" in out, out)
+    r = d.request("query", what="pins", lib_ids=[DAISY], cwd=str(lib))
+    check("pins: the session directory's library", r["ok"] and f"{DAISY}  units=" in r["output"], r["output"])
+    r = d.request("query", what="pins", lib_ids=[DAISY], cwd=str(other), dir=str(lib))
+    check("pins: dir", r["ok"] and f"{DAISY}  units=" in r["output"], r["output"])
+    r = d.request("query", what="pins", lib_ids=[DAISY], cwd=str(other))
+    check("pins: not found elsewhere", f"not found: {DAISY}" in r["output"], r["output"])
+    r = d.request("query", what="pins", lib_ids=[DAISY], dir=str(tmp / "missing"))
+    check("pins: a missing dir is an error", not r["ok"] and "no such directory" in r["output"], r["output"])
+
+
+def built(d, tmp):
+    out = tmp / "ne555"
+    r = d.request("build", script=str(EXAMPLES / "ne555_blinker.py"), out=str(out), cwd=str(tmp))
+    check("build: exit 0", r["ok"] and r["output"].endswith("exit: 0"), r["output"][-600:])
+    r = d.request("query", what="symbols")
+    check("query symbols", r["ok"] and "/ R1  Device:R  4.7k  @ " in r["output"], r["output"])
+    r = d.request("query", what="nets")
+    check("query nets", r["ok"] and "R1.2" in r["output"], r["output"])
+    r = d.request("query", what="erc")
+    check("query erc", r["ok"] and r["output"].startswith("ERC: 0 violation(s)"), r["output"])
+    r = d.request("render")
+    check("render: crops exist", r["ok"] and r["images"] and all(Path(p).exists() for p in r["images"]), r["output"])
+
+    r = d.request("edit", code='s.field("R3", "Value", text="1k")', expect={"values": {"R3": "1k"}})
+    check("edit: committed, expect matched", r["ok"] and "batch 1 committed" in r["output"]
+          and "expect: matched" in r["output"], r["output"])
+    r = d.request("edit", code='s.field("R3", "Value", text="2k")', expect={})
+    check("edit: expect mismatch drops the batch", not r["ok"] and "expect mismatch:" in r["output"], r["output"])
+    r = d.request("edit", code="raise SystemExit('stop')", expect={})
+    check("edit: exit() drops the batch", not r["ok"] and "SystemExit: stop" in r["output"]
+          and r["output"].rstrip().endswith("batch dropped: document unchanged"), r["output"])
+    r = d.request("status")
+    check("status: the daemon is up, 1 batch", r["ok"] and "batches: 1" in r["output"], r["output"])
+
+    r = d.request("edit", code='s.flags("C2", dnp=True)\ns.flags("R3", exclude_from_bom=True)', expect={})
+    check("flags: batch report", r["ok"] and "netlist: unchanged" in r["output"] and "flags: C2 dnp" in r["output"]
+          and "flags: R3 no-bom" in r["output"], r["output"])
+    r = d.request("edit", code='s.symbol("C4", "Device:C", (130, 30), value="10n", exclude_from_board=True)',
+                  expect={"add": {"C4": "10n"}})
+    check("flags: s.symbol argument", r["ok"] and "flags: C4 no-board" in r["output"], r["output"])
+    r = d.request("edit", code='s.flags("C2", dnp="yes")', expect={})
+    check("flags: a non-boolean is refused", not r["ok"] and "dnp must be True, False, or None" in r["output"],
+          r["output"])
+    r = d.request("query", what="symbols", refs=["C2", "R3", "C4", "R1"])
+    lines = symbol_lines(r["output"])
+    check("flags: query symbols", lines.get("C2", "").endswith(" dnp") and lines.get("R3", "").endswith(" no-bom")
+          and lines.get("C4", "").endswith(" no-board") and lines.get("R1", "").endswith(")"), r["output"])
+    check("flags: saved", (out / "ne555_blinker.kicad_sch").read_text().count("(dnp yes)") == 1)
+    code, text = kicaddy("bom", out)
+    rows = {}
+    if code == 0:
+        with open(out / "ne555_blinker_bom.csv", newline="") as f:
+            rows = {row[0]: row for row in list(csv.reader(f))[1:]}
+    check("bom: DNP and populated parts of one value are separate rows; no-bom parts have none",
+          rows.get("C2", [""])[-1] == "DNP" and rows.get("C4", ["x"])[-1] == ""
+          and not any("R3" in ref.split(",") for ref in rows), f"{text}\n{rows}")
+
+
+def crossing(d, tmp):
+    script = tmp / "cross/build.py"
+    script.parent.mkdir()
+    script.write_text(CROSS.replace("JUNCTION", "pass"))
+    r = d.request("build", script=str(script), cwd=str(tmp))
+    check("hint: NETLIST MISMATCH names the crossing", r["ok"] and "NETLIST MISMATCH" in r["output"]
+          and HINT.format(40, 40) in r["output"] and r["output"].endswith("exit: 1"), r["output"])
+    script.write_text(CROSS.replace("JUNCTION", "s.junction((40, 40))"))
+    r = d.request("build", script=str(script), cwd=str(tmp))
+    check("hint: none with the junction, exit 0", r["ok"] and "hint:" not in r["output"]
+          and r["output"].endswith("exit: 0"), r["output"])
+    r = d.request("edit", code="s.wire((60, 70), (60, 80))\ns.wire((55, 75), (60, 75))\ns.wire((60, 75), (65, 75))",
+                  expect={"values": {"R1": "1k"}})
+    check("hint: expect mismatch names the batch's crossing only", not r["ok"] and "expect mismatch:" in r["output"]
+          and HINT.format(60, 75) in r["output"] and r["output"].count("hint:") == 1, r["output"])
+
+
+def stable(d, tmp):
+    directory = tmp / "stable"
+    directory.mkdir()
+    root = directory / "stable.kicad_sch"
+    root.write_text(STABLE_SHEET)
+    (directory / "stable.kicad_pro").write_text(STABLE_PROJECT)
+    before = sha(root)
+    r = d.request("open", path=str(directory))
+    note = [line for line in r["output"].splitlines()
+            if line.startswith("file format: 20260306, saved by KiCad 10.0; this is KiCad ")]
+    check("open: format line, no edit line", r["ok"] and len(note) == 1 and "kicaddy_edit is refused" in note[0]
+          and "edit with kicaddy_edit" not in r["output"], r["output"])
+    r = d.request("edit", code="", expect={})
+    check("edit: refused without upgrade, file unchanged", not r["ok"]
+          and r["output"].startswith("this project is in the file format of KiCad 10.0") and sha(root) == before,
+          r["output"])
+    r = d.request("query", what="symbols")
+    check("query: allowed without upgrade", r["ok"] and r["output"] == "no symbols", r["output"])
+    r = d.request("open", path=str(directory), upgrade=True)
+    check("open: upgrade", r["ok"] and "upgrade: true given" in r["output"]
+          and r["output"].splitlines()[-1] == "edit with kicaddy_edit; pass expect", r["output"])
+    r = d.request("edit", code=STABLE_BATCH, expect=STABLE_EXPECT)
+    text = root.read_text()
+    check("edit: committed after upgrade, file rewritten", r["ok"] and "(version 20260306)" not in text, r["output"])
+    check("LINT: a text line carries the text's box", re.search(TEXT_BOX, r["output"]), r["output"])
+    check("flags: reported for added parts, library default included", "flags: U1 dnp" in r["output"]
+          and "flags: H1 no-bom" in r["output"] and "flags: H2" not in r["output"], r["output"])
+    check("flags: every unit of a part", text.count("(dnp yes)") == 3, text.count("(dnp yes)"))
+    r = d.request("open", path=str(directory))
+    check("open: no format line once saved by this KiCad", r["ok"] and "file format:" not in r["output"]
+          and r["output"].splitlines()[-1] == "edit with kicaddy_edit; pass expect", r["output"])
+
+
+def main():
+    tmp = Path(tempfile.mkdtemp(prefix="kicaddy-daemon-check-"))
+    started = time.time()
+    d = Daemon(tmp)
+    try:
+        for part in (pins, built, crossing, stable):
+            part(d, tmp)
+    except Failure as e:
+        check("the daemon stayed up", False, e)
+    finally:
+        d.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+    print(f"daemon check: {sum(RESULTS)}/{len(RESULTS)} in {time.time() - started:.0f} s")
+    return 0 if all(RESULTS) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

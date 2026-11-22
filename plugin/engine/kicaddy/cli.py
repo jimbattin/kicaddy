@@ -17,7 +17,7 @@ ENV_KEYS = (("KICADDY_PYTHON", "python"), ("KICADDY_KICAD_PATH", "kicad"),
             ("KICAD_API_BINDINGS", "bindings"), ("KICAD_CONFIG_HOME", "config_home"))
 BOM_FIELDS = "Reference,Value,Footprint,${QUANTITY},MPN,Manufacturer,Datasheet,${DNP}"
 BOM_LABELS = "Reference,Value,Footprint,Qty,MPN,Manufacturer,Datasheet,DNP"
-BOM_GROUP_BY = "Value,Footprint,MPN"
+BOM_GROUP_BY = "Value,Footprint,MPN,${DNP}"
 
 
 def _exec_venv(args: list) -> int:

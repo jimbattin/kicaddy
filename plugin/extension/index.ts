@@ -259,14 +259,26 @@ export default function kicaddy(pi: HostAPI): void {
 			}),
 	});
 
-	pi.registerTool<{ path: string }>({
+	pi.registerTool<{ path: string; upgrade?: boolean }>({
 		name: "kicaddy_open",
 		label: "kicaddy open",
 		description:
-			"Open an existing KiCad project (directory, .kicad_pro, or root .kicad_sch) for kicaddy_query, kicaddy_render, and kicaddy_edit.",
-		parameters: Type.Object({ path: Type.String({ description: "project directory, .kicad_pro, or root .kicad_sch" }) }),
+			"Open an existing KiCad project (directory, .kicad_pro, or root .kicad_sch) for kicaddy_query, kicaddy_render, and kicaddy_edit.\nA project saved by another KiCad release opens for query and render only, because a save rewrites it in this KiCad's file format; `upgrade: true` allows kicaddy_edit.",
+		parameters: Type.Object({
+			path: Type.String({ description: "project directory, .kicad_pro, or root .kicad_sch" }),
+			upgrade: Type.Optional(
+				Type.Boolean({
+					description:
+						"allow kicaddy_edit on a project saved by another KiCad release: the first committed batch rewrites every sheet in the running KiCad's file format, which that release cannot open. Only when the user has agreed",
+				}),
+			),
+		}),
 		approval: "read",
-		execute: (_id, params, signal, _onUpdate, ctx) => call(ctx, signal, "open", { path: resolve(ctx.cwd, params.path) }),
+		execute: (_id, params, signal, _onUpdate, ctx) =>
+			call(ctx, signal, "open", {
+				path: resolve(ctx.cwd, params.path),
+				...(params.upgrade === true ? { upgrade: true } : {}),
+			}),
 	});
 
 	pi.registerTool<{ what: string; lib_ids?: string[]; refs?: string[]; dir?: string }>({
@@ -313,7 +325,7 @@ export default function kicaddy(pi: HostAPI): void {
 		name: "kicaddy_edit",
 		label: "kicaddy edit",
 		description:
-			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), project.rename_net): the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
+			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), s.flags, project.rename_net): the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
 		parameters: Type.Object({
 			code: Type.String({ description: "Python, e.g. s.symbol(\"R5\", \"Device:R\", (60, 30), value=\"1k\")" }),
 			sheet: Type.Optional(Type.String({ description: "sheet file stem; default the root sheet" })),

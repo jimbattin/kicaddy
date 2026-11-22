@@ -10,7 +10,9 @@ updates, the changed and deleted items, and the new items (a symbol placed insid
 for UpdateItems until that commit ends). An exception in the code drops the first; a failure in the second drops
 it and deletes the placed symbols. The model is loaded from the document before and after each batch; the netlist
 difference is reported, and when the batch declares `expect` (required for opened projects) a difference from it
-drops the batch and reopens the saved files.
+drops the batch and reopens the saved files. A project whose root sheet was saved by another KiCad release opens
+for query and render; `edit` is refused until `open` is sent with `upgrade`, because a save rewrites every sheet
+in the running release's file format.
 """
 
 import builtins
@@ -32,6 +34,8 @@ from . import bootstrap, netdiff, runtime, schematic
 NO_DOCUMENT = "no document: call kicaddy_build or kicaddy_open first"
 NO_EXPECT = ("kicaddy_edit on a project opened with kicaddy_open needs expect: the netlist change the batch makes "
              "({} for none)")
+NEEDS_UPGRADE = ("this project is in the file format of {saved}; a save rewrites every sheet in that of KiCad "
+                 "{ours}, which {saved} cannot open. Reopen with upgrade: true when the user has agreed")
 GRID_NM = schematic.GRID_MM * 1e6
 
 
@@ -77,6 +81,8 @@ class Session:
         self.project = None  # schematic.Project: built this session (run() adopts it) or opened
         self.built = False  # the project was built this session by kicaddy_build
         self.batches = 0
+        self.foreign = None  # (format version, "KiCad 10.0", "10.99"): the opened root was saved by another release
+        self.upgrade = False  # kicaddy_open was told that a save may rewrite such a project
         # The plot jobs draw the files as they were at the first plot after the document was opened, whatever
         # was committed and saved since (docs/02-ipc-protocol.md#export-jobs): reopen before plotting again.
         self.plots_stale = False
@@ -116,6 +122,7 @@ class Session:
         self.built = False
         self.batches = 0
         self.plots_stale = False
+        self.foreign, self.upgrade = None, False
 
     @contextlib.contextmanager
     def attach(self, out):
@@ -131,10 +138,10 @@ class Session:
 
     def reopen(self):
         """Close every document and open the project again from its saved files."""
-        root, built, batches = self.project.root.path.resolve(), self.built, self.batches
+        root, kept = self.project.root.path.resolve(), (self.built, self.batches, self.foreign, self.upgrade)
         self.reset_documents()
         self.project = schematic.Project.open(self.api, root)
-        self.built, self.batches = built, batches
+        self.built, self.batches, self.foreign, self.upgrade = kept
 
     def close(self):
         stack, self.stack = self.stack, None
@@ -142,6 +149,7 @@ class Session:
         self.built = False
         self.batches = 0
         self.plots_stale = False
+        self.foreign, self.upgrade = None, False
         if stack is not None:
             stack.close()
 
@@ -150,19 +158,17 @@ class Session:
         if self.project is None:
             raise OpError(NO_DOCUMENT)
 
-    def _format_note(self, root):
-        """A line for a root sheet last saved by another KiCad release than the running one. KiCad saves only
-        its own file format, so the first committed batch rewrites every sheet in it."""
+    def _foreign(self, root):
+        """(format version, saved by, running release) when the root sheet was last saved by another KiCad
+        release than the running one, else None. KiCad saves only its own file format."""
         head = root.read_text(errors="replace")[:2000]
         saved = re.search(r'\(generator_version "([^"]*)"\)', head)
         ours = ".".join(self.current["full_version"].split(".")[:2])
         if saved and saved[1] == ours:
-            return []
+            return None
         version = re.search(r"\(version (\d+)\)", head)
-        return [f"file format: {version[1] if version else 'unknown'}, saved by KiCad "
-                f"{saved[1] if saved else 'unknown'}; this is KiCad {ours}. KiCad saves only its own format: the "
-                f"first committed kicaddy_edit batch rewrites every sheet in the {ours} format, which earlier "
-                "releases cannot open. Tell the user."]
+        return (version[1] if version else "unknown", f"KiCad {saved[1]}" if saved else "another KiCad release",
+                ours)
 
     def root(self):
         """(root .kicad_sch path, root DocumentSpecifier) of the open document."""
@@ -237,11 +243,22 @@ class Session:
         self.ensure_server(root.parent)
         self.reset_documents()
         self.project = schematic.Project.open(self.api, root)
+        self.foreign, self.upgrade = self._foreign(root), request.get("upgrade") is True
         sheets = self.project.sheets
         symbols = sum(1 for s in sheets for p in s.placements.values() if not p.ref.startswith("#"))
-        return {"output": "\n".join([f"opened {root} ({len(sheets)} sheet(s): {' '.join(s.hier_path for s in sheets)})",
-                                     f"symbols: {symbols}", *self._format_note(root),
-                                     "edit with kicaddy_edit; pass expect"])}
+        lines = [f"opened {root} ({len(sheets)} sheet(s): {' '.join(s.hier_path for s in sheets)})",
+                 f"symbols: {symbols}"]
+        if self.foreign:
+            version, saved, ours = self.foreign
+            lines.append(f"file format: {version}, saved by {saved}; this is KiCad {ours}. " + (
+                f"upgrade: true given: the first committed kicaddy_edit batch rewrites every sheet in the {ours} "
+                f"format, which {saved} cannot open." if self.upgrade else
+                "kicaddy_query and kicaddy_render change nothing. kicaddy_edit is refused: a save rewrites every "
+                f"sheet in the {ours} format, which {saved} cannot open. Ask the user; when they agree, reopen "
+                "with upgrade: true."))
+        if not self.foreign or self.upgrade:
+            lines.append("edit with kicaddy_edit; pass expect")
+        return {"output": "\n".join(lines)}
 
     def op_build(self, request):
         script = Path(request["script"]).expanduser().resolve()
@@ -310,8 +327,10 @@ class Session:
                     lib = p.definition.id
                     unit = f" unit {p.unit}" if p.definition.unit_count > 1 else ""
                     turn = (f" rot {p.rotation}" if p.rotation else "") + (f" mirror {p.mirror}" if p.mirror else "")
+                    flags = schematic.flag_text(p.instance)
                     lines.append(f"{s.hier_path} {p.ref}{unit}  {lib.library_nickname}:{lib.entry_name}  "
-                                 f"{p.instance.value_field.text.text}  @ ({p.origin[0]:g}, {p.origin[1]:g}){turn}")
+                                 f"{p.instance.value_field.text.text}  @ ({p.origin[0]:g}, {p.origin[1]:g}){turn}"
+                                 f"{' ' + flags if flags else ''}")
                     if refs:
                         lines.append("  pins: " + "  ".join(f"{n} ({x:g}, {y:g})" for n, (x, y) in p.pins.items()))
             lines += [f"not found: {ref}" for ref in sorted(refs - seen)]
@@ -346,6 +365,8 @@ class Session:
 
     def op_edit(self, request):
         self.require_document()
+        if self.foreign and not self.upgrade:
+            raise OpError(NEEDS_UPGRADE.format(saved=self.foreign[1], ours=self.foreign[2]))
         project, api, e = self.project, self.api, schematic._proto.editor
         stems = {s.path.stem: s for s in project.sheets}
         target = stems.get(request.get("sheet") or project.root.path.stem)
@@ -359,6 +380,8 @@ class Session:
         linecache.cache["<batch>"] = (len(code), None, code.splitlines(True), "<batch>")  # source in tracebacks
         project.load()  # the model equals the document at batch start
         before = netdiff.Snapshot(project.components(), project.netlist())
+        flags_before = project.part_flags()
+        hints_before = set(schematic.crossing_hints(project))
         if expect is not None:
             try:
                 want = netdiff.expected(before, expect)
@@ -408,6 +431,7 @@ class Session:
         finally:
             project.in_batch = False
 
+        hints = [h for h in schematic.crossing_hints(project) if h not in hints_before]  # before the reload merges
         project.load()
         after = netdiff.Snapshot(project.components(), project.netlist())
         changes = netdiff.diff(before, after)
@@ -416,12 +440,14 @@ class Session:
             report = [f"netlist: {len(after.nets)} nets, {len(changes)} change(s)", *(f"  {c}" for c in changes)]
         else:
             report = ["netlist: unchanged"]
+        report += [f"flags: {ref} {text or 'none'}" for ref, text in sorted(project.part_flags().items())
+                   if text != flags_before.get(ref, "")]
         if expect is not None:
             mismatch = netdiff.check(want, after, set(expect.get("add", {})))
             if mismatch:
                 self.reopen()
                 state = "unchanged" if self._hashes() == hashes else "CHANGED"
-                lines += [*report, "expect mismatch:", *(f"  {m}" for m in mismatch),
+                lines += [*report, "expect mismatch:", *(f"  {m}" for m in mismatch), *hints,
                           f"batch dropped: the netlist change does not match expect; reopened the saved files ({state})"]
                 raise OpError("\n".join(line for line in lines if line))
 

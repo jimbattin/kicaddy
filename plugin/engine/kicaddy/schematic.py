@@ -18,10 +18,11 @@ in grid units for planning a layout; `kicaddy symbol TABLE.json --dir DIR` write
 pin table into the project's library (symbols.py) and prints its offsets.
 
 Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move,
-show, or change the text of a field), `power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`,
-`note`, `junction` for a deliberate four-way dot, `sheet` (a child sheet drawn by its own build function, with
-sheet pins from its hierarchical labels), and `net_class`. `Project` holds what the sheets share and writes the
-project scaffold (.kicad_pro, empty board, library tables, datasheets/ and analysis/); `run()` builds into it.
+show, or change the text of a field), `flags` (do not populate, exclude from the BOM or the board), `power`,
+`wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction` for a deliberate four-way dot,
+`sheet` (a child sheet drawn by its own build function, with sheet pins from its hierarchical labels), and
+`net_class`. `Project` holds what the sheets share and writes the project scaffold (.kicad_pro, empty board,
+library tables, datasheets/ and analysis/); `run()` builds into it.
 `Project.open` loads an existing project into the same model (`Schematic.load`), where an edit batch may also
 `move`, `remove`, `remove_wire`, `remove_label`, `remove_no_connect` items already in the document and
 `Project.rename_net`. `commit` adds junctions where KiCad's rule finds 3+ wire directions or pins meeting
@@ -193,6 +194,23 @@ class _SheetBox:
 MANDATORY = {"Reference": "reference_field", "Value": "value_field", "Footprint": "footprint_field",
              "Datasheet": "datasheet_field", "Description": "description_field"}
 
+# builder argument -> (SchematicSymbolAttributes field, word in query and batch output)
+FLAGS = {"dnp": ("do_not_populate", "dnp"), "exclude_from_bom": ("exclude_from_bill_of_materials", "no-bom"),
+         "exclude_from_board": ("exclude_from_board", "no-board")}
+
+
+def _flags(**given):
+    """{SchematicSymbolAttributes field: bool} of the part flags that are not None."""
+    for name, value in given.items():
+        if value is not None and not isinstance(value, bool):
+            raise ValueError(f"{name} must be True, False, or None, not {value!r}")
+    return {FLAGS[name][0]: value for name, value in given.items() if value is not None}
+
+
+def flag_text(instance):
+    """"dnp no-bom no-board": the part flags set on a symbol instance, "" for none."""
+    return " ".join(word for field, word in FLAGS.values() if getattr(instance.attributes, field))
+
 
 def _pack(message):
     from google.protobuf import any_pb2
@@ -322,6 +340,17 @@ class Project:
                 p = s.placements[key]
                 if not p.ref.startswith("#"):
                     found.setdefault(p.ref, p.instance.value_field.text.text)
+        return found
+
+    def part_flags(self):
+        """{ref: flag_text} of every placed symbol, power symbols and flags excluded; the first unit's, as
+        components()."""
+        found = {}
+        for s in self.sheets:
+            for key in sorted(s.placements):
+                p = s.placements[key]
+                if not p.ref.startswith("#"):
+                    found.setdefault(p.ref, flag_text(p.instance))
         return found
 
     def rename_net(self, name, text):
@@ -581,16 +610,18 @@ class Schematic:
 
     # -- symbols ----------------------------------------------------------------------------------
     def symbol(self, ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None,
-               datasheet=None, fields=None):
+               datasheet=None, fields=None, dnp=None, exclude_from_bom=None, exclude_from_board=None):
         """Place a library symbol with its origin at grid point `at`; return {pin number: (x, y)}.
         `mirror` ("x": top-bottom, "y": left-right) applies to the library drawing before `rotation`;
-        `fields` adds or sets hidden user fields (MPN, Manufacturer, ...)."""
+        `fields` adds or sets hidden user fields (MPN, Manufacturer, ...). `dnp`, `exclude_from_bom`,
+        `exclude_from_board` set the part flags (flags()); None keeps the library symbol's."""
         sch, t = _proto.sch, _proto.types
         rotation, mirror = sch_geometry.canonical(rotation, mirror)
         sch_geometry.orient(0, 0, rotation, mirror)  # validates both
         for name in fields or {}:
             if name in MANDATORY:
                 raise ValueError(f"{name} is a mandatory field; use value=, footprint=, datasheet=")
+        _flags(dnp=dnp, exclude_from_bom=exclude_from_bom, exclude_from_board=exclude_from_board)  # before placing
         key = (ref, unit or 1)
         if key in self.project.units:
             raise ValueError(f"{ref} unit {unit or 1} is already placed on sheet {self.project.units[key]}")
@@ -646,6 +677,12 @@ class Schematic:
                 field.text.position.CopyFrom(self.mm(at))
                 field.text.attributes.visible = False
             field.text.text = text
+        twin = next((o for sheet in self.project.sheets for o in sheet.placements.values()
+                     if o.ref == ref and o is not p), None)
+        if twin is not None:  # KiCad stores the flags per unit; the units of one part carry the same
+            for name, _ in FLAGS.values():
+                setattr(placed.attributes, name, getattr(twin.instance.attributes, name))
+        self.flags(ref, dnp, exclude_from_bom, exclude_from_board)
         return result
 
     @staticmethod
@@ -683,6 +720,21 @@ class Schematic:
         if visible is not None:
             field.visible = field.text.attributes.visible = visible
         p.dirty = True
+
+    def flags(self, ref, dnp=None, exclude_from_bom=None, exclude_from_board=None):
+        """Part flags of a placed symbol: do not populate, exclude from the BOM, exclude from the board. True
+        sets one, False clears it, None leaves it. They belong to the part: every unit of `ref`, on any sheet,
+        gets them."""
+        given = _flags(dnp=dnp, exclude_from_bom=exclude_from_bom, exclude_from_board=exclude_from_board)
+        units = [p for sheet in self.project.sheets for p in sheet.placements.values() if p.ref == ref]
+        if not units:
+            raise ValueError(f"no symbol {ref}")
+        for p in units:
+            changed = [name for name, value in given.items() if getattr(p.instance.attributes, name) != value]
+            for name in changed:
+                setattr(p.instance.attributes, name, given[name])
+            if changed:
+                p.dirty = True
 
     @staticmethod
     def _new_in_batch(what, instead):
@@ -1104,6 +1156,11 @@ class Schematic:
         self._updates, self._deletes, self._touched, self._items = {}, set(), set(), []
 
     # -- lint -------------------------------------------------------------------------------------
+    @staticmethod
+    def _upright(text):
+        """True for a Text drawn at 90 or 270 degrees."""
+        return round(text.attributes.angle.value_degrees / 90) % 2 == 1
+
     def _extents(self, text, ink=True):
         """Box (x0, y0, x1, y1) in nm of a Text at its position, rotated by its angle: KiCad's text box
         (EDA_TEXT::GetTextBox), or with `ink` that box less its stroke-font padding: KiCad inflates the
@@ -1216,18 +1273,20 @@ class Schematic:
             fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
             for name, field in fields + [(f.name, f) for f in p.instance.user_fields]:
                 if field.visible and field.text.text:
-                    texts.append(g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None))
+                    texts.append(g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None,
+                                           self._upright(field.text) != (p.rotation in (90, 270))))
         for kind, text, anchor, spin, shape in self._labels:
-            texts.append(g.TextBox(f"{kind} {text!r}", self._label_box(kind, text, anchor, spin, shape), None, anchor))
+            texts.append(g.TextBox(f"{kind} {text!r}", self._label_box(kind, text, anchor, spin, shape), None, anchor,
+                                   spin in ("up", "bottom")))
         for b in self._sheets:
             bodies.append(g.Body(f"sheet {b.name}", b.box, frozenset(p for p, _, _ in b.pins.values())))
             for i, text in enumerate(b.fields):
                 box = tuple(v / 1e6 / GRID_MM for v in self._extents(text))
                 texts.append(g.TextBox(f"sheet {b.name}.{'Sheetname' if i == 0 else 'Sheetfile'}", box,
-                                       f"sheet {b.name}", None))
+                                       f"sheet {b.name}", None, self._upright(text)))
             for label, (point, spin, shape) in b.pins.items():
                 texts.append(g.TextBox(f"sheet pin {b.name}.{label}", self._label_box("hier", label, point, spin, shape),
-                                       f"sheet {b.name}", point))
+                                       f"sheet {b.name}", point, spin in ("up", "bottom")))
         for at, note in self._notes:
             text = _proto.types.Text()
             text.CopyFrom(note)
@@ -1235,7 +1294,7 @@ class Schematic:
             if text.attributes.vertical_alignment == enums.VA_UNKNOWN:
                 text.attributes.vertical_alignment = enums.VA_CENTER  # multi-line notes centre vertically
             box = tuple(v / 1e6 / GRID_MM for v in self._extents(text))
-            texts.append(g.TextBox(f"note ({at[0]:g}, {at[1]:g})", box, None, None))
+            texts.append(g.TextBox(f"note ({at[0]:g}, {at[1]:g})", box, None, None, self._upright(text)))
         return g.lint(bodies, texts, pin_lines, self._wires)
 
 
@@ -1294,6 +1353,15 @@ def print_erc(violations):
 
 def lint_issues(project):
     return [f"{s.hier_path} {i}" for s in project.sheets for i in s.lint()]
+
+
+def crossing_hints(project):
+    """One `hint:` line per point where two wire ends meet on a crossing without a junction
+    (sch_geometry.end_crossings), from the model as the builder calls left it: KiCad merges the two ends when
+    the commit ends, so a model loaded from the document no longer has them."""
+    return [f"hint: wire ends meet on a crossing at ({x:g}, {y:g}) on {s.hier_path}: "
+            f"s.junction(({x:g}, {y:g})) joins all four"
+            for s in project.sheets for x, y in sch_geometry.end_crossings(s._wires, s._junctions_created)]
 
 
 def print_lint(issues):
@@ -1425,6 +1493,8 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
         if not ok:
             print(f"NETLIST MISMATCH\n  missing:    {[sorted(n) for n in want - got]}\n"
                   f"  unexpected: {[sorted(n) for n in got - want]}")
+            for hint in crossing_hints(project):
+                print(hint)
 
         violations = project.erc()
         print_erc(violations)

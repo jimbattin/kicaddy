@@ -1,6 +1,7 @@
 """Schematic geometry on the connection grid (1 unit = 1.27 mm, Y down): symbol transforms, KiCad's junction
 rule, and the layout lint. Pure Python: no protobuf, no server."""
 
+import math
 from typing import NamedTuple
 
 _ROTATE = {0: lambda x, y: (x, y), 90: lambda x, y: (y, -x), 180: lambda x, y: (-x, -y), 270: lambda x, y: (-y, x)}
@@ -102,6 +103,22 @@ def crossing(wires, p):
     return any(through(w, 0) for w in wires) and any(through(w, 1) for w in wires)
 
 
+def end_crossings(wires, junction_points):
+    """Points without a junction where two wire ends meet in line, strictly inside a wire running the other way.
+    KiCad merges the two ends into one wire, so the drawing is a crossing: no dot and no connection."""
+    wires = [(tuple(a), tuple(b)) for a, b in wires]
+    found = set()
+    for p in {q for w in wires for q in w} - set(junction_points):
+        exits = {_exit(w, p) for w in wires if p in w}
+        for axis in (0, 1):  # the two ends run along x (0) or y (1); the third wire runs the other way
+            if exits == {(1 - axis, axis), (axis - 1, -axis)} and any(
+                    a[axis] == p[axis] == b[axis]
+                    and min(a[1 - axis], b[1 - axis]) < p[1 - axis] < max(a[1 - axis], b[1 - axis])
+                    for a, b in wires):
+                found.add(p)
+    return sorted(found)
+
+
 # -- lint -----------------------------------------------------------------------------------------
 
 class Body(NamedTuple):
@@ -116,6 +133,7 @@ class TextBox(NamedTuple):
     box: tuple
     owner: object  # placement name for symbol fields, else None
     anchor: object  # label anchor point for labels, else None
+    vertical: bool = False  # the text runs along y on the sheet
 
 
 class PinLine(NamedTuple):
@@ -174,13 +192,23 @@ def _near(p, q):
     return abs(p[0] - q[0]) <= EPS and abs(p[1] - q[1]) <= EPS
 
 
-def _line(kind, a, b, box):
+def _extent(text):
+    """"; <name> box (x0, y0)-(x1, y1) <direction>" of a TextBox, the box rounded outwards to 0.1 unit."""
+    x0, y0 = (math.floor(round(v * 10, 4)) / 10 + 0.0 for v in text.box[:2])
+    x1, y1 = (math.ceil(round(v * 10, 4)) / 10 + 0.0 for v in text.box[2:])
+    return (f"; {text.name} box ({x0:g}, {y0:g})-({x1:g}, {y1:g}) "
+            f"{'vertical' if text.vertical else 'horizontal'}")
+
+
+def _line(kind, a, b, box, *texts):
+    """One issue line; `texts` are the TextBox items among `a` and `b`: each adds its extent on the sheet."""
     x, y = (round((box[0] + box[2]) / 2, 1) + 0.0, round((box[1] + box[3]) / 2, 1) + 0.0)
-    return f"{kind}: {a} / {b} @ ({x:g}, {y:g})"
+    return f"{kind}: {a} / {b} @ ({x:g}, {y:g})" + "".join(map(_extent, texts))
 
 
 def lint(bodies, texts, pins, wires):
-    """Layout issues as sorted lines "kind: a / b @ (x, y)"; `wires` are ((x1, y1), (x2, y2)) segments."""
+    """Layout issues as sorted lines "kind: a / b @ (x, y)", the centre of the clash; a text-* line ends with the
+    box of each text in it (_extent). `wires` are ((x1, y1), (x2, y2)) segments."""
     issues = []
     wires = [(tuple(a), tuple(b)) for a, b in wires]
     names = {w: f"wire ({w[0][0]:g}, {w[0][1]:g})-({w[1][0]:g}, {w[1][1]:g})" for w in wires}
@@ -192,20 +220,20 @@ def lint(bodies, texts, pins, wires):
     for i, a in enumerate(texts):
         for b in texts[i + 1:]:
             if box := _overlap(a.box, b.box):
-                issues.append(_line("text-text", a.name, b.name, box))
+                issues.append(_line("text-text", a.name, b.name, box, a, b))
         for body in bodies:
             if a.owner != body.name and (box := _overlap(a.box, body.box)):
-                issues.append(_line("text-body", a.name, body.name, box))
+                issues.append(_line("text-body", a.name, body.name, box, a))
             elif a.owner == body.name:
                 hit = next((box for s in body.strokes if (box := _clip(s, a.box))), None)
                 if hit:
-                    issues.append(_line("text-own", a.name, body.name, hit))
+                    issues.append(_line("text-own", a.name, body.name, hit, a))
         for pin in pins:
             if box := _hit((pin.start, pin.end), a.box):
-                issues.append(_line("text-pin", a.name, pin.name, box))
+                issues.append(_line("text-pin", a.name, pin.name, box, a))
         for w in wires:
             if not (a.anchor is not None and _contains(w, a.anchor)) and (box := _hit(w, a.box)):
-                issues.append(_line("text-wire", a.name, names[w], box))
+                issues.append(_line("text-wire", a.name, names[w], box, a))
     for w in wires:
         for body in bodies:
             if w[0] not in body.pins and w[1] not in body.pins and (box := _hit(w, body.box)):

@@ -45,13 +45,15 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
     `kicaddy pins --dir`), so the project's own `library:name` symbols are found.
   - `symbols`: one line per placed symbol (sheet, reference, library id, value, origin, `rot`/`mirror` when
     set). With `refs` (a list of references), only those, each followed by its pin points on the sheet: look
-    there before wiring to a part of an opened project.
+    there before wiring to a part of an opened project. A line ends with the part flags that are set: `dnp`,
+    `no-bom`, `no-board`.
   - `nets` (`REF.PIN` sets) and `erc`.
 
   `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root `.kicad_sch`) for query, render,
-  and edit. When the files were saved by another KiCad release, its output has a `file format:` line: the first
-  committed batch rewrites every sheet in the running KiCad's format, which earlier releases cannot open (query
-  and render change nothing). Pass that on to the user.
+  and edit. When the files were saved by another KiCad release (stable 10.0, say), its output has a
+  `file format:` line and `kicaddy_edit` is refused: KiCad saves only its own format, so the first committed
+  batch would rewrite every sheet in a format that release cannot open. Query and render change nothing. Tell
+  the user, and only when they agree reopen with `upgrade: true`.
 - **Edit** with `kicaddy_edit`: `code` is Python run as one batch against the open project, `s` the sheet
   (`sheet`: file stem, default the root), `sheets` maps stems to sheets, `project` the project. Before the batch
   the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. The builder
@@ -70,7 +72,8 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   - `project.rename_net("/VPP_ON", "VPP_EN")`: give the local or global labels naming that net (full name, as
     `kicaddy_query nets` prints it) the new text. A net named by a power symbol is refused.
   These work only on items in the document when the batch started; a symbol placed in the batch is placed at
-  its final position instead.
+  its final position instead. `s.flags(ref, dnp=None, exclude_from_bom=None, exclude_from_board=None)`
+  (Methods) works on both; a batch that only changes flags has `expect` `{}`.
 - **`expect`** declares the netlist change of a batch. Always pass it; `{}` for a layout-only change. It is
   required for projects from `kicaddy_open`; when the change differs, the batch is dropped and the saved files
   are reopened. Keys, all optional:
@@ -79,11 +82,12 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
     name; `disconnect` `["R5.1"]`;
   - `rename` `{"/VPP_ON": "/VPP_EN"}` (full net names).
   Pins of added parts left unconnected need not be declared.
-- A committed batch saves the files and reports `netlist: …` (component and net changes, or `unchanged`),
-  `expect: matched`, and the ERC and LINT totals with the issues the batch added. Any exception, or `exit()`,
-  drops the whole batch and leaves the document unchanged. For a project from `kicaddy_build`, a rebuild discards
-  batches, so copy every change you keep into `build.py` (the source of truth), then rebuild once at the end. For
-  a project from `kicaddy_open`, the saved files are the only copy of the batches.
+- A committed batch saves the files and reports `netlist: …` (component and net changes, or `unchanged`), a
+  `flags: <ref> <flags set, or none>` line per part whose flags changed, `expect: matched`, and the ERC and
+  LINT totals with the issues the batch added. Any exception, or `exit()`, drops the whole batch and leaves the
+  document unchanged. For a project from `kicaddy_build`, a rebuild discards batches, so copy every change you
+  keep into `build.py` (the source of truth), then rebuild once at the end. For a project from `kicaddy_open`,
+  the saved files are the only copy of the batches.
 - While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
   same directory fails as busy: use the tools.
 
@@ -141,10 +145,13 @@ Without the tools, the CLI workflow below is unchanged.
    prints every net (`net <name> <pins>`; pins connected to nothing share one `unconnected:` line), the ERC
    violations with positions, `LINT: n issue(s)` with one line per layout issue, and the output paths. Exit 0
    only when the netlist matches the declared nets, ERC reports 0 violations, and LINT reports 0 issues; on
-   `NETLIST MISMATCH` it lists missing and unexpected nets. A failing build writes no plots, removes the
-   earlier ones, and prints `plots: none (the build failed)`. An ERC line ends in
-   `on <sheet path>` (`/` for the root, `/amp/` for child sheet `amp`). A LINT line reads
-   `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of the clash); kinds:
+   `NETLIST MISMATCH` it lists missing and unexpected nets, with a `hint:` line for each point where two wire
+   ends meet on a crossing (Rules). A failing build writes no plots, removes the earlier ones, and prints
+   `plots: none (the build failed)`. An ERC line ends in `on <sheet path>` (`/` for the root, `/amp/` for child
+   sheet `amp`). A LINT line reads `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of
+   the clash). A `text-*` line continues with `; <text> box (x0, y0)-(x1, y1) horizontal` (or `vertical`) for
+   each text in it: the extent of that text on the sheet. That box is what has to clear the other item; take
+   the distance to move from it. Kinds:
    - `body-body`: two symbol bodies (or sheet boxes) overlap.
    - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
    - `text-body`: a text overlaps another symbol's body.
@@ -248,17 +255,23 @@ pin's connection point (pin number, not name).
 Methods on `s`:
 
 - `s.symbol(ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None, datasheet=None,
-  fields=None)`: place a library symbol with its origin at grid point `at`; returns `{pin number: (x, y)}`.
+  fields=None, dnp=None, exclude_from_bom=None, exclude_from_board=None)`: place a library symbol with its
+  origin at grid point `at`; returns `{pin number: (x, y)}`.
   `(ref, unit)` is unique across the project; the units of one symbol may sit on different sheets (e.g. the
   amplifiers on one sheet, the supply unit on another).
   Each pin is also available as `"REF.PIN"` (and in `s.pins`). Fails if a pin lands off the connection grid.
   `mirror="x"` flips the symbol top-bottom, `mirror="y"` left-right (see Geometry). `datasheet` sets the
   Datasheet field; `fields` is a dict of extra hidden fields, e.g. `{"MPN": "RC0603FR-0710KL",
   "Manufacturer": "Yageo"}` (not `Reference`, `Value`, `Footprint`, `Datasheet`, `Description`).
+  `dnp`, `exclude_from_bom`, `exclude_from_board` (`True` or `False`) set the part's flags: do not populate,
+  leave out of the BOM, leave off the board. `None` keeps the library symbol's own (`Mechanical:MountingHole`
+  is excluded from the BOM unless you pass `exclude_from_bom=False`). The units of one symbol share the flags.
 - `s.field(ref, name, at=None, visible=None, unit=None)`: move a field of a placed symbol to grid point `at`
   (half units such as `(40, 33.5)` are fine) and/or show or hide it. `name` is `Reference`, `Value`,
   `Footprint`, `Datasheet`, `Description`, or a name from `fields`. Pass `unit=` for a multi-unit symbol.
   Call it after `s.symbol`.
+- `s.flags(ref, dnp=None, exclude_from_bom=None, exclude_from_board=None)`: set (`True`) or clear (`False`) the
+  flags of a placed symbol, on every unit of it; `None` leaves one as it is.
 - `s.power(name, at, rotation=0)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with an automatic
   `#PWR`/`#FLG` reference; its pin is at `at`, a grid point or `"REF.PIN"`. Returns the reference.
 - `s.wire(*points)`: polyline through grid points and/or `"REF.PIN"` names; one wire segment per leg. Legs must
@@ -327,8 +340,8 @@ Methods on `s`:
   on the middle of another wire. A pin or a single wire end that touches the middle of a wire connects to it,
   so route wires around pins they must not join. Two wires crossing middle to middle do not connect, and
   neither do two wire ends that meet from opposite sides on the middle of a third wire: KiCad reads the two as
-  one wire crossing it, draws no dot, and the build reports `NETLIST MISMATCH`. To join all four directions
-  there, add `s.junction(point)`.
+  one wire crossing it, draws no dot, and the build reports `NETLIST MISMATCH` with a `hint:` line naming the
+  point. To join all four directions there, add `s.junction(point)`.
 - Two pins on the same point connect without a wire. `s.wire` fails with `zero-length wire at (x, y)` when two
   consecutive points coincide: a wire between pins that already touch (e.g. a resistor placed with its pin on a
   capacitor's pin), or a corner point equal to the pin the wire starts or ends at. Work out each pin's absolute
@@ -349,9 +362,10 @@ Methods on `s`:
 
 - **BOM.** `kicaddy bom <project dir | .kicad_pro | root .kicad_sch> [-o FILE]` writes `<name>_bom.csv` next to
   the root sheet from the saved files, so it includes `kicaddy_edit` batches and works on projects from
-  `kicaddy_open`. One row per group of parts with the same Value, Footprint, and MPN; columns Reference,
-  Value, Footprint, Qty, MPN, Manufacturer, Datasheet, DNP. It is not part of the build: run it again after
-  any change.
+  `kicaddy_open`. One row per group of parts with the same Value, Footprint, MPN, and DNP state; parts flagged
+  `exclude_from_bom` have no row, `dnp` parts have `DNP` in the last column; columns Reference, Value,
+  Footprint, Qty, MPN, Manufacturer, Datasheet, DNP. It is not part of the build: run it again after any
+  change.
 - **Review, simulation, sourcing.** kicaddy does not review a design. When the user asks for a design review,
   a SPICE check, or sourcing, and the `kicad`, `spice`, or `bom` skills (kicad-happy) are available, read that
   skill and run its scripts from the project directory, which already has `analysis/` and `datasheets/` (for a
