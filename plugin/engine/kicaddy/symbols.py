@@ -59,28 +59,64 @@ class Spec:
     sides: dict  # side -> [Group], left/right top to bottom, top/bottom left to right
 
 
-def _identifier(table, key):
-    value = table.get(key)
-    if not isinstance(value, str) or not IDENTIFIER.match(value):
-        raise ValueError(f"{key} {value!r}: use letters, digits, _ . + -")
+def _json_type(value):
+    """JSON name of a parsed value's type, for error messages."""
+    for kind, name in ((bool, "boolean"), (dict, "object"), (list, "array"), (str, "string"),
+                       ((int, float), "number")):
+        if isinstance(value, kind):
+            return name
+    return "null"
+
+
+def _show(value, limit=60):
+    """`value` as compact JSON, cut to `limit` characters."""
+    text = json.dumps(value)
+    return text if len(text) <= limit else text[:limit - 3] + "..."
+
+
+def _expect(value, kinds, where, example):
+    """ValueError naming `where`, the expected shape (`example`), and the JSON value found, unless `value` is
+    one of `kinds` (booleans never count as numbers)."""
+    if not isinstance(value, kinds) or (isinstance(value, bool) and bool not in kinds):
+        found = "null" if value is None else f"{_json_type(value)} {_show(value)}"
+        raise ValueError(f"{where}: expected {example}, got {found}")
     return value
 
 
-def _group(pin):
+def _identifier(table, key):
+    if key not in table:
+        raise ValueError(f"{key}: missing (required); use letters, digits, _ . + -")
+    value = table[key]
+    if not isinstance(value, str) or not IDENTIFIER.match(value):
+        raise ValueError(f"{key} {_show(value)}: use letters, digits, _ . + -")
+    return value
+
+
+def _number(value, where):
+    """A pin number: a JSON string or integer, as str."""
+    return str(_expect(value, (str, int), where, 'a pin number such as "1" or 1'))
+
+
+def _group(pin, i):
+    where = f"pins[{i}]"
+    _expect(pin, dict, where, 'an object such as {"numbers": ["1"], "name": "VIN", "type": "power_in"}')
     if "numbers" in pin:
-        numbers = [str(n) for n in pin["numbers"]]
+        _expect(pin["numbers"], list, f"{where}.numbers", 'a list such as ["1"] (use "number" for one pin)')
+        numbers = [_number(n, f"{where}.numbers[{k}]") for k, n in enumerate(pin["numbers"])]
     elif "number" in pin:
-        numbers = [str(pin["number"])]
+        numbers = [_number(pin["number"], f"{where}.number")]
     else:
-        raise ValueError(f"pin {pin!r}: needs `numbers` or `number`")
+        raise ValueError(f"{where}: needs \"numbers\" (a list) or \"number\"; "
+                         f"keys found: {', '.join(pin) or 'none'}")
     if not numbers or any(not n for n in numbers):
-        raise ValueError(f"pin {pin!r}: empty pin number")
-    name = str(pin.get("name", ""))
+        raise ValueError(f"{where}: empty pin number in {json.dumps(numbers)}")
+    name = _expect(pin.get("name", ""), str, f"{where}.name (pin {numbers[0]})", 'a string ("" for no name)')
     if re.search(r"\s", name):
         raise ValueError(f"pin {numbers[0]}: name {name!r} contains whitespace; use _")
     kind = pin.get("type")
-    if kind not in PIN_TYPES:
-        raise ValueError(f"pin {numbers[0]}: type {kind!r}: use one of {', '.join(sorted(PIN_TYPES))}")
+    if not isinstance(kind, str) or kind not in PIN_TYPES:
+        found = "missing" if "type" not in pin else _show(kind)
+        raise ValueError(f"pin {numbers[0]}: type {found}: use one of {', '.join(sorted(PIN_TYPES))}")
     return Group(numbers, name or "~", PIN_TYPES[kind])
 
 
@@ -88,6 +124,7 @@ def _sides(groups, sides):
     if sides is None:
         half = math.ceil(len(groups) / 2)
         return {"left": groups[:half], "right": groups[half:][::-1], "top": [], "bottom": []}
+    _expect(sides, dict, "sides", 'an object such as {"left": ["1", "2"], "right": ["4", "3"]}')
     unknown = set(sides) - set(SIDES)
     if unknown:
         raise ValueError(f"sides: unknown key(s) {sorted(unknown)}; use {', '.join(SIDES)}")
@@ -96,7 +133,9 @@ def _sides(groups, sides):
     placed, result = set(), {}
     for side in SIDES:
         result[side] = []
-        for number in map(str, sides.get(side, [])):
+        listed = _expect(sides.get(side, []), list, f"sides.{side}", 'a list of pin numbers such as ["1", "2"]')
+        for k, value in enumerate(listed):
+            number = _number(value, f"sides.{side}[{k}]")
             if number in stacked:
                 raise ValueError(f"sides.{side}: pin {number} is stacked; list stacked pins by their first number")
             if number not in first:
@@ -112,32 +151,47 @@ def _sides(groups, sides):
 
 
 def load(path):
-    """Read and validate a pin table; ValueError names the problem."""
+    """Read and validate a pin table; the ValueError starts with the file name and names the key at fault."""
     path = Path(path)
     try:
         table = json.loads(path.read_text())
-    except json.JSONDecodeError as e:
+    except OSError as e:
+        raise ValueError(f"{path}: cannot read: {e.strerror}") from None
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise ValueError(f"{path}: not valid JSON: {e}") from None
+    try:
+        return _spec(table)
+    except ValueError as e:
         raise ValueError(f"{path}: {e}") from None
-    if not isinstance(table, dict):
-        raise ValueError(f"{path}: expected a JSON object")
+
+
+def _spec(table):
+    _expect(table, dict, "table", 'an object such as {"library": "mylib", "name": "MyPart", "pins": [...]}')
     library, name = _identifier(table, "library"), _identifier(table, "name")
-    pins = table.get("pins")
-    if not isinstance(pins, list) or not pins:
-        raise ValueError("pins: expected a non-empty list")
-    groups = [_group(p) for p in pins]
+    if "pins" not in table:
+        raise ValueError('pins: missing (required); a list such as [{"numbers": ["1"], "name": "VIN", '
+                         '"type": "power_in"}]')
+    pins = _expect(table["pins"], list, "pins", 'a list of pin objects such as [{"numbers": ["1"], ...}]')
+    if not pins:
+        raise ValueError("pins: the list is empty; a symbol needs at least one pin")
+    groups = [_group(p, i) for i, p in enumerate(pins)]
     seen = set()
     for number in (n for g in groups for n in g.numbers):
         if number in seen:
             raise ValueError(f"pin {number}: number used twice")
         seen.add(number)
-    fields = {str(k): str(v) for k, v in table.get("fields", {}).items()}
-    for key in fields:
+    text = {key: _expect(table.get(key, default), str, key, "a string")
+            for key, default in (("reference", "U"), ("value", name), ("footprint", ""), ("datasheet", ""),
+                                 ("description", ""))}
+    raw = _expect(table.get("fields", {}), dict, "fields", 'an object such as {"Manufacturer": "Acme"}')
+    fields = {}
+    for key, value in raw.items():
         if key in MANDATORY:
-            raise ValueError(f"{key} is a mandatory field; use reference, value, footprint, datasheet, "
-                             f"description")
-    return Spec(library, name, str(table.get("reference", "U")), str(table.get("value", name)),
-                str(table.get("footprint", "")), str(table.get("datasheet", "")),
-                str(table.get("description", "")), fields, _sides(groups, table.get("sides")))
+            raise ValueError(f"fields.{key}: {key} is a mandatory field; use reference, value, footprint, "
+                             f"datasheet, description")
+        fields[key] = str(_expect(value, (str, int, float), f"fields.{key}", "a string or number"))
+    return Spec(library, name, text["reference"], text["value"], text["footprint"], text["datasheet"],
+                text["description"], fields, _sides(groups, table.get("sides")))
 
 
 def _quote(text):

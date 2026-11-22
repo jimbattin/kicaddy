@@ -780,7 +780,7 @@ def symbol_command(tables, directory):
         specs = [symbols.load(t) for t in tables]
         for line in symbols.write(Path(directory).resolve(), specs):
             print(line)
-    except ValueError as e:
+    except (ValueError, OSError) as e:  # bad table, or a project file that cannot be read or written
         print(f"error: {e}")
         return 1
     ids = [f"{s.library}:{s.name}" for s in specs]
