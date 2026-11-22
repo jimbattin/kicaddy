@@ -13,9 +13,9 @@ expects; `run()` does the rest: headless server, save, connectivity check, ERC, 
         sys.exit(run(build, "my_design", page="A4", title="My design"))
 
 Coordinates are in units of the 1.27 mm connection grid, Y down. A point given as "REF.PIN" resolves
-to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...` prints pin offsets
-in grid units for planning a layout; `kicaddy symbol TABLE.json --dir DIR` writes a custom symbol from a
-pin table into the project's library (symbols.py) and prints its offsets.
+to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...` prints pin offsets,
+body boxes and default field anchors in grid units for planning a layout; `kicaddy symbol TABLE.json --dir DIR`
+writes a custom symbol from a pin table into the project's library (symbols.py) and prints its offsets.
 
 Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move,
 show, turn, align, or change the text of a field), `flags` (do not populate, exclude from the BOM or the board),

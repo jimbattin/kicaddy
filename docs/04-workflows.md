@@ -90,9 +90,10 @@ The returned instance carries the full library definition. Pins are `SchematicPi
 | `Connector_Generic:Conn_01x02` | 1 | (−4, 0) |
 | `Connector_Generic:Conn_01x02` | 2 | (−4, +2) |
 
-For pin offsets of any symbol, run `python3 plugin/bin/kicaddy pins Lib:Symbol …`. For a part missing from the stock
-libraries, `python3 plugin/bin/kicaddy symbol TABLE.json --dir PROJECT` writes a symbol from a pin table into a
-project library (`PROJECT/<library>.kicad_sym`, registered in `PROJECT/sym-lib-table`) and prints its offsets;
+For pin offsets of any symbol, run `python3 plugin/bin/kicaddy pins Lib:Symbol …`; it also prints each unit's body
+box and the default Reference and Value anchors. For a part missing from the stock libraries,
+`python3 plugin/bin/kicaddy symbol TABLE.json --dir PROJECT` writes a symbol from a pin table into a project library
+(`PROJECT/<library>.kicad_sym`, registered in `PROJECT/sym-lib-table`) and prints its offsets;
 `kicaddy pins --dir PROJECT library:name` reprints them.
 
 Connection point = `symbol.position + T(pin.position)`. `orientation` rotates counter-clockwise on screen. In grid
@@ -111,6 +112,16 @@ offset is M(R(library offset)) with `mirror_x` flipping Y and `mirror_y` flippin
 `mirror_x` is lost on the server (`SCH_SYMBOL::Deserialize` decodes it as mirror-Y at 0, then clears it); send the
 same matrix as orientation 0 with `mirror_y`. Field positions in the message are absolute and are read after the
 transform, so a field keeps its sent position. `user_fields` added on an update are saved with the symbol.
+
+Field geometry (measured on 6860 against the SVG plot, 72 combinations of orientation, mirror, field angle and
+alignment). A library `SchematicSymbol` from `GetItemsFromLibrary` carries `reference_field` and `value_field` with
+positions in the pin frame (`Device:R`: Reference (1.6, 0), Value (0, 0), both at 90°), so a placed field's default
+anchor is `position + M(T(offset))`. A field's `attributes.angle` is stored against the symbol: a field at 0° on a
+symbol at `SSO_90` or `SSO_270` reads vertically. KiCad keeps text reading rightwards or upwards, so a stored
+`HA_LEFT` is the right end on the sheet whenever the stored reading direction ((1, 0), or (0, −1) at 90°) comes out of
+the transform as (−1, 0) or (0, 1). Angle and `horizontal_alignment` set on an `UpdateItems` survive the save. The
+text box from `GetTextExtents`, moved through the same transform (`SCH_FIELD::GetBoundingBox`), lies within 0.11
+grid units of the plotted ink.
 
 Multi-unit symbols: `PlaceSymbolFromLibrary` with `unit` set places one unit. `NJM4556A` units 1, 2, 3 placed with
 the same `reference` gave `U1A`, `U1B`, `U1C` (the power unit) of one `U1`. In `definition.items` a pin child's
@@ -166,6 +177,11 @@ for net in netlist.nets:
 # Net-(D1-K) ['J1.2', 'D1.1']
 # Net-(J1-Pin_1) ['R1.1', 'J1.1']
 ```
+
+With `types` that also name `KOT_SCH_LINE`, `KOT_SCH_JUNCTION` and the three label kinds, each net's per-sheet
+`items` also hold the KIIDs of its wires, junctions and labels (a 12-sheet, 436-part project: 3,372 items against
+1,734 with pins only). They match the ids `GetItems` returns, so a net's wiring on one sheet needs no tracing from
+its pins.
 
 A pin with a `NoConnectMarker` still appears in the netlist, as a single-pin net named like
 `unconnected-(U1-GAIN-Pad1)`.

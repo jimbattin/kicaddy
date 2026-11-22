@@ -126,7 +126,8 @@ def main(argv=None) -> int:
     run.add_argument("script")
     run.add_argument("args", nargs=argparse.REMAINDER)
 
-    pins = commands.add_parser("pins", help="print pin offsets (grid units, Y down) of library symbols")
+    pins = commands.add_parser("pins", help="print pin offsets, body boxes and Reference/Value positions "
+                                            "(grid units, Y down, rotation 0) of library symbols")
     pins.add_argument("lib_ids", nargs="+", metavar="LIB:SYM")
     pins.add_argument("--dir", help="project directory whose sym-lib-table to use (custom symbols)")
 
