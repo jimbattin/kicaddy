@@ -130,6 +130,9 @@ Without the tools, the CLI workflow below is unchanged.
 4. **Layout on the grid.** Pick a page, place symbols so that the pins you connect line up on X or Y, and route
    orthogonal wires between them (see Geometry and Rules). Put everything the drawing needs in this first
    `build.py`: the note right next to the circuit (not at a far edge of the page), and any section titles.
+   Write the note's equations with the references and values on the drawing (`Av = 1 + R3/R5 = 1 + 10k/4.7k =
+   3.1`), not generic names (`Rf`, `Rg`, `Cout`) the reader cannot find on the sheet; one line per result, with
+   its number.
 5. **Build.** Write `build.py` in the user's project directory, then run `kicaddy run build.py [--out DIR]`. It
    prints every net (`net <name> <pins>`; pins connected to nothing share one `unconnected:` line), the ERC
    violations with positions, `LINT: n issue(s)` with one line per layout issue, and the output paths. Exit 0
@@ -153,8 +156,29 @@ Without the tools, the CLI workflow below is unchanged.
    wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read each sheet's
    `<stem>_crop.png` (or the tiles `<stem>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
    no overlaps; the review looks only for what LINT cannot see: text that sits closer to the wrong part than to
-   its own, or a crop split into tiles. If the image has neither, stop: do not rebuild to add decorations, to
-   nudge text that does not touch anything, or to tighten spacing. Aim for one image review.
+   its own, a crop split into tiles, or a wrong fact in the note. This first clean build and its one review end
+   the drawing work. Rebuild only to fix one of those three, then read the crop once more; otherwise do not
+   rebuild and do not read the crop again: no moving fields, parts, or wires that LINT passed, no rewording the
+   note, no added decorations, no tighter spacing.
+7. **Circuit check.** A build that exits 0 already proves the drawing has the declared nets and passes ERC. When
+   the task also asks to verify how the circuit behaves, simulate it this way, from the output directory:
+   - With the `kicad` and `spice` skills (kicad-happy) installed, simulate the saved schematic, so the
+     simulation matches the drawing:
+
+     ```sh
+     python3 "$(realpath skill://kicad)/scripts/analyze_schematic.py" <name>.kicad_sch --analysis-dir analysis/
+     python3 "$(realpath skill://spice)/scripts/simulate_subcircuits.py" --analysis-dir analysis/ --text
+     python3 -c "import json,glob; d=json.load(open(sorted(glob.glob('analysis/*/spice.json'))[-1])); [print(r['subcircuit_type'], r['status'], ' '.join(r['components']), r.get('simulated') or r.get('note', '')) for r in d['simulation_results']]"
+     ```
+
+     The second command prints one summary line; the third prints each subcircuit with its measured values. It
+     covers RC filters, voltage dividers, and decoupling. On a headphone amp it simulated no op-amp gain stage
+     (it saw only the NJM4556A's power unit) and nothing that depends on a load missing from the schematic,
+     skipped some RC pairs, and reported two bias resistors as a divider: check each line against the circuit
+     before citing it.
+   - For what it does not cover (an op-amp stage's gain, an output into its load), or without kicad-happy: at
+     most one hand-written ngspice deck in the output directory and at most two `ngspice -b` runs. Then stop and
+     report which parts were simulated and which were not; do not debug the deck further.
 
 ## Build script contract
 
@@ -313,7 +337,8 @@ Methods on `s`:
   any change.
 - **Review, simulation, sourcing.** kicaddy does not review a design. When the user asks for a design review,
   a SPICE check, or sourcing, and the `kicad`, `spice`, or `bom` skills (kicad-happy) are available, read that
-  skill and run its scripts from the project directory, which already has `analysis/` and `datasheets/`:
+  skill and run its scripts from the project directory, which already has `analysis/` and `datasheets/` (for a
+  behaviour check within a build task, Workflow step 7 has the commands and what the simulation covers):
   - `python3 <kicad skill>/scripts/analyze_schematic.py <name>.kicad_sch --analysis-dir analysis/`
   - `python3 <spice skill>/scripts/simulate_subcircuits.py --analysis-dir analysis/`
   - `python3 <bom skill>/scripts/bom_manager.py export <name>.kicad_sch -o bom/bom.csv --recursive`
