@@ -4,8 +4,9 @@ Everything here ran on the headless server of build `10.99.0-6860-gbdd2930d2b`, 
 **[src]**. Test designs: the bundled `pic_programmer` demo (2 sheets, 124 symbols, 63 footprints, 370 tracks) and a
 three-part board built from scratch via the API. The schematic recipes are packaged as a reusable builder in
 [`plugin/engine/kicaddy/schematic.py`](../plugin/engine/kicaddy/schematic.py): grid snapping, pin lookup, library-load waiting,
-netlist check, ERC, plots, cropping ([05](05-cropping-schematic-plots.md)). It built five designs of 7 to 100
-components each (power and flag symbols not counted). It runs on the runtime from
+netlist check, ERC, plots, cropping ([05](05-cropping-schematic-plots.md)). It built seven designs of 7 to 100
+components each (power and flag symbols not counted), and edits existing schematics such as `pic_programmer`
+([Edit an existing schematic](#edit-an-existing-schematic)). It runs on the runtime from
 [`kicaddy doctor`](../plugin/engine/kicaddy/bootstrap.py): bindings, venv, isolated config, locked server.
 
 Snippets assume `call(request)`, which wraps the request in an `ApiRequest`, checks status, and returns the unpacked
