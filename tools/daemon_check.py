@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Check the session daemon (`kicaddy daemon`, behind the omp extension) on the configured KiCad: library pins
 through `cwd` and `dir`, build, query, render, edit batches with `expect`, `exit()` in a batch, part flags and the
-BOM, the crossing hint, LINT text boxes, and the file-format gate of `open`. Everything is written to a temporary
+BOM, lookups with body and field geometry, queries by sheet, lint and items, field angle and alignment, the
+crossing hint, LINT text boxes, and the file-format gate of `open`. Everything is written to a temporary
 directory; one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
 
     python3 tools/daemon_check.py
@@ -188,6 +189,65 @@ def built(d, tmp):
           and not any("R3" in ref.split(",") for ref in rows), f"{text}\n{rows}")
 
 
+VALUE_BOX = r'  Value "Red" at \((\d+), (\d+)\) (\w+) box \(([\d.]+), ([\d.]+)\)-\(([\d.]+), ([\d.]+)\) (\w+)'
+R9 = '''s.symbol("R9", "Device:R", (150, 30), rotation=90, value="102k 0.1%")
+for pin in ("R9.1", "R9.2"):
+    s.no_connect(pin)
+'''
+
+
+def queries(d, tmp):
+    """On the NE555 project built() left open: lookups with geometry, queries by sheet, lint, items, and
+    s.field(angle=, justify=)."""
+    r = d.request("query", what="pins", lib_ids=["Device:R", "Amplifier_Operational:TL072"])
+    check("pins: body boxes and field positions", r["ok"] and "  unit 1  body (-0.8, -2)-(0.8, 2)" in r["output"]
+          and "  Value at (0, 0) center vertical" in r["output"] and "  unit 3  body none" in r["output"]
+          and "  Reference at (0, -4) left horizontal" in r["output"], r["output"])
+    r = d.request("query", what="symbols", refs=["D1"])
+    m = re.search(VALUE_BOX, r["output"])
+    check("symbols: body and field boxes of a placed symbol", r["ok"] and "\n  body (" in r["output"] and m
+          and (m[3], m[8]) == ("center", "vertical"), r["output"])
+    r = d.request("edit", code='s.field("D1", "Value", at=(113, 50), angle=0, justify="left")', expect={})
+    q = d.request("query", what="symbols", refs=["D1"])
+    m = re.search(VALUE_BOX, q["output"])
+    check("field: angle and justify as read on the sheet", r["ok"] and m
+          and (m[1], m[2], m[3], m[8]) == ("113", "50", "left", "horizontal") and 113 <= float(m[4]) < 113.5,
+          f'{r["output"]}\n{q["output"]}')
+    r = d.request("edit", code='s.field("D1", "Value", angle=45)', expect={})
+    check("field: a bad angle is refused", not r["ok"] and "angle must be 0 or 90" in r["output"], r["output"])
+    r = d.request("query", what="symbols", sheet="ne555_blinker")
+    check("query: sheet", r["ok"] and "/ R1  Device:R  4.7k  @ " in r["output"], r["output"])
+    r = d.request("query", what="symbols", sheet="nope")
+    check("query: an unknown sheet is an error", not r["ok"]
+          and r["output"] == "no sheet 'nope'; sheets: ne555_blinker", r["output"])
+    r = d.request("query", what="nets", sheet="ne555_blinker")
+    check("query nets: sheet", r["ok"] and "R1.2" in r["output"] and "on other sheets" not in r["output"],
+          r["output"])
+    r = d.request("edit", code=R9, expect={"add": {"R9": "102k 0.1%"}})
+    total = re.search(r"^LINT: (\d+) issue\(s\), (\d+) new$", r["output"], re.M)
+    q = d.request("query", what="lint")
+    check("query lint: the batch's total, one line each", r["ok"] and q["ok"] and total and int(total[2]) >= 1
+          and q["output"].splitlines()[0] == f"LINT: {total[1]} issue(s)"
+          and len(q["output"].splitlines()) == int(total[1]) + 1
+          and "text-pin: R9.Value / pin R9.1" in q["output"], f'{r["output"]}\n{q["output"]}')
+    r = d.request("query", what="lint", sheet="ne555_blinker")
+    check("query lint: sheet", r["ok"] and r["output"] == q["output"], r["output"])
+    r = d.request("query", what="items")
+    lines = r["output"].splitlines()
+    check("items: power symbols, wires, junctions, no-connects, notes", r["ok"]
+          and re.fullmatch(r"/ \d+ item\(s\)", lines[0]) and len(lines) == int(lines[0].split()[1]) + 1
+          and re.search(r"^power #PWR\d+ \+9V \(\d+, \d+\)$", r["output"], re.M)
+          and re.search(r"^wire \(\d+, \d+\)-\(\d+, \d+\)$", r["output"], re.M)
+          and all(f"\n{kind} (" in r["output"] for kind in ("junction", "no-connect", "note")), r["output"])
+    r = d.request("query", what="items", net="+9V")
+    check("items: one net", r["ok"] and r["output"].splitlines()[0].endswith(" item(s) of net +9V")
+          and "\npins BT1.1 C3.1 R1.1 U1.4 U1.8\n" in r["output"] and " PWR_FLAG (" in r["output"]
+          and "\nnote (" not in r["output"], r["output"])
+    r = d.request("query", what="items", net="NOPE")
+    check("items: an unknown net is an error", not r["ok"] and r["output"].startswith("no net 'NOPE'"),
+          r["output"])
+
+
 def crossing(d, tmp):
     script = tmp / "cross/build.py"
     script.parent.mkdir()
@@ -243,7 +303,7 @@ def main():
     started = time.time()
     d = Daemon(tmp)
     try:
-        for part in (pins, built, crossing, stable):
+        for part in (pins, built, queries, crossing, stable):
             part(d, tmp)
     except Failure as e:
         check("the daemon stayed up", False, e)

@@ -281,21 +281,41 @@ export default function kicaddy(pi: HostAPI): void {
 			}),
 	});
 
-	pi.registerTool<{ what: string; lib_ids?: string[]; refs?: string[]; dir?: string }>({
+	pi.registerTool<{ what: string; lib_ids?: string[]; refs?: string[]; dir?: string; sheet?: string; net?: string }>({
 		name: "kicaddy_query",
 		label: "kicaddy query",
 		description:
-			"Query the open project (placed symbols, pin points of `refs`, nets as REF.PIN sets, ERC) or library pin offsets in grid units (`lib_ids`, like `kicaddy pins`; no open project needed: the session directory's sym-lib-table is used, or `dir`'s).",
+			"Query the open project (placed symbols; with `refs` their pin points, body box and fields with anchor and box; nets as REF.PIN sets; ERC; LINT; `items`: the power symbols, wires, junctions, labels and notes of a sheet, or of one net on it) or library pin offsets, body boxes and field positions in grid units (`lib_ids`, like `kicaddy pins`; no open project needed: the session directory's sym-lib-table is used, or `dir`'s).",
 		parameters: Type.Object({
-			what: Type.Union([Type.Literal("symbols"), Type.Literal("nets"), Type.Literal("erc"), Type.Literal("pins")]),
+			what: Type.Union([
+				Type.Literal("symbols"),
+				Type.Literal("nets"),
+				Type.Literal("erc"),
+				Type.Literal("lint"),
+				Type.Literal("items"),
+				Type.Literal("pins"),
+			]),
 			lib_ids: Type.Optional(Type.Array(Type.String(), { description: "Library:Symbol ids, for what=pins" })),
 			refs: Type.Optional(
-				Type.Array(Type.String(), { description: "for what=symbols: only these references, each with its pin points" }),
+				Type.Array(Type.String(), {
+					description: "for what=symbols: only these references, each with its pin points, body box and fields",
+				}),
 			),
 			dir: Type.Optional(
 				Type.String({
 					description:
 						"for what=pins: project directory whose sym-lib-table to use, as `kicaddy pins --dir`; default the open project, else the session directory",
+				}),
+			),
+			sheet: Type.Optional(
+				Type.String({
+					description:
+						"sheet file stem: only that sheet's symbols, nets, ERC or LINT lines; for what=items the sheet to list (default the root sheet)",
+				}),
+			),
+			net: Type.Optional(
+				Type.String({
+					description: "for what=items: only this net's items on the sheet; the full net name as what=nets prints it",
 				}),
 			),
 		}),
@@ -307,6 +327,8 @@ export default function kicaddy(pi: HostAPI): void {
 				refs: params.refs ?? [],
 				cwd: ctx.cwd,
 				...(params.dir ? { dir: resolve(ctx.cwd, params.dir) } : {}),
+				...(params.sheet ? { sheet: params.sheet } : {}),
+				...(params.net ? { net: params.net } : {}),
 			}),
 	});
 

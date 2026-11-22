@@ -126,7 +126,7 @@ Locations:
 | `kicaddy doctor [--kicad CHOICE] [--refresh]` | set up and check the runtime |
 | `kicaddy config kicad [CHOICE]` | show the KiCad choice and its source, or validate and save one |
 | `kicaddy run SCRIPT [ARGS…]` | run a Python script (a design `build.py`) on the runtime's venv, with the engine importable |
-| `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets (grid units, Y down) of library symbols; `--dir` adds the project's `sym-lib-table`. An id that does not exist gets a `not found:` line with the closest names, and the exit status is 1 |
+| `kicaddy pins LIB:SYM… [--dir PROJECT]` | print pin offsets, each unit's body box, and the Reference and Value field positions (grid units, Y down, rotation 0) of library symbols; `--dir` adds the project's `sym-lib-table`. An id that does not exist gets a `not found:` line with the closest names, and the exit status is 1 |
 | `kicaddy symbol TABLE.json… --dir PROJECT` | write pin-table JSON files into a project symbol library, register it in `sym-lib-table`, and print the pin offsets |
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
 | `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched; the first launch shows KiCad's startup wizard once) |
@@ -158,9 +158,9 @@ pi exposes them as tools.
 |---|---|
 | `kicaddy_build` | run a design `build.py` (`script`, optional `out` directory) on the warm server: same output and files as `kicaddy run` |
 | `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query, render, and edit; a project saved by another KiCad release opens for query and render only, until `upgrade: true` is passed |
-| `kicaddy_query` | placed symbols (with `refs`: those symbols and their pin points), nets, or ERC of the open project; library pin offsets (`lib_ids`), with or without an open project; `dir` (or, with nothing open, the session directory) supplies the project's `sym-lib-table` for `lib_ids` |
+| `kicaddy_query` | placed symbols (with `refs`: those symbols with their pin points, body box and fields), nets, ERC, or LINT of the open project, each limited to one sheet with `sheet`; `items`: the power symbols, wires, junctions, no-connects, labels and notes of a sheet, or of one `net` on it; library pin offsets, body boxes and field positions (`lib_ids`), with or without an open project; `dir` (or, with nothing open, the session directory) supplies the project's `sym-lib-table` for `lib_ids` |
 | `kicaddy_render` | cropped PNGs of every sheet (or one), returned as images |
-| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `s.flags`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception, or `exit()`, drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
+| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=, angle=, justify=)`, `s.flags`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception, or `exit()`, drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
 
 While a project is open, the agent's `edit`/`write` calls on its `.kicad_sch`/`.kicad_pro` files are blocked.
 

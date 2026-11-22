@@ -7,7 +7,7 @@
 			"name": "kicaddy",
 			"source": "./plugin",
 			"description": "Build and edit KiCad schematics headless from Python on KiCad's IPC API: netlist checked against declared intent, ERC, layout lint, cropped renders, custom symbols, BOM. Needs a KiCad 10.99 nightly.",
-			"version": "0.5.6",
+			"version": "0.5.7",
 			"category": "development",
 			"keywords": ["kicad", "schematic", "eda"]
 		}

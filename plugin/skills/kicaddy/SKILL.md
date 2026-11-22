@@ -40,14 +40,24 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
 - **Review** with `kicaddy_render` (optional `sheet`: a file stem) instead of reading `<stem>_crop.png`: it
   plots the crops again and returns them as images.
 - **Query** with `kicaddy_query`, `what` =
-  - `pins` with `lib_ids`: library pin offsets, as `kicaddy pins`; works before any project is open: it then
-    reads the `sym-lib-table` of the session directory, or of `dir` (a project directory, as
-    `kicaddy pins --dir`), so the project's own `library:name` symbols are found.
+  - `pins` with `lib_ids`: library pin offsets, body boxes and field positions, as `kicaddy pins`; works before
+    any project is open: it then reads the `sym-lib-table` of the session directory, or of `dir` (a project
+    directory, as `kicaddy pins --dir`), so the project's own `library:name` symbols are found.
   - `symbols`: one line per placed symbol (sheet, reference, library id, value, origin, `rot`/`mirror` when
-    set). With `refs` (a list of references), only those, each followed by its pin points on the sheet: look
-    there before wiring to a part of an opened project. A line ends with the part flags that are set: `dnp`,
-    `no-bom`, `no-board`.
-  - `nets` (`REF.PIN` sets) and `erc`.
+    set, then the part flags that are set: `dnp`, `no-bom`, `no-board`). With `refs` (a list of references),
+    only those, each followed by its pin points, its `body` box, and its fields on the sheet:
+    `Value "102k 0.1%" at (40, 40) center box (36, 39.4)-(44, 40.6) horizontal` for a visible field (`at` is
+    the anchor `s.field(at=…)` sets, then the alignment as read), `Footprint "…" hidden` for a hidden one. Look
+    there before wiring to a part of an opened project or moving one of its fields.
+  - `nets` (`REF.PIN` sets), `erc`, and `lint` (the `LINT:` block of a build, for the open project as it is).
+  - `items`: what `symbols` leaves out of one sheet (`sheet`, default the root): `power <ref> <value> (x, y)`
+    for power symbols and flags (the pin point), `wire (x1, y1)-(x2, y2)`, `junction`, `no-connect`,
+    `label 'X' (x, y) right` (also `global`, `hier`), `note (x, y) "text"`, and child `sheet` boxes. With `net`
+    (a full name as `nets` prints it), only that net's power symbols, pins, wires, junctions and labels on the
+    sheet. Use it instead of reading the `.kicad_sch` files or probing with a batch that raises.
+
+  `sheet` (a file stem) limits `symbols`, `nets`, `erc` and `lint` to one sheet; a net line then lists that
+  sheet's pins and ends with `+N on other sheets`.
 
   `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root `.kicad_sch`) for query, render,
   and edit. When the files were saved by another KiCad release (stable 10.0, say), its output has a
@@ -56,8 +66,9 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   the user, and only when they agree reopen with `upgrade: true`.
 - **Edit** with `kicaddy_edit`: `code` is Python run as one batch against the open project, `s` the sheet
   (`sheet`: file stem, default the root), `sheets` maps stems to sheets, `project` the project. Before the batch
-  the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. The builder
-  methods work as in `build.py` (`s.symbol`, `s.wire`, `s.label`, `s.power`, ...), except `s.sheet`,
+  the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. See what is on
+  a sheet with `kicaddy_query items` and `symbols` with `refs`, not with a batch that prints and raises. The
+  builder methods work as in `build.py` (`s.symbol`, `s.wire`, `s.label`, `s.power`, ...), except `s.sheet`,
   `s.net_class`, and `commit()`. Items already in the document can also be changed:
   - `s.move(ref, at, unit=None)`: translate the symbol so its origin is `at` (no rotation); returns the new
     pins. A wire ending on a pin follows it (stretched, or with one dog-leg corner); labels and no-connect
@@ -96,7 +107,10 @@ Without the tools, the CLI workflow below is unchanged.
 ## Workflow
 
 1. **Pin offsets.** `kicaddy pins Lib:Sym …` (e.g. `kicaddy pins Device:R Timer:NE555P`) prints each pin's
-   unit, number, name, offset from the symbol origin in grid units at rotation 0, and electrical type.
+   unit, number, name, offset from the symbol origin in grid units at rotation 0, and electrical type. After
+   the pins come `unit N  body (x0, y0)-(x1, y1)`, the box that unit's drawing fills (`none` for a unit of pins
+   only), and `Reference at (x, y) center vertical` / `Value at …`: each visible field's anchor, alignment and
+   direction at rotation 0 (Geometry).
    Look up every symbol you will place, in one call, before laying anything out. An id that does not exist
    gets a line `not found: Timer:NE555 (Timer has NE555P, NE555D, …)` with the closest names in that library
    (or the closest library names), and the exit status is 1: pick from that line instead of guessing again.
@@ -151,10 +165,10 @@ Without the tools, the CLI workflow below is unchanged.
    sheet `amp`). A LINT line reads `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of
    the clash). A `text-*` line continues with `; <text> box (x0, y0)-(x1, y1) horizontal` (or `vertical`) for
    each text in it: the extent of that text on the sheet. That box is what has to clear the other item; take
-   the distance to move from it. `s.field(ref, name, at=…)` places the field's anchor, which is not always the
-   box centre: a `Device:R` Value is centred on it, a `Device:C` Value starts there (the left end of the box).
-   Moving across the text (up or down for horizontal text) works whatever the anchor; for a move along the
-   text, check the next build. Kinds:
+   the distance to move from it. `s.field(ref, name, at=…)` places the field's anchor, which is the middle of
+   the text only for a `center` field: `kicaddy pins` prints each field's alignment, and
+   `kicaddy_query symbols` with `refs` the anchor and box of a placed one. `s.field(..., justify="center")`
+   puts `at` in the middle of the box; `angle=0` turns a vertical field. Kinds:
    - `body-body`: two symbol bodies (or sheet boxes) overlap.
    - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
    - `text-body`: a text overlaps another symbol's body.
@@ -271,10 +285,12 @@ Methods on `s`:
   is excluded from the BOM unless you pass `exclude_from_bom=False`). The units of one symbol share the flags.
   A part excluded from the board keeps its pins in kicaddy's netlist (the build check, a batch's `netlist:`),
   but the `kicad-cli` netlist export a board is updated from leaves it out.
-- `s.field(ref, name, at=None, visible=None, unit=None)`: move a field of a placed symbol to grid point `at`
-  (half units such as `(40, 33.5)` are fine) and/or show or hide it. `name` is `Reference`, `Value`,
-  `Footprint`, `Datasheet`, `Description`, or a name from `fields`. Pass `unit=` for a multi-unit symbol.
-  Call it after `s.symbol`.
+- `s.field(ref, name, at=None, visible=None, unit=None, angle=None, justify=None)`: move a field of a placed
+  symbol to grid point `at` (half units such as `(40, 33.5)` are fine), show or hide it, turn it (`angle`: `0`
+  horizontal or `90` vertical, as read on the sheet, whatever the symbol's rotation), and align it (`justify`:
+  `"left"` the text starts at `at`, `"center"`, `"right"` it ends there; vertical text reads upwards, so it
+  starts at its lower end). `name` is `Reference`, `Value`, `Footprint`, `Datasheet`, `Description`, or a name
+  from `fields`. Pass `unit=` for a multi-unit symbol. Call it after `s.symbol`.
 - `s.flags(ref, dnp=None, exclude_from_bom=None, exclude_from_board=None)`: set (`True`) or clear (`False`) the
   flags of a placed symbol, on every unit of it; `None` leaves one as it is.
 - `s.power(name, at, rotation=0)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with an automatic
@@ -287,7 +303,9 @@ Methods on `s`:
   `output`, `bidirectional`, `tri_state`, or `passive`.
 - `s.no_connect(at)`: no-connect marker on an unused pin (`"REF.PIN"`).
 - `s.note(text, at, size=1.27)`: left-aligned text; `size` in mm; `\n` for new lines. Multi-line notes are
-  centred vertically on `at`.
+  centred vertically on `at`. At the default size text is about 0.85 units per character (0.8 lower case, 0.95
+  digits and capitals) and lines are 1.6 units apart: 100 characters are about 85 units wide. Field values and
+  labels have the same size. Nothing wraps: break long notes yourself.
 - `s.junction(*points)`: explicit dot for a deliberate four-way connection; T junctions are automatic.
 - `s.sheet(name, build, at, size, pins=None, page=None, title=None)`: child sheet, drawn as a box with its
   top-left corner at `at` and `size` (w, h) in grid units; returns `{label: (x, y)}` of its sheet pins.
@@ -328,7 +346,10 @@ Methods on `s`:
   | `270` | (−y, x) |
 
   Example: offset (−4, 0) at `rotation=90, mirror="x"` → T = (0, 4) → M = (0, −4).
-- Fields move with the symbol when it is mirrored; `s.field(..., at=...)` takes absolute grid points.
+- Fields turn and mirror with the symbol: a field whose anchor `kicaddy pins` prints at (x, y) sits at symbol
+  position + M(T(x, y)), and one that reads horizontally at rotation 0 reads vertically at 90 and 270, and the
+  other way round (`Device:R` fields are vertical at rotation 0). `s.field(..., at=...)` takes an absolute grid
+  point for the anchor; `angle=` and `justify=` say how the field reads, whatever the rotation.
 - Multi-unit symbols (e.g. a dual op-amp): place each unit with the same `ref` and `unit=1`, `unit=2`, …;
   they become `U1A`, `U1B`, … of one `U1`. The dual op-amps above have 3 units: 1 and 2 are the amplifiers,
   3 carries V+ and V−; place unit 3 too and wire its supply pins. In `kicaddy pins` output, unit `0` or `*`
@@ -351,7 +372,8 @@ Methods on `s`:
   consecutive points coincide: a wire between pins that already touch (e.g. a resistor placed with its pin on a
   capacitor's pin), or a corner point equal to the pin the wire starts or ends at. Work out each pin's absolute
   point (Geometry) before choosing corner points.
-- A field that collides with a pin, wire, or another text: move it with `s.field(ref, "Value", at=...)`.
+- A field that collides with a pin, wire, or another text: move it with `s.field(ref, "Value", at=...)`, or
+  turn it with `angle=`.
 - Put the part number in `fields={"MPN": ..., "Manufacturer": ...}` and the datasheet URL in `datasheet=`
   when known.
 - A global label alone on a one-pin net gives the ERC warning `Label connected to only one pin`.

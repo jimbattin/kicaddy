@@ -22,6 +22,14 @@ def orient(x, y, rotation, mirror=None):
     return _MIRROR[mirror](*_ROTATE[rotation](x, y))
 
 
+def text_flipped(upright, rotation, mirror=None):
+    """True when a symbol field stored at 0 degrees (`upright`: at 90) is drawn with its ends swapped on a symbol
+    with this transform. KiCad keeps text reading rightwards or upwards: when the stored reading direction comes
+    out of the transform leftwards or downwards the text is drawn the other way round, and the field's stored
+    left alignment is its right end on the sheet. Measured on the server for every rotation and mirror."""
+    return orient(*((0, -1) if upright else (1, 0)), rotation, mirror) in ((-1, 0), (0, 1))
+
+
 def unorient(x, y, rotation, mirror=None):
     """Inverse of orient(): screen offset -> library offset."""
     _check(rotation, mirror)
@@ -192,12 +200,16 @@ def _near(p, q):
     return abs(p[0] - q[0]) <= EPS and abs(p[1] - q[1]) <= EPS
 
 
+def span(box):
+    """"(x0, y0)-(x1, y1)" of a box, rounded outwards to 0.1 unit."""
+    x0, y0 = (math.floor(round(v * 10, 4)) / 10 + 0.0 for v in box[:2])
+    x1, y1 = (math.ceil(round(v * 10, 4)) / 10 + 0.0 for v in box[2:])
+    return f"({x0:g}, {y0:g})-({x1:g}, {y1:g})"
+
+
 def _extent(text):
-    """"; <name> box (x0, y0)-(x1, y1) <direction>" of a TextBox, the box rounded outwards to 0.1 unit."""
-    x0, y0 = (math.floor(round(v * 10, 4)) / 10 + 0.0 for v in text.box[:2])
-    x1, y1 = (math.ceil(round(v * 10, 4)) / 10 + 0.0 for v in text.box[2:])
-    return (f"; {text.name} box ({x0:g}, {y0:g})-({x1:g}, {y1:g}) "
-            f"{'vertical' if text.vertical else 'horizontal'}")
+    """"; <name> box (x0, y0)-(x1, y1) <direction>" of a TextBox (span)."""
+    return f"; {text.name} box {span(text.box)} {'vertical' if text.vertical else 'horizontal'}"
 
 
 def _line(kind, a, b, box, *texts):

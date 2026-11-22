@@ -158,6 +158,16 @@ class Session:
         if self.project is None:
             raise OpError(NO_DOCUMENT)
 
+    def _sheet(self, request):
+        """The sheet a query names with `sheet` (a file stem), or None when it names none."""
+        stem = request.get("sheet")
+        if not stem:
+            return None
+        found = next((s for s in self.project.sheets if s.path.stem == stem), None)
+        if found is None:
+            raise OpError(f"no sheet {stem!r}; sheets: {', '.join(s.path.stem for s in self.project.sheets)}")
+        return found
+
     def _foreign(self, root):
         """(format version, saved by, running release) when the root sheet was last saved by another KiCad
         release than the running one, else None. KiCad saves only its own file format."""
@@ -316,10 +326,11 @@ class Session:
             except RuntimeError as e:  # a library that does not load, as the CLI reports it
                 raise OpError(f"error: {e}") from None
         self.require_document()
+        sheet = self._sheet(request)
         if what == "symbols":
             refs = set(request.get("refs") or [])
             lines, seen = [], set()
-            for s in self.project.sheets:
+            for s in [sheet] if sheet else self.project.sheets:
                 for p in s.placements.values():
                     if p.ref.startswith("#") or (refs and p.ref not in refs):
                         continue
@@ -332,14 +343,29 @@ class Session:
                                  f"{p.instance.value_field.text.text}  @ ({p.origin[0]:g}, {p.origin[1]:g}){turn}"
                                  f"{' ' + flags if flags else ''}")
                     if refs:
-                        lines.append("  pins: " + "  ".join(f"{n} ({x:g}, {y:g})" for n, (x, y) in p.pins.items()))
+                        lines += schematic.symbol_detail(s, p)
             lines += [f"not found: {ref}" for ref in sorted(refs - seen)]
             return {"output": "\n".join(lines) or "no symbols"}
         if what == "nets":
-            return {"output": _capture(schematic.print_nets, self.project.netlist())[1].rstrip() or "no nets"}
+            here = set(sheet.pins) if sheet else None
+            return {"output": _capture(schematic.print_nets, self.project.netlist(), here)[1].rstrip() or "no nets"}
         if what == "erc":
-            return {"output": _capture(schematic.print_erc, self.project.erc())[1].rstrip()}
-        raise OpError(f"what must be symbols, nets, erc, or pins, not {what!r}")
+            violations = self.project.erc()
+            if sheet:
+                violations = [v for v in violations
+                              if (v.sheet_specific_path.path_human_readable or "/") == sheet.hier_path]
+            return {"output": _capture(schematic.print_erc, violations)[1].rstrip()}
+        if what == "lint":
+            issues = schematic.lint_issues(self.project, sheet)
+            return {"output": _capture(schematic.print_lint, issues)[1].rstrip()}
+        if what == "items":
+            self.project.load()  # the document as it is: a project built this session has no item ids until loaded
+            try:
+                lines = schematic.sheet_items(self.project, sheet or self.project.root, request.get("net") or None)
+            except ValueError as e:
+                raise OpError(str(e)) from None
+            return {"output": "\n".join(lines)}
+        raise OpError(f"what must be symbols, nets, erc, lint, items, or pins, not {what!r}")
 
     def op_render(self, request):
         self.require_document()

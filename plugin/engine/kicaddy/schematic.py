@@ -18,8 +18,8 @@ in grid units for planning a layout; `kicaddy symbol TABLE.json --dir DIR` write
 pin table into the project's library (symbols.py) and prints its offsets.
 
 Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move,
-show, or change the text of a field), `flags` (do not populate, exclude from the BOM or the board), `power`,
-`wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction` for a deliberate four-way dot,
+show, turn, align, or change the text of a field), `flags` (do not populate, exclude from the BOM or the board),
+`power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction` for a deliberate four-way dot,
 `sheet` (a child sheet drawn by its own build function, with sheet pins from its hierarchical labels), and
 `net_class`. `Project` holds what the sheets share and writes the project scaffold (.kicad_pro, empty board,
 library tables, datasheets/ and analysis/); `run()` builds into it.
@@ -34,6 +34,7 @@ Requires the runtime set up by `kicaddy doctor`; run a design script with `kicad
 
 import argparse
 import copy
+import json
 import math
 import re
 import sys
@@ -72,20 +73,24 @@ def _server(project_dir=None, paths=()):
     return runtime.server(current["launcher"], Path(current["config_home"]), project_dir, paths)
 
 
-def _pins(definition, unit, body_style=1):
-    """Yield (pin, dx, dy), library offsets in grid units, for the pins of `unit` (None: unit 1) in
-    `body_style` (1: the normal body, 2: De Morgan)."""
-    sch = _proto.sch
+def _unit_items(definition, unit, body_style=1):
+    """The children of a library symbol that `unit` (None: unit 1) draws in `body_style` (1: the normal body,
+    2: De Morgan); those of unit 0 and of style 0 belong to every unit and style."""
     for child in definition.items:
-        if not child.item.Is(sch.SchematicPin.DESCRIPTOR):
-            continue
-        if child.HasField("unit") and child.unit.unit not in (0, unit or 1):  # 0: shared by all units
+        if child.HasField("unit") and child.unit.unit not in (0, unit or 1):
             continue
         if child.HasField("body_style") and child.body_style.style not in (0, body_style):
             continue
-        pin = sch.SchematicPin()
-        child.item.Unpack(pin)
-        yield pin, pin.position.x_nm / 1e6 / GRID_MM, pin.position.y_nm / 1e6 / GRID_MM
+        yield child
+
+
+def _pins(definition, unit, body_style=1):
+    """Yield (pin, dx, dy), library offsets in grid units, for the pins of `unit` in `body_style`
+    (_unit_items)."""
+    for child in _unit_items(definition, unit, body_style):
+        if child.item.Is(_proto.sch.SchematicPin.DESCRIPTOR):
+            pin = _unpack(child.item, _proto.sch.SchematicPin)
+            yield pin, pin.position.x_nm / 1e6 / GRID_MM, pin.position.y_nm / 1e6 / GRID_MM
 
 
 def _grid(v):
@@ -157,6 +162,29 @@ def _shape_strokes(shape):
     else:
         return []
     return [(a, b) for chain in chains for a, b in zip(chain, chain[1:]) if a != b]
+
+
+def _body_box(definition, unit):
+    """(x0, y0, x1, y1) in library grid units around the shapes `unit` draws in the normal body style, or None
+    when it draws none (the supply unit of an op-amp): the body LINT checks."""
+    shape = _proto.sch.SchematicGraphicShape
+    points = [point for child in _unit_items(definition, unit) if child.item.Is(shape.DESCRIPTOR)
+              for point in _shape_points(_unpack(child.item, shape).shape)]
+    if not points:
+        return None
+    xs, ys = [x / 1e6 / GRID_MM for x, _ in points], [y / 1e6 / GRID_MM for _, y in points]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _justify(text):
+    """"left", "center", or "right": the stored horizontal alignment of a Text."""
+    en = _proto.enums
+    return {en.HA_LEFT: "left", en.HA_RIGHT: "right"}.get(text.attributes.horizontal_alignment, "center")
+
+
+def _xy(point):
+    """"(x, y)" of a grid point, to 0.01 unit."""
+    return f"({round(point[0], 2) + 0.0:g}, {round(point[1], 2) + 0.0:g})"
 
 
 @dataclass
@@ -701,9 +729,14 @@ class Schematic:
             raise ValueError(f"{ref} has units {units}; no unit {unit}")
         return self.placements[(ref, unit)]
 
-    def field(self, ref, name, at=None, visible=None, unit=None, text=None):
-        """Move (`at`: absolute grid point, half-grid allowed), show/hide, or change the `text` of a field of
-        a placed symbol."""
+    def field(self, ref, name, at=None, visible=None, unit=None, text=None, angle=None, justify=None):
+        """Move (`at`: absolute grid point, half-grid allowed), show/hide, turn (`angle`: 0 or 90, as read on the
+        sheet), align (`justify`: "left", "center", "right": the part of the text, as read, that sits on its
+        anchor), or change the `text` of a field of a placed symbol. A turn keeps the alignment as read."""
+        if angle not in (None, 0, 90):
+            raise ValueError(f"angle must be 0 or 90 (as read on the sheet), not {angle!r}")
+        if justify not in (None, "left", "center", "right"):
+            raise ValueError(f'justify must be "left", "center" or "right", not {justify!r}')
         p = self._placement(ref, unit)
         if name in MANDATORY:
             field = getattr(p.instance, MANDATORY[name])
@@ -719,6 +752,15 @@ class Schematic:
             field.text.position.CopyFrom(self.mm(at))
         if visible is not None:
             field.visible = field.text.attributes.visible = visible
+        if angle is not None or justify is not None:
+            en, attributes = _proto.enums, field.text.attributes
+            wanted = justify or self._seen(p, field)[1]
+            if angle is not None:  # stored against the symbol: a quarter turn of the symbol turns the text
+                attributes.angle.value_degrees = 90 if (angle == 90) != (p.rotation in (90, 270)) else 0
+            if wanted != "center" and sch_geometry.text_flipped(self._upright(field.text), p.rotation, p.mirror):
+                wanted = "right" if wanted == "left" else "left"
+            attributes.horizontal_alignment = {"left": en.HA_LEFT, "center": en.HA_CENTER,
+                                               "right": en.HA_RIGHT}[wanted]
         p.dirty = True
 
     def flags(self, ref, dnp=None, exclude_from_bom=None, exclude_from_board=None):
@@ -1234,6 +1276,25 @@ class Schematic:
             y0, y1 = y0 - dist, y1 - dist
         return (min(x0, ax), min(y0, ay), max(x1, ax), max(y1, ay))
 
+    def body_box(self, p):
+        """Box (x0, y0, x1, y1) on the sheet around the drawing of placement `p`, or None (_body_box)."""
+        box = _body_box(p.definition, p.unit)
+        if box is None:
+            return None
+        corners = [sch_geometry.orient(x, y, p.rotation, p.mirror) for x in box[::2] for y in box[1::2]]
+        xs, ys = [p.origin[0] + x for x, _ in corners], [p.origin[1] + y for _, y in corners]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def _seen(self, p, field):
+        """(vertical, justify) of a symbol field as drawn: its stored angle and alignment through the symbol's
+        rotation and mirror (sch_geometry.text_flipped). justify: "left" (the text starts on its anchor),
+        "center", or "right"."""
+        upright = self._upright(field.text)
+        justify = _justify(field.text)
+        if justify != "center" and sch_geometry.text_flipped(upright, p.rotation, p.mirror):
+            justify = "right" if justify == "left" else "left"
+        return upright != (p.rotation in (90, 270)), justify
+
     def lint(self):
         """Layout issues: overlapping bodies and text, fields over their own symbol's lines, wires over pins,
         bodies, and text (sch_geometry.lint)."""
@@ -1245,16 +1306,11 @@ class Schematic:
                 dx, dy = g.orient(x / 1e6 / GRID_MM, y / 1e6 / GRID_MM, p.rotation, p.mirror)
                 return (p.origin[0] + dx, p.origin[1] + dy)
 
-            points, strokes = [], []
-            for child in p.definition.items:
-                if child.HasField("unit") and child.unit.unit not in (0, p.unit):
-                    continue
-                if child.HasField("body_style") and child.body_style.style not in (0, 1):
-                    continue
+            strokes = []
+            for child in _unit_items(p.definition, p.unit):
                 if child.item.Is(sch.SchematicGraphicShape.DESCRIPTOR):
                     shape = sch.SchematicGraphicShape()
                     child.item.Unpack(shape)
-                    points += [place(x, y) for x, y in _shape_points(shape.shape)]
                     strokes += [(place(*a), place(*b)) for a, b in _shape_strokes(shape.shape)]
                 elif child.item.Is(sch.SchematicPin.DESCRIPTOR):
                     pin = sch.SchematicPin()
@@ -1266,15 +1322,14 @@ class Schematic:
                     start = place(pin.position.x_nm, pin.position.y_nm)
                     end = place(pin.position.x_nm + dx * n, pin.position.y_nm + dy * n)
                     pin_lines.append(g.PinLine(f"pin {p.ref}.{pin.number}", start, end))
-            if points:
-                xs, ys = [x for x, _ in points], [y for _, y in points]
-                bodies.append(g.Body(p.name, (min(xs), min(ys), max(xs), max(ys)), frozenset(p.pins.values()),
-                                     tuple(strokes)))
+            box = self.body_box(p)
+            if box:
+                bodies.append(g.Body(p.name, box, frozenset(p.pins.values()), tuple(strokes)))
             fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
             for name, field in fields + [(f.name, f) for f in p.instance.user_fields]:
                 if field.visible and field.text.text:
                     texts.append(g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None,
-                                           self._upright(field.text) != (p.rotation in (90, 270))))
+                                           self._seen(p, field)[0]))
         for kind, text, anchor, spin, shape in self._labels:
             texts.append(g.TextBox(f"{kind} {text!r}", self._label_box(kind, text, anchor, spin, shape), None, anchor,
                                    spin in ("up", "bottom")))
@@ -1327,14 +1382,20 @@ def plot_cropped(api, document, output):
             return crop.save(crop.crop(image, PLOT_DPI), output)
 
 
-def print_nets(nets):
-    """One line per net; the single-pin nets KiCad names `unconnected-(...)` share one `unconnected:` line."""
+def print_nets(nets, here=None):
+    """One line per net; the single-pin nets KiCad names `unconnected-(...)` share one `unconnected:` line.
+    With `here` (a sheet's "REF.PIN" names) only the nets with a pin among them, each with those pins and the
+    number of its pins on other sheets."""
     loose = []
     for net, members in nets:
+        shown = members if here is None else members & here
+        if not shown:
+            continue
         if len(members) == 1 and net.startswith("unconnected-("):
-            loose += members
+            loose += shown
         else:
-            print(f"net {net:28s} {' '.join(sorted(members))}")
+            more = f"  +{len(members) - len(shown)} on other sheets" if len(shown) < len(members) else ""
+            print(f"net {net:28s} {' '.join(sorted(shown))}{more}")
     if loose:
         print(f"unconnected: {' '.join(sorted(loose))}")
 
@@ -1351,8 +1412,80 @@ def print_erc(violations):
         print(f"  {format_violation(v)}")
 
 
-def lint_issues(project):
-    return [f"{s.hier_path} {i}" for s in project.sheets for i in s.lint()]
+def lint_issues(project, sheet=None):
+    """LINT lines "<sheet path> kind: ..." of every sheet, or of `sheet` only."""
+    return [f"{s.hier_path} {i}" for s in ([sheet] if sheet else project.sheets) for i in s.lint()]
+
+
+def symbol_detail(s, p):
+    """The lines under a symbol in `kicaddy_query symbols` with refs: its pin points, its body box, each visible
+    field with anchor, alignment, box and direction as drawn on sheet `s`, and the hidden fields that have a
+    text (Datasheet and Description left out)."""
+    lines = ["  pins: " + "  ".join(f"{n} ({x:g}, {y:g})" for n, (x, y) in p.pins.items())]
+    box = s.body_box(p)
+    if box:
+        lines.append(f"  body {sch_geometry.span(box)}")
+    fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
+    for name, field in fields + [(f.name, f) for f in p.instance.user_fields]:
+        if not field.text.text:
+            continue
+        text = json.dumps(field.text.text, ensure_ascii=False)
+        if field.visible:
+            vertical, justify = s._seen(p, field)
+            lines.append(f"  {name} {text} at {_xy(_point(field.text.position))} {justify} box "
+                         f"{sch_geometry.span(s._field_box(p, field))} {'vertical' if vertical else 'horizontal'}")
+        elif name not in ("Datasheet", "Description"):
+            lines.append(f"  {name} {text} hidden")
+    return lines
+
+
+def sheet_items(project, s, net=None):
+    """The lines of `kicaddy_query items`: what `symbols` leaves out of sheet `s`, from a model loaded from the
+    document: power symbols and flags (reference, value, pin point), wires, junctions, no-connect markers,
+    labels, notes, and child sheet boxes. With `net` (a full net name) only that net's power symbols, pins,
+    wires, junctions, and labels on the sheet."""
+    en = _proto.enums
+    entries = {k: s._entry(proto) for k, proto in s._existing.items()}
+    power = {p.ref: p for p in s.placements.values() if p.ref.startswith("#")}
+    pins = []
+    if net is not None:
+        nets = project.api(_proto.sch_cmd.GetSchematicNetlist(document=project.root.document, types=[
+            en.KOT_SCH_PIN, en.KOT_SCH_LINE, en.KOT_SCH_JUNCTION, en.KOT_SCH_LABEL, en.KOT_SCH_GLOBAL_LABEL,
+            en.KOT_SCH_HIER_LABEL])).nets
+        found = next((n for n in nets if n.name == net), None)
+        if found is None:
+            raise ValueError(f"no net {net!r}; use the name kicaddy_query nets prints")
+        paths = {tuple(k.value for k in sheet.document.sheet_path.path): sheet for sheet in project.sheets}
+        ids = set()
+        for contents in found.sheets:
+            if paths.get(tuple(k.value for k in contents.path.path)) is s:
+                ids |= {i.value for i in contents.items}
+        if not ids:
+            keys = (tuple(k.value for k in contents.path.path) for contents in found.sheets)
+            on = sorted(paths[key].hier_path for key in keys if key in paths)
+            return [f"{s.hier_path} no item of net {net}; it is on: {' '.join(on)}"]
+        entries = {k: e for k, e in entries.items() if k in ids}
+        pins = sorted(project.pin_ids[i] for i in ids if i in project.pin_ids)
+        power = {ref: p for ref, p in power.items() if any(pin.startswith(f"{ref}.") for pin in pins)}
+        pins = [pin for pin in pins if not pin.startswith("#")]
+    lines = [f"power {ref} {p.instance.value_field.text.text} {_xy(next(iter(p.pins.values()), p.origin))}"
+             for ref, p in sorted(power.items())]
+    if pins:
+        lines.append(f"pins {' '.join(pins)}")
+    wires = sorted(tuple(sorted(e)) for kind, e in entries.values() if kind == "wire")
+    lines += [f"wire {_xy(a)}-{_xy(b)}" for a, b in wires]
+    lines += [f"junction {_xy(e)}" for e in sorted(e for kind, e in entries.values() if kind == "junction")]
+    lines += [f"no-connect {_xy(e)}" for e in sorted(e for kind, e in entries.values() if kind == "no_connect")]
+    labels = sorted((e for kind, e in entries.values() if kind == "label"), key=lambda e: e[:3])
+    lines += [f"{kind} {text!r} {_xy(point)} {spin}{' ' + shape if shape else ''}"
+              for kind, text, point, spin, shape in labels]
+    if net is None:
+        lines += [f"note {_xy(point)} {json.dumps(text.text, ensure_ascii=False)}"
+                  for point, text in sorted(s._notes, key=lambda n: n[0])]
+        for b in s._sheets:
+            pin_text = "  ".join(f"{label} {_xy(point)}" for label, (point, _, _) in b.pins.items())
+            lines.append(f"sheet {b.name} {sch_geometry.span(b.box)}" + (f" pins: {pin_text}" if pin_text else ""))
+    return [f"{s.hier_path} {len(lines)} item(s)" + (f" of net {net}" if net else ""), *lines]
 
 
 def crossing_hints(project):
@@ -1371,9 +1504,9 @@ def print_lint(issues):
 
 
 def print_library_pins(api, document, lib_ids):
-    """Print pin offsets (grid units, Y down, rotation 0) of library symbols, looked up through `document`'s
-    library tables, then one `not found:` line per id that is not there, with the names it may have meant.
-    Returns the "lib:name" ids printed."""
+    """Print pin offsets, each unit's body box, and the visible Reference and Value anchors (grid units, Y down,
+    rotation 0) of library symbols, looked up through `document`'s library tables, then one `not found:` line
+    per id that is not there, with the names it may have meant. Returns the "lib:name" ids printed."""
     lt = _proto.library_types
     libraries = runtime.symbol_libraries(api)
     wanted = [i for i in lib_ids if ":" in i and i.split(":", 1)[0] in libraries]
@@ -1401,6 +1534,13 @@ def print_library_pins(api, document, lib_ids):
                 print(f"  unit {unit}  pin {pin.number:>3} {pin.name:12s} "
                       f"({pin.position.x_nm / 1e6 / GRID_MM:g}, {pin.position.y_nm / 1e6 / GRID_MM:g})  "
                       f"{_proto.types.ElectricalPinType.Name(pin.electrical_type)}")
+        for unit in range(1, (symbol.unit_count or 1) + 1):
+            box = _body_box(symbol, unit)
+            print(f"  unit {unit}  body {sch_geometry.span(box) if box else 'none'}")
+        for name, field in (("Reference", symbol.reference_field), ("Value", symbol.value_field)):
+            if field.visible:
+                print(f"  {name} at {_xy(_point(field.text.position))} {_justify(field.text)} "
+                      f"{'vertical' if Schematic._upright(field.text) else 'horizontal'}")
     names = {}  # library -> its symbol names, for the hints
     for lib_id in lib_ids:
         if lib_id in found:
