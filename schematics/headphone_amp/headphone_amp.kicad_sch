@@ -2,7 +2,7 @@
 	(version 20261106)
 	(generator "eeschema")
 	(generator_version "10.99")
-	(uuid "852235ad-451c-4306-b17e-4b65c2ba5b1e")
+	(uuid "9d55ee48-3cb0-4981-b48f-a8f624b84935")
 	(paper "A4")
 	(title_block
 		(title "Stereo headphone amplifier, 9 V, NJM4556A")
@@ -1605,599 +1605,79 @@
 			)
 			(justify left)
 		)
-		(uuid "71ed1947-d53b-4715-bd3a-56cbfe516830")
-	)
-	(junction
-		(at 78.74 48.26)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "0119171a-2a81-4bb1-910f-eec8b8d4c3db")
-	)
-	(junction
-		(at 12.7 115.57)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "025f7b46-be7e-4f2d-9479-83fe01a8fbd7")
-	)
-	(junction
-		(at 121.92 88.9)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "141c1965-a9f7-40df-915f-ea7113268872")
+		(uuid "a46c2d63-f624-4f7a-8458-1f8ffa143f13")
 	)
 	(junction
 		(at 101.6 38.1)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "1b4a231d-2a0c-4bdf-8458-e1f9758fda99")
+		(uuid "325fe7f6-fd25-489b-b8a7-d5e2b5723e73")
 	)
 	(junction
-		(at 45.72 60.96)
+		(at 121.92 88.9)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "45ad905c-b922-435b-af1c-c270e6d3b28f")
+		(uuid "608c5ac7-82fb-4a8f-9acf-7568a074effb")
 	)
 	(junction
 		(at 121.92 38.1)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "63c46c3e-0643-4399-b7a2-3d0f326d43fb")
+		(uuid "6d08bfcb-e2e3-41a5-8e62-39ba2de27c97")
 	)
 	(junction
-		(at 78.74 99.06)
+		(at 12.7 115.57)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "8b7efbfc-6297-451f-8bd7-6db1251cd897")
+		(uuid "71cfbfed-9d0c-45d6-a535-e78037dcb673")
 	)
 	(junction
 		(at 45.72 86.36)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "b322280e-c301-4b2f-a11c-0607a4440c43")
+		(uuid "8394f29a-13d3-40ba-abb2-e03cf27651e0")
 	)
 	(junction
-		(at 45.72 35.56)
+		(at 78.74 99.06)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "c42284c3-10b3-4971-974b-a91324e53f8b")
+		(uuid "8c0dad28-3b26-4c0f-b0b5-1ea822fea88a")
 	)
 	(junction
-		(at 101.6 88.9)
+		(at 78.74 48.26)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "c59798b8-3c9f-4ca9-9f91-01d25eccf374")
-	)
-	(junction
-		(at 12.7 100.33)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "f303879b-e6ad-4528-90da-7354851b92ee")
+		(uuid "b0c235a2-2044-4339-9237-6b8cc2d3a408")
 	)
 	(junction
 		(at 55.88 60.96)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "feb7c61f-ab4a-4cdb-94e0-bde5185cbed1")
+		(uuid "b70afcc1-a535-40b7-a52d-c659a55d73d0")
 	)
-	(wire
-		(pts
-			(xy 78.74 114.3) (xy 78.74 116.84)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0226778c-d892-4b2b-b657-e1a2a7ac5bac")
+	(junction
+		(at 101.6 88.9)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "e059ba9f-a99d-42d6-8065-2bff18f5fbe4")
 	)
-	(wire
-		(pts
-			(xy 27.94 86.36) (xy 29.21 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "03d0ade1-c3cc-4c6c-afad-ea2f16d4154a")
+	(junction
+		(at 12.7 100.33)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "e5a445e5-f254-496e-9391-d9920fc906af")
 	)
-	(wire
-		(pts
-			(xy 101.6 88.9) (xy 105.41 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "04392030-b5eb-4196-a31f-9ad1001d40eb")
+	(junction
+		(at 45.72 35.56)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "f623bb96-4928-4150-85c3-572be6c3fb36")
 	)
-	(wire
-		(pts
-			(xy 55.88 68.58) (xy 55.88 71.12)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "0ccc5c20-f537-4d00-a8cb-97db457aef79")
-	)
-	(wire
-		(pts
-			(xy 12.7 115.57) (xy 20.32 115.57)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1456d894-5569-4b33-9110-cd862200f074")
-	)
-	(wire
-		(pts
-			(xy 36.83 86.36) (xy 45.72 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "159ccf68-8392-494a-a4b8-ef0017e17fb5")
-	)
-	(wire
-		(pts
-			(xy 27.94 66.04) (xy 27.94 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "19b86212-adfd-4f94-8888-a799235dde24")
-	)
-	(wire
-		(pts
-			(xy 12.7 100.33) (xy 20.32 100.33)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1da46616-a63a-46c7-8eb0-04559ce043bd")
-	)
-	(wire
-		(pts
-			(xy 121.92 45.72) (xy 121.92 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1db8406c-92ab-42ce-8f0e-ae38422c0885")
-	)
-	(wire
-		(pts
-			(xy 101.6 38.1) (xy 105.41 38.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2560f76e-ae22-4f1b-a2df-093acdc11bfa")
-	)
-	(wire
-		(pts
-			(xy 101.6 38.1) (xy 96.52 38.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "34fbce24-818f-4d56-80f5-0fe217a84f20")
-	)
-	(wire
-		(pts
-			(xy 144.78 55.88) (xy 144.78 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3d805293-3bb6-4c29-bc21-8e901c441003")
-	)
-	(wire
-		(pts
-			(xy 45.72 43.18) (xy 45.72 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "421f191c-487c-41d0-b3ef-b5d5d137253d")
-	)
-	(wire
-		(pts
-			(xy 35.56 115.57) (xy 35.56 118.11)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4518db48-b03d-4040-910a-145ff6ff9f25")
-	)
-	(wire
-		(pts
-			(xy 149.86 88.9) (xy 149.86 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4b673788-c04b-4f57-9300-a14479bf31f7")
-	)
-	(wire
-		(pts
-			(xy 78.74 48.26) (xy 85.09 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4fd6e2db-67f6-4879-aba7-2a25ab6149e6")
-	)
-	(wire
-		(pts
-			(xy 139.7 60.96) (xy 139.7 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "50a08117-ad92-40ff-8ce5-2da480cc4c89")
-	)
-	(wire
-		(pts
-			(xy 15.24 60.96) (xy 19.05 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "56ac2977-e35c-4b3d-89e3-08133c3ae443")
-	)
-	(wire
-		(pts
-			(xy 45.72 60.96) (xy 45.72 78.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "57e53860-4beb-4602-aa65-6fb2c46527cc")
-	)
-	(wire
-		(pts
-			(xy 113.03 38.1) (xy 121.92 38.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5cd7ae96-f9fd-4b01-93e1-d6e70ce2896b")
-	)
-	(wire
-		(pts
-			(xy 12.7 115.57) (xy 12.7 118.11)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "60990207-4d52-411b-aab9-5440d5368715")
-	)
-	(wire
-		(pts
-			(xy 12.7 113.03) (xy 12.7 115.57)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "60a400c5-32f9-489d-b2fd-422456ea8c37")
-	)
-	(wire
-		(pts
-			(xy 78.74 63.5) (xy 78.74 66.04)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6769b145-5889-4fe8-ad09-2c800b07b89a")
-	)
-	(wire
-		(pts
-			(xy 58.42 101.6) (xy 58.42 104.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6fea8d64-9d0e-44ef-ba65-14414c0bea9e")
-	)
-	(wire
-		(pts
-			(xy 101.6 99.06) (xy 101.6 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "72858be4-13e2-4007-a12b-a47471e16cbc")
-	)
-	(wire
-		(pts
-			(xy 142.24 38.1) (xy 142.24 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "74a1fd6b-e44f-4e03-9211-aa8021d2fb97")
-	)
-	(wire
-		(pts
-			(xy 58.42 111.76) (xy 58.42 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "76bfcea1-7627-4cc4-bdc5-c18f463b9f5d")
-	)
-	(wire
-		(pts
-			(xy 92.71 48.26) (xy 101.6 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7c03059b-5e04-437f-bd4e-0828f34ea700")
-	)
-	(wire
-		(pts
-			(xy 36.83 35.56) (xy 45.72 35.56)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7cafa33a-cf91-4dec-8894-65d6e5bb7af0")
-	)
-	(wire
-		(pts
-			(xy 78.74 91.44) (xy 78.74 99.06)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8b4fefee-aba2-456b-bc9f-bb40d3ba85f0")
-	)
-	(wire
-		(pts
-			(xy 35.56 97.79) (xy 35.56 100.33)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8fb30fa8-2271-48ae-9aaa-a732f278e725")
-	)
-	(wire
-		(pts
-			(xy 121.92 88.9) (xy 149.86 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "93899b7e-5e02-423e-98e2-a4fe665d080f")
-	)
-	(wire
-		(pts
-			(xy 78.74 40.64) (xy 78.74 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "942897f9-99d1-4c48-a409-3333b340a4e2")
-	)
-	(wire
-		(pts
-			(xy 81.28 40.64) (xy 78.74 40.64)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9a3ba03a-da67-4982-9b4d-f428471c3c86")
-	)
-	(wire
-		(pts
-			(xy 45.72 86.36) (xy 81.28 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9b1ca37e-b21d-4386-8a2b-ca0e05950292")
-	)
-	(wire
-		(pts
-			(xy 113.03 88.9) (xy 121.92 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9d7527c3-8393-4411-8b3d-915fd312ad58")
-	)
-	(wire
-		(pts
-			(xy 15.24 63.5) (xy 25.4 63.5)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "aa036746-399d-4ae6-a35e-e3941bc111de")
-	)
-	(wire
-		(pts
-			(xy 81.28 91.44) (xy 78.74 91.44)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "acd1e313-b605-42ca-9dec-cee85b612365")
-	)
-	(wire
-		(pts
-			(xy 48.26 111.76) (xy 48.26 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b2407f83-8a6b-4f14-81c3-6e8efb7dde6a")
-	)
-	(wire
-		(pts
-			(xy 45.72 35.56) (xy 81.28 35.56)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b2f72443-1e19-4ba1-a3e9-6f8f4eb07b63")
-	)
-	(wire
-		(pts
-			(xy 149.86 55.88) (xy 144.78 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b55b487c-80e9-4054-a50f-893e6c08e3cb")
-	)
-	(wire
-		(pts
-			(xy 66.04 68.58) (xy 66.04 71.12)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "bf8a47e9-7484-4fe5-8623-90b7f7152634")
-	)
-	(wire
-		(pts
-			(xy 121.92 96.52) (xy 121.92 99.06)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c35bc98c-04ec-4f71-9f9d-d50f2dcb7718")
-	)
-	(wire
-		(pts
-			(xy 139.7 55.88) (xy 129.54 55.88)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c4048617-2365-4afe-9967-b73c5efdbea2")
-	)
-	(wire
-		(pts
-			(xy 12.7 100.33) (xy 12.7 97.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c7dcf2e7-90a1-4c07-85e1-6655463a51e0")
-	)
-	(wire
-		(pts
-			(xy 92.71 99.06) (xy 101.6 99.06)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ca4d5597-91c3-4d64-8a5d-76aa7f727141")
-	)
-	(wire
-		(pts
-			(xy 129.54 55.88) (xy 129.54 58.42)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "cdc12f93-6505-4f4b-aefe-0b0d8ba9f815")
-	)
-	(wire
-		(pts
-			(xy 25.4 35.56) (xy 29.21 35.56)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d0070ac3-c02d-4f8a-be15-d7414abd9817")
-	)
-	(wire
-		(pts
-			(xy 55.88 60.96) (xy 66.04 60.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d1bb88fc-3a95-4ba8-a168-2b2d37a32cb2")
-	)
-	(wire
-		(pts
-			(xy 15.24 66.04) (xy 27.94 66.04)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d38aa7f2-0dde-45de-bb5c-b7abb67b1053")
-	)
-	(wire
-		(pts
-			(xy 101.6 48.26) (xy 101.6 38.1)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d412d104-e9b1-44ba-b9f3-32cabcdae904")
-	)
-	(wire
-		(pts
-			(xy 48.26 101.6) (xy 48.26 104.14)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d6d65c09-5eb3-4c71-88fa-b25df49b647d")
+	(junction
+		(at 45.72 60.96)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "fca02fb6-bc04-4bef-8542-e5a07d700a57")
 	)
 	(wire
 		(pts
@@ -2207,57 +1687,67 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "d767f867-5abc-42c1-9e56-5ca29f4b1a83")
+		(uuid "0518dddf-d00b-40d6-bb3f-0d8bfa7066f0")
 	)
 	(wire
 		(pts
-			(xy 12.7 102.87) (xy 12.7 100.33)
+			(xy 58.42 101.6) (xy 58.42 104.14)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "df4522fe-5be3-481b-84d8-9f641170cf7a")
+		(uuid "060e0d7c-0c84-462b-a2b8-8d5e66f8ded3")
 	)
 	(wire
 		(pts
-			(xy 121.92 38.1) (xy 142.24 38.1)
+			(xy 78.74 91.44) (xy 78.74 99.06)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "e6f757ee-e5f8-4680-914f-a40fdb508beb")
+		(uuid "09f181fe-f95e-47b1-9895-a9bf6dbc2590")
 	)
 	(wire
 		(pts
-			(xy 25.4 63.5) (xy 25.4 35.56)
+			(xy 45.72 60.96) (xy 45.72 78.74)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "f1a24259-39c9-4fc7-907f-b4155da622a3")
+		(uuid "0e4a5f8c-480f-47fb-bb5e-9d572ddefb39")
 	)
 	(wire
 		(pts
-			(xy 55.88 50.8) (xy 55.88 53.34)
+			(xy 36.83 86.36) (xy 45.72 86.36)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "f6492780-8360-4655-89c2-c825f49e24f7")
+		(uuid "0e57ff84-a3d0-4716-8576-89425593b248")
 	)
 	(wire
 		(pts
-			(xy 78.74 99.06) (xy 85.09 99.06)
+			(xy 27.94 86.36) (xy 29.21 86.36)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "f7e9ea07-c9c1-4d25-8cb0-2f12dc508218")
+		(uuid "135506d0-464b-493e-ba20-cecd42eb44dd")
+	)
+	(wire
+		(pts
+			(xy 48.26 111.76) (xy 48.26 114.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "13cfb6d0-f8dc-4d81-8e9a-7dd9faf032bd")
 	)
 	(wire
 		(pts
@@ -2267,554 +1757,517 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "f976cb9c-3839-415d-8253-454ed79d0fb1")
+		(uuid "1649d620-3671-4b06-8220-943fefeea9d1")
 	)
-	(symbol
-		(lib_id "Device:R")
-		(at 45.72 39.37 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "0f47545e-ae72-4e47-b073-4e55ff62fa99")
-		(property "Reference" "R1"
-			(at 47.752 39.37 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+	(wire
+		(pts
+			(xy 45.72 43.18) (xy 45.72 60.96)
 		)
-		(property "Value" "100k"
-			(at 45.72 39.37 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 43.942 39.37 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 45.72 39.37 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 45.72 39.37 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "229e01ad-a72b-4a52-9366-792a20b2fcae")
-		)
-		(pin "2"
-			(uuid "62df1d26-922e-4678-90e2-da81a5e8f858")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R1")
-					(unit 1)
-				)
-			)
-		)
+		(uuid "173157eb-a6ff-45ba-aadb-2b18ecc0f810")
 	)
-	(symbol
-		(lib_id "power:+9V")
-		(at 58.42 101.6 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "1bddfe9a-7c67-41fa-9fb2-d9db19d51bc2")
-		(property "Reference" "#PWR14"
-			(at 58.42 105.41 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+	(wire
+		(pts
+			(xy 92.71 48.26) (xy 101.6 48.26)
 		)
-		(property "Value" "+9V"
-			(at 58.42 98.044 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 58.42 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 58.42 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+9V\""
-			(at 58.42 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "75aeebff-0f3c-4989-84d3-d8e4a9a99300")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR14")
-					(unit 1)
-				)
-			)
-		)
+		(uuid "1b3e081c-5d99-4c0e-b16d-c0964405eafd")
 	)
-	(symbol
-		(lib_id "power:+9V")
-		(at 48.26 101.6 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "1cd2324a-9ed5-435b-986a-8e10374d9ca4")
-		(property "Reference" "#PWR12"
-			(at 48.26 105.41 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+	(wire
+		(pts
+			(xy 58.42 111.76) (xy 58.42 114.3)
 		)
-		(property "Value" "+9V"
-			(at 48.26 98.044 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 48.26 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 48.26 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+9V\""
-			(at 48.26 101.6 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "fd1ff630-8784-4d7f-bce5-320cd2cb5fbd")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR12")
-					(unit 1)
-				)
-			)
-		)
+		(uuid "1e624ca0-0d1a-41c6-8575-e36ee8e92204")
 	)
-	(symbol
-		(lib_id "power:+9V")
-		(at 55.88 50.8 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "221679e0-79f7-4292-bb95-66aa5b11633e")
-		(property "Reference" "#PWR05"
-			(at 55.88 54.61 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+	(wire
+		(pts
+			(xy 81.28 40.64) (xy 78.74 40.64)
 		)
-		(property "Value" "+9V"
-			(at 55.88 47.244 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 55.88 50.8 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 55.88 50.8 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+9V\""
-			(at 55.88 50.8 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "72d53d28-1b4a-4f35-afdf-95b0a0847b47")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR05")
-					(unit 1)
-				)
-			)
-		)
+		(uuid "21469990-a895-4134-883b-55faeb5f3006")
 	)
-	(symbol
-		(lib_id "power:GND")
-		(at 129.54 58.42 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "2a1554f4-685d-4f39-8277-55613e69b949")
-		(property "Reference" "#PWR17"
-			(at 129.54 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+	(wire
+		(pts
+			(xy 92.71 99.06) (xy 101.6 99.06)
 		)
-		(property "Value" "GND"
-			(at 129.54 62.23 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 129.54 58.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 129.54 58.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 129.54 58.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c3cd4c1b-aa5d-4b64-ba5d-786c67d8f17b")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR17")
-					(unit 1)
-				)
-			)
-		)
+		(uuid "239e4cf2-1877-4dc1-8878-2c7b83e6a89e")
 	)
-	(symbol
-		(lib_id "Device:C_Polarized")
-		(at 78.74 110.49 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "30843381-04d1-4af1-8ebd-25bd40159454")
-		(property "Reference" "C8"
-			(at 79.375 107.95 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
+	(wire
+		(pts
+			(xy 12.7 115.57) (xy 20.32 115.57)
 		)
-		(property "Value" "22u"
-			(at 79.375 113.03 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 79.7052 114.3 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 78.74 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Polarized capacitor"
-			(at 78.74 110.49 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "dd5ca557-0cdd-471e-8f58-695b63ee240a")
-		)
-		(pin "2"
-			(uuid "e2e4dfeb-b66d-44b7-9104-9dd6cb289ce3")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "C8")
-					(unit 1)
-				)
-			)
-		)
+		(uuid "2972198f-78b5-4c9b-a99c-238ee3bed4b1")
 	)
-	(symbol
-		(lib_id "Device:R")
-		(at 88.9 99.06 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "3e49adf8-2326-49f9-b981-6ee0f9675329")
-		(property "Reference" "R5"
-			(at 88.9 97.028 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+	(wire
+		(pts
+			(xy 66.04 68.58) (xy 66.04 71.12)
 		)
-		(property "Value" "22k"
-			(at 88.9 99.06 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Footprint" ""
-			(at 88.9 100.838 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(uuid "2b8691ca-c443-40ea-83b3-1c11537d24d5")
+	)
+	(wire
+		(pts
+			(xy 101.6 38.1) (xy 96.52 38.1)
 		)
-		(property "Datasheet" ""
-			(at 88.9 99.06 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(property "Description" "Resistor"
-			(at 88.9 99.06 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
+		(uuid "3ad7063e-d613-4860-80e7-cda352d98205")
+	)
+	(wire
+		(pts
+			(xy 149.86 55.88) (xy 144.78 55.88)
 		)
-		(pin "1"
-			(uuid "9f24249d-89f7-4fb7-aa59-64437692422f")
+		(stroke
+			(width 0)
+			(type default)
 		)
-		(pin "2"
-			(uuid "0af3d03b-4cb9-4f06-abbe-f0e318ab9da2")
+		(uuid "3e89a069-125d-43dd-8d13-e805fe21223e")
+	)
+	(wire
+		(pts
+			(xy 78.74 48.26) (xy 85.09 48.26)
 		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R5")
-					(unit 1)
-				)
-			)
+		(stroke
+			(width 0)
+			(type default)
 		)
+		(uuid "46577105-63f6-47d0-bd2b-b75f467c08b4")
+	)
+	(wire
+		(pts
+			(xy 101.6 48.26) (xy 101.6 38.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "47b15970-a5b1-4334-9a7f-88d1ed4b420a")
+	)
+	(wire
+		(pts
+			(xy 15.24 60.96) (xy 19.05 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4d6e5f3b-5368-4453-86d3-701c2c5301be")
+	)
+	(wire
+		(pts
+			(xy 45.72 35.56) (xy 81.28 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4e30ebda-6fcb-45ca-b67b-7cc39f51e513")
+	)
+	(wire
+		(pts
+			(xy 121.92 45.72) (xy 121.92 48.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4f38c903-33c3-481a-ae43-fdbd285e8733")
+	)
+	(wire
+		(pts
+			(xy 81.28 91.44) (xy 78.74 91.44)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "51de7730-2050-4c77-afc2-11856007dbaf")
+	)
+	(wire
+		(pts
+			(xy 12.7 113.03) (xy 12.7 115.57)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "567a5931-2946-44dd-9c31-ea0b06cc0ef4")
+	)
+	(wire
+		(pts
+			(xy 142.24 38.1) (xy 142.24 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5689e55a-67d0-461d-8ac2-7907ff01d211")
+	)
+	(wire
+		(pts
+			(xy 101.6 38.1) (xy 105.41 38.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5adaeb4e-e8c9-4e9a-bc84-ed5b3ed7be7a")
+	)
+	(wire
+		(pts
+			(xy 45.72 86.36) (xy 81.28 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "636b47b3-ff9a-4d5f-9bba-1658a67b7a1b")
+	)
+	(wire
+		(pts
+			(xy 15.24 63.5) (xy 25.4 63.5)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "67b7bc47-581b-41c3-977a-68287269a968")
+	)
+	(wire
+		(pts
+			(xy 27.94 66.04) (xy 27.94 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6ca85288-c4f0-4379-abbd-a072070985e9")
+	)
+	(wire
+		(pts
+			(xy 78.74 40.64) (xy 78.74 48.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7177d30b-6283-4271-a502-6dd14032fa76")
+	)
+	(wire
+		(pts
+			(xy 139.7 55.88) (xy 129.54 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "76fbd569-4cda-4eaf-ae8c-8da53744d286")
+	)
+	(wire
+		(pts
+			(xy 139.7 60.96) (xy 139.7 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "821479ac-b026-4137-8e93-7a0e225f2f6f")
+	)
+	(wire
+		(pts
+			(xy 121.92 96.52) (xy 121.92 99.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "83e1b498-fcdf-40c4-ba58-9900a6f112a2")
+	)
+	(wire
+		(pts
+			(xy 48.26 101.6) (xy 48.26 104.14)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8adf5694-ad9e-4e87-bc1e-2f924e3a9cb7")
+	)
+	(wire
+		(pts
+			(xy 12.7 115.57) (xy 12.7 118.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "905e0be6-6d13-444f-9113-27482dbd67c0")
+	)
+	(wire
+		(pts
+			(xy 55.88 68.58) (xy 55.88 71.12)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "95ffda2c-27f7-438b-9963-18bb1cff1b31")
+	)
+	(wire
+		(pts
+			(xy 35.56 97.79) (xy 35.56 100.33)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9bbef74f-33ed-4a26-ab82-d920cd477a92")
+	)
+	(wire
+		(pts
+			(xy 35.56 115.57) (xy 35.56 118.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b190620d-1eb0-438b-adbe-5d69f68e48b1")
+	)
+	(wire
+		(pts
+			(xy 25.4 63.5) (xy 25.4 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bc42224d-077a-4660-bb1f-ea2d11192d9f")
+	)
+	(wire
+		(pts
+			(xy 101.6 99.06) (xy 101.6 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bcdae153-fb61-4979-935a-d65ca9305e91")
+	)
+	(wire
+		(pts
+			(xy 25.4 35.56) (xy 29.21 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "be326026-10e4-4f33-9c7e-51bfbc138912")
+	)
+	(wire
+		(pts
+			(xy 78.74 99.06) (xy 85.09 99.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bf20fcbf-7171-4099-923a-d92b284091bb")
+	)
+	(wire
+		(pts
+			(xy 121.92 38.1) (xy 142.24 38.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c4d12550-9563-47a6-a07e-823024e64d56")
+	)
+	(wire
+		(pts
+			(xy 149.86 88.9) (xy 149.86 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cd552f7e-8ddc-44ec-81ad-6439d4c814ae")
+	)
+	(wire
+		(pts
+			(xy 55.88 60.96) (xy 66.04 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d27091e4-34be-467c-8b54-0f69eb1f03b0")
+	)
+	(wire
+		(pts
+			(xy 15.24 66.04) (xy 27.94 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dc13a905-1266-4365-9261-183420267a01")
+	)
+	(wire
+		(pts
+			(xy 78.74 63.5) (xy 78.74 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dc2d9c34-5649-4844-b1f2-4ee1359b927a")
+	)
+	(wire
+		(pts
+			(xy 121.92 88.9) (xy 149.86 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e3e6cd2c-d615-4fe0-9a74-5e96e4eeaff8")
+	)
+	(wire
+		(pts
+			(xy 144.78 55.88) (xy 144.78 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e5a1d516-485b-425d-9b23-b9031a47cac9")
+	)
+	(wire
+		(pts
+			(xy 129.54 55.88) (xy 129.54 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e696dd6a-a84e-4486-b121-7a1d4507a8d5")
+	)
+	(wire
+		(pts
+			(xy 55.88 50.8) (xy 55.88 53.34)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e8e937bc-d212-4916-aeed-90995b32daf8")
+	)
+	(wire
+		(pts
+			(xy 12.7 100.33) (xy 20.32 100.33)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e9c1c9dd-3a81-4864-8805-1d9eb3b01ffc")
+	)
+	(wire
+		(pts
+			(xy 113.03 38.1) (xy 121.92 38.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ec5489b2-aa42-45eb-b56d-b242635b382e")
+	)
+	(wire
+		(pts
+			(xy 101.6 88.9) (xy 105.41 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ed5e3e53-861e-4cfb-8d8e-167bc202c2f0")
+	)
+	(wire
+		(pts
+			(xy 36.83 35.56) (xy 45.72 35.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f21798fc-ae1f-4941-98a3-524af265ac8e")
+	)
+	(wire
+		(pts
+			(xy 78.74 114.3) (xy 78.74 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f896d59c-bf91-42da-88cb-33c0a07d22ba")
+	)
+	(wire
+		(pts
+			(xy 12.7 102.87) (xy 12.7 100.33)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f9b5ef40-6930-4226-837b-473f8c93679a")
+	)
+	(wire
+		(pts
+			(xy 113.03 88.9) (xy 121.92 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "faeb4877-72e3-4b9a-ad0b-ee407c6ae96e")
+	)
+	(wire
+		(pts
+			(xy 12.7 100.33) (xy 12.7 97.79)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fbb4b5c3-a590-46a8-aa74-a5f4bc55b56b")
 	)
 	(symbol
 		(lib_id "Device:C")
@@ -2826,7 +2279,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "3fe0f148-39ae-45b0-8f93-e1ac22fd3ba2")
+		(uuid "01eb7377-8f9e-4b27-9f83-b0330c07e39d")
 		(property "Reference" "C4"
 			(at 48.895 105.41 0)
 			(show_name no)
@@ -2883,14 +2336,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "3fa81f67-3d6c-4279-aa0d-257a23a512b9")
+			(uuid "d61903c3-9269-4dfb-962c-83acd88fe8ed")
 		)
 		(pin "2"
-			(uuid "a78bcdf0-c2e2-47f3-9b27-0dea027dcded")
+			(uuid "96358e95-3ba7-4a80-b083-9ef946f16285")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "C4")
 					(unit 1)
 				)
@@ -2898,87 +2351,8 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 55.88 64.77 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "42859fb4-2fa6-4b9b-9972-790bfcb23430")
-		(property "Reference" "R8"
-			(at 57.912 64.77 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "22k"
-			(at 55.88 64.77 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 54.102 64.77 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 55.88 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 55.88 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "14c78011-ffec-41a4-acb2-eeeb9733b43d")
-		)
-		(pin "2"
-			(uuid "3602b65b-9ba3-458a-90b5-340018210eba")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:+9V")
-		(at 35.56 97.79 0)
+		(at 58.42 101.6 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -2986,9 +2360,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "467dfd15-5d4a-48f0-a235-cdac6841dfa1")
-		(property "Reference" "#PWR10"
-			(at 35.56 101.6 0)
+		(uuid "0cea3a1b-6da0-41e1-a37c-727821e77676")
+		(property "Reference" "#PWR14"
+			(at 58.42 105.41 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -2999,7 +2373,7 @@
 			)
 		)
 		(property "Value" "+9V"
-			(at 35.56 94.234 0)
+			(at 58.42 98.044 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3009,7 +2383,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 35.56 97.79 0)
+			(at 58.42 101.6 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3020,7 +2394,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 35.56 97.79 0)
+			(at 58.42 101.6 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3031,7 +2405,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+9V\""
-			(at 35.56 97.79 0)
+			(at 58.42 101.6 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3042,188 +2416,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "defa37df-872d-4f98-a74b-b3a938dd0cca")
+			(uuid "300e1826-f06e-4900-b961-f5b58b4b240b")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR10")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Amplifier_Operational:NJM4556A")
-		(at 88.9 88.9 0)
-		(unit 2)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "493511d1-92de-404b-ad0e-be2b339b3611")
-		(property "Reference" "U1"
-			(at 88.9 83.82 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "NJM4556A"
-			(at 88.9 93.98 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 88.9 88.9 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "http://www.njr.com/semicon/PDF/NJM4556A_E.pdf"
-			(at 88.9 88.9 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Dual High Current Operational Amplifier, DIP-8/DMP-8/SIP-8/SSOP-8"
-			(at 88.9 88.9 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "d2247bd6-a148-43d2-9cab-33abd3366fd5")
-		)
-		(pin "2"
-			(uuid "f2213fc6-0458-44f3-99b7-d34a1223df04")
-		)
-		(pin "3"
-			(uuid "07a0c3ab-ab4a-44ee-9918-45b595bdb5c9")
-		)
-		(pin "5"
-			(uuid "314d2bf5-d04c-440b-b05c-4500fac6563c")
-		)
-		(pin "6"
-			(uuid "dac4c8f7-a606-4f59-b17e-52d0be5bab97")
-		)
-		(pin "7"
-			(uuid "3c9a4b64-50df-4dcf-8b90-754317cb4e4d")
-		)
-		(pin "4"
-			(uuid "6de31ca9-3528-4239-8fdd-6c2dfebf32bf")
-		)
-		(pin "8"
-			(uuid "fe7a45f9-533b-4071-978b-a851446741a3")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "U1")
-					(unit 2)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 121.92 48.26 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "4ff7ff78-04d9-4b89-82dc-450d51318e5b")
-		(property "Reference" "#PWR02"
-			(at 121.92 54.61 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 121.92 52.07 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 121.92 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 121.92 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 121.92 48.26 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "63db62e1-d053-4ab8-a9a2-af6c49dd70d8")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR02")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR14")
 					(unit 1)
 				)
 			)
@@ -3231,7 +2429,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 121.92 41.91 0)
+		(at 78.74 102.87 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -3239,9 +2437,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "51bfd544-a35b-46e3-824f-d9031dadd49e")
-		(property "Reference" "R9"
-			(at 123.952 41.91 90)
+		(uuid "2047640c-ae55-46f4-a630-64f5d09d0811")
+		(property "Reference" "R6"
+			(at 80.772 102.87 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3251,7 +2449,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at 121.92 41.91 90)
+			(at 78.74 102.87 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3261,7 +2459,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 120.142 41.91 90)
+			(at 76.962 102.87 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3272,7 +2470,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 121.92 41.91 0)
+			(at 78.74 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3283,7 +2481,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 121.92 41.91 0)
+			(at 78.74 102.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3294,507 +2492,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "88e7955f-3761-484a-b286-8e24ffbb52fd")
+			(uuid "9fd13086-bf8d-447f-b060-b773642c7e7b")
 		)
 		(pin "2"
-			(uuid "a4756f38-133f-4494-b176-9bf843a2a8a7")
+			(uuid "7d0d714b-4106-4626-b9dc-692f63ea00ab")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 35.56 118.11 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "590e4278-a00a-470f-a1be-78a3ca13b2a7")
-		(property "Reference" "#PWR11"
-			(at 35.56 124.46 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 35.56 121.92 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 35.56 118.11 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 35.56 118.11 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 35.56 118.11 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "4f8c9488-579a-469d-88a2-cae341e392a6")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR11")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:C_Polarized")
-		(at 66.04 64.77 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "5980fb07-3217-4a47-b2fe-7cfe3f0ffec1")
-		(property "Reference" "C3"
-			(at 66.675 62.23 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "47u"
-			(at 66.675 67.31 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 67.0052 68.58 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 66.04 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Polarized capacitor"
-			(at 66.04 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "95801196-3b02-4138-885f-81f5cc80d0ea")
-		)
-		(pin "2"
-			(uuid "d502b378-4012-431d-8e66-72aed77ffe5a")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "C3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 58.42 114.3 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "5dcaf573-41d6-48f2-9228-f88b23610039")
-		(property "Reference" "#PWR15"
-			(at 58.42 120.65 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 58.42 118.11 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 58.42 114.3 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 58.42 114.3 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 58.42 114.3 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "fb8e20f3-8d8c-4601-8204-3ad0423d91ee")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR15")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 78.74 66.04 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "6276332d-b7d9-432f-96f0-aeaefabddf4a")
-		(property "Reference" "#PWR01"
-			(at 78.74 72.39 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 78.74 69.85 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 78.74 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 78.74 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 78.74 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "bd0bea7e-08a9-48dc-a0a0-559a23fb1d1d")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR01")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:C_Polarized")
-		(at 109.22 38.1 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "6441e327-badb-4555-8b26-dd334ac59fc5")
-		(property "Reference" "C7"
-			(at 106.68 37.465 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "1000u"
-			(at 111.76 37.465 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 113.03 37.1348 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 109.22 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Polarized capacitor"
-			(at 109.22 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "e180cc9d-e6c3-4430-ad06-202846cef478")
-		)
-		(pin "2"
-			(uuid "a9d57af2-3187-4d9c-9ee7-8fb35bed4f3f")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "C7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Amplifier_Operational:NJM4556A")
-		(at 88.9 38.1 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "671fba50-52cc-4358-a16f-97f8bec14473")
-		(property "Reference" "U1"
-			(at 88.9 33.02 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "NJM4556A"
-			(at 88.9 43.18 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 88.9 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "http://www.njr.com/semicon/PDF/NJM4556A_E.pdf"
-			(at 88.9 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Dual High Current Operational Amplifier, DIP-8/DMP-8/SIP-8/SSOP-8"
-			(at 88.9 38.1 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "ae64e1bb-90a7-43c0-9fd7-6258e2781edc")
-		)
-		(pin "2"
-			(uuid "c2510e6a-e3c3-47e2-9774-07b36d5ac0c8")
-		)
-		(pin "3"
-			(uuid "7421da80-17f8-4d42-b82d-dd218776e6c1")
-		)
-		(pin "5"
-			(uuid "e5dd0efc-04c1-4730-a98d-28af37ecbcf6")
-		)
-		(pin "6"
-			(uuid "5f68b533-5057-418f-aca9-b17380728d1e")
-		)
-		(pin "7"
-			(uuid "c340abd6-cb6b-45a6-974d-cd2e45240317")
-		)
-		(pin "4"
-			(uuid "9e755c43-f42e-437f-a5f9-7385e4250cb2")
-		)
-		(pin "8"
-			(uuid "cd1de3e6-450b-4d43-96d5-d77d7c62a9da")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "U1")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R6")
 					(unit 1)
 				)
 			)
@@ -3810,7 +2516,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "6749f209-41d6-4fde-b0f4-6c1a9c8d7f7f")
+		(uuid "218adf77-9d9e-4d09-96c4-b74c6b7c6a60")
 		(property "Reference" "BT1"
 			(at 15.24 105.41 0)
 			(show_name no)
@@ -3900,14 +2606,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "d8aa94e1-715a-4786-86b4-c1ea41566480")
+			(uuid "a7081c88-c85f-475f-8e7c-bc43b0e3cf84")
 		)
 		(pin "2"
-			(uuid "3b501a70-6ad9-4a4b-a438-66f38323d90b")
+			(uuid "bcf6bef4-3d43-4f26-8bd6-a7bc2122b020")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "BT1")
 					(unit 1)
 				)
@@ -3915,8 +2621,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 55.88 71.12 0)
+		(lib_id "power:+9V")
+		(at 35.56 97.79 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -3924,9 +2630,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "6c4ba943-a2c8-4c95-add5-4e87a409e1b4")
-		(property "Reference" "#PWR06"
-			(at 55.88 77.47 0)
+		(uuid "247f3e97-0d51-4cdc-adbd-a78c6aa524d0")
+		(property "Reference" "#PWR10"
+			(at 35.56 101.6 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3936,8 +2642,8 @@
 				)
 			)
 		)
-		(property "Value" "GND"
-			(at 55.88 74.93 0)
+		(property "Value" "+9V"
+			(at 35.56 94.234 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3947,7 +2653,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 55.88 71.12 0)
+			(at 35.56 97.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3958,7 +2664,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 55.88 71.12 0)
+			(at 35.56 97.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3968,8 +2674,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 55.88 71.12 0)
+		(property "Description" "Power symbol creates a global label with name \"+9V\""
+			(at 35.56 97.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3980,20 +2686,20 @@
 			)
 		)
 		(pin "1"
-			(uuid "2a982cd3-5746-46e3-b98e-9655aa39dded")
+			(uuid "f8fb1685-66f5-4c19-9cdb-6657f94a8021")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR06")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR10")
 					(unit 1)
 				)
 			)
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 78.74 116.84 0)
+		(lib_id "Device:R")
+		(at 88.9 99.06 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -4001,10 +2707,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "6f6ab618-338d-4b5a-bad9-105c055d19f1")
-		(property "Reference" "#PWR03"
-			(at 78.74 123.19 0)
-			(hide yes)
+		(uuid "25553509-0ef4-480e-81bd-88644d917b84")
+		(property "Reference" "R5"
+			(at 88.9 97.028 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4013,8 +2718,8 @@
 				)
 			)
 		)
-		(property "Value" "GND"
-			(at 78.74 120.65 0)
+		(property "Value" "22k"
+			(at 88.9 99.06 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4024,7 +2729,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 78.74 116.84 0)
+			(at 88.9 100.838 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4035,7 +2740,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 78.74 116.84 0)
+			(at 88.9 99.06 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4045,85 +2750,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 78.74 116.84 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "1bd478f8-4985-43b0-b6c3-c0be7b68c272")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR03")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 20.32 115.57 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "7db42952-fe33-4b13-b49e-9c6ac93212d6")
-		(property "Reference" "#FLG02"
-			(at 20.32 113.665 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 20.32 111.76 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 20.32 115.57 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 20.32 115.57 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 20.32 115.57 0)
+		(property "Description" "Resistor"
+			(at 88.9 99.06 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4134,89 +2762,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "d04bcf40-8259-4bf8-a328-db283618e225")
+			(uuid "04c14b83-f049-4463-962f-d8980b4af01e")
+		)
+		(pin "2"
+			(uuid "65f6def2-35dc-4f72-8db6-904344a7773b")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#FLG02")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 66.04 71.12 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "7e12f7dd-2970-41aa-bd14-d67bf438b079")
-		(property "Reference" "#PWR07"
-			(at 66.04 77.47 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 66.04 74.93 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 66.04 71.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 66.04 71.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 66.04 71.12 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "09b2858b-fdc6-4292-9fce-d273d6393cf5")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR07")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R5")
 					(unit 1)
 				)
 			)
@@ -4232,7 +2786,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "7f1d7f47-e538-4dbe-93a3-c2a2b5af621f")
+		(uuid "32b856e5-c1e4-420e-8f1c-ae511e54e98c")
 		(property "Reference" "C5"
 			(at 59.055 105.41 0)
 			(show_name no)
@@ -4289,15 +2843,587 @@
 			)
 		)
 		(pin "1"
-			(uuid "ac4d6635-0cbf-4d8d-ab60-c121ddd04eb1")
+			(uuid "3ca8c29d-8e94-4fb8-9098-ba21bbc187e5")
 		)
 		(pin "2"
-			(uuid "e7a1e55f-5651-49f4-b958-4767f5818840")
+			(uuid "b6596905-c189-4b33-b718-2199a1a929db")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "C5")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Amplifier_Operational:NJM4556A")
+		(at 88.9 38.1 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "34709826-85f0-4c79-aaac-d53db10ef7f5")
+		(property "Reference" "U1"
+			(at 88.9 33.02 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "NJM4556A"
+			(at 88.9 43.18 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 88.9 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "http://www.njr.com/semicon/PDF/NJM4556A_E.pdf"
+			(at 88.9 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Dual High Current Operational Amplifier, DIP-8/DMP-8/SIP-8/SSOP-8"
+			(at 88.9 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "663e4bec-d7a5-421b-aff8-ed3b9d5a7c86")
+		)
+		(pin "2"
+			(uuid "21edca75-8b4d-45fe-be58-2a2ac21d389f")
+		)
+		(pin "3"
+			(uuid "21bc79e8-7667-4992-aed6-670eaa4f345a")
+		)
+		(pin "5"
+			(uuid "badf15c0-fe93-4735-8e3b-56743d9c3488")
+		)
+		(pin "6"
+			(uuid "d0215c40-3b3a-4b83-866e-87f74217f081")
+		)
+		(pin "7"
+			(uuid "2075cd6d-57b3-40e8-8b49-d166cca46d99")
+		)
+		(pin "4"
+			(uuid "2019ae74-18f4-4a4f-ae51-0047f358017f")
+		)
+		(pin "8"
+			(uuid "fd3d1ceb-c256-473a-bc4f-37299556b33a")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "U1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Audio:AudioJack3")
+		(at 142.24 66.04 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4058f2f1-9e14-4537-a245-940bf40d9876")
+		(property "Reference" "J2"
+			(at 133.35 66.04 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Phones"
+			(at 135.89 66.04 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 142.24 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 142.24 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Audio Jack, 3 Poles (Stereo / TRS)"
+			(at 142.24 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "R"
+			(uuid "e8752fff-86db-4179-b0bb-37fbcb9cb97a")
+		)
+		(pin "S"
+			(uuid "a711835c-be71-4d31-8b7f-6e02257c44c6")
+		)
+		(pin "T"
+			(uuid "3560ffdd-980d-4c22-bf19-c6b0ce5854ad")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "J2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+9V")
+		(at 12.7 97.79 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4821505f-d628-47b8-85b0-f2eefd2a879a")
+		(property "Reference" "#PWR08"
+			(at 12.7 101.6 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+9V"
+			(at 12.7 94.234 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 12.7 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 12.7 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+9V\""
+			(at 12.7 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c202267c-9afc-4252-acbb-c2ab1c0e4217")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR08")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 121.92 92.71 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4c29da08-57d9-424a-a344-6d7c21c7ec0d")
+		(property "Reference" "R10"
+			(at 123.952 92.71 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10k"
+			(at 121.92 92.71 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 120.142 92.71 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 121.92 92.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 121.92 92.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "ae53b4a2-3a43-424d-b2c2-d9c20c0879aa")
+		)
+		(pin "2"
+			(uuid "4105bf4c-2b60-45d2-96ca-50879d0940a0")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R10")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+9V")
+		(at 48.26 101.6 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "568e302d-2ecd-4d76-8a2e-2e08f66361c7")
+		(property "Reference" "#PWR12"
+			(at 48.26 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+9V"
+			(at 48.26 98.044 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 48.26 101.6 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 48.26 101.6 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+9V\""
+			(at 48.26 101.6 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "597e41e2-8d68-4f59-a564-0ed65371600d")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 121.92 48.26 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "5719b745-7b75-4e75-9278-c1ddaf2681b2")
+		(property "Reference" "#PWR02"
+			(at 121.92 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 121.92 52.07 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 121.92 48.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 121.92 48.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 121.92 48.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9e452933-cabd-4ceb-b2c0-53cf0004afbd")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR02")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Polarized")
+		(at 66.04 64.77 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "5b4f4edc-d437-4199-b149-3e1e08ad73f9")
+		(property "Reference" "C3"
+			(at 66.675 62.23 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "47u"
+			(at 66.675 67.31 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 67.0052 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 66.04 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Polarized capacitor"
+			(at 66.04 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "111d26fe-c164-4b12-b6ff-c10619932a62")
+		)
+		(pin "2"
+			(uuid "50a0e782-b77b-44a0-8dba-654897cbbf2e")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "C3")
 					(unit 1)
 				)
 			)
@@ -4313,7 +3439,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "80f612d8-9859-4d9d-9894-19871c08cb6a")
+		(uuid "5d3945d8-9ebd-4bda-9f52-5a1999f4fbe2")
 		(property "Reference" "C6"
 			(at 79.375 57.15 0)
 			(show_name no)
@@ -4370,14 +3496,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "e7888a5b-9c5b-4091-98f8-8e5df535379e")
+			(uuid "b6660714-7f02-43c2-ab42-a90f8076fd75")
 		)
 		(pin "2"
-			(uuid "8419fae6-3230-4290-a92c-0d0bfc1a42fd")
+			(uuid "99003d73-808d-4021-a993-7c5fdea997c2")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "C6")
 					(unit 1)
 				)
@@ -4385,90 +3511,8 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector_Audio:AudioJack3")
-		(at 142.24 66.04 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "84056426-07b1-4608-9338-3f30d8f5b501")
-		(property "Reference" "J2"
-			(at 133.35 66.04 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "Phones"
-			(at 135.89 66.04 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 142.24 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 142.24 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Audio Jack, 3 Poles (Stereo / TRS)"
-			(at 142.24 66.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "R"
-			(uuid "fa50b0a3-e7eb-43c3-8db0-a6d370d18558")
-		)
-		(pin "S"
-			(uuid "d9a1aad2-0c27-46aa-b7ae-6fc96707dbb9")
-		)
-		(pin "T"
-			(uuid "d75e8c86-ba0b-400d-bd3e-a3b81e52e22f")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "J2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
-		(at 55.88 57.15 0)
+		(at 88.9 48.26 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -4476,9 +3520,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "89ba2c8d-f6a3-4940-92af-f6be2c96f387")
-		(property "Reference" "R7"
-			(at 57.912 57.15 90)
+		(uuid "5f1015e5-5d09-496d-bb93-a905ed0dce90")
+		(property "Reference" "R3"
+			(at 88.9 46.228 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4488,7 +3532,7 @@
 			)
 		)
 		(property "Value" "22k"
-			(at 55.88 57.15 90)
+			(at 88.9 48.26 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4498,7 +3542,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 54.102 57.15 90)
+			(at 88.9 50.038 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4509,7 +3553,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 55.88 57.15 0)
+			(at 88.9 48.26 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4520,7 +3564,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 55.88 57.15 0)
+			(at 88.9 48.26 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4531,15 +3575,94 @@
 			)
 		)
 		(pin "1"
-			(uuid "8e739b09-51a7-4b54-8bc9-8def37e04da7")
+			(uuid "a1bd0dd5-4455-4972-aaf0-1fc38c000ae7")
 		)
 		(pin "2"
-			(uuid "5e1fbdc9-0028-4b35-a0f0-87cfaaa64cb7")
+			(uuid "c30b61de-db8d-466e-9187-2d1ea10c6f57")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R7")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 45.72 82.55 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "6df1aa12-6c03-4771-81d7-ae9719ad40d2")
+		(property "Reference" "R2"
+			(at 47.752 82.55 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 82.55 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.942 82.55 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 45.72 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 45.72 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9370354b-291d-4a5e-a92d-05ab32661407")
+		)
+		(pin "2"
+			(uuid "e9403b6c-3f64-4ddf-99b5-a7f74b0622d9")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R2")
 					(unit 1)
 				)
 			)
@@ -4555,7 +3678,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "8ab18fb6-1e4e-499a-b9b5-d25561130f63")
+		(uuid "738c624a-c9a4-404f-9451-e8ffee684481")
 		(property "Reference" "J1"
 			(at 10.16 54.61 0)
 			(show_name no)
@@ -4610,17 +3733,17 @@
 			)
 		)
 		(pin "R"
-			(uuid "aa9c7fd3-de9b-41dc-965a-722f1656d183")
+			(uuid "642b47b5-f839-4261-a360-136ab76cab3f")
 		)
 		(pin "S"
-			(uuid "f01db087-db8b-4676-9b58-29e544237883")
+			(uuid "9a93af2a-4c48-45f2-95c9-d39e8c5a62f5")
 		)
 		(pin "T"
-			(uuid "0144b463-01ec-4c8f-9bc0-7bf529f3c8be")
+			(uuid "328287c8-7a18-4cb3-a445-41d60d613247")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "J1")
 					(unit 1)
 				)
@@ -4628,8 +3751,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+9V")
-		(at 12.7 97.79 0)
+		(lib_id "power:PWR_FLAG")
+		(at 20.32 115.57 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -4637,9 +3760,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "8d08ab15-50cc-4daf-9751-0f5601fd3cd5")
-		(property "Reference" "#PWR08"
-			(at 12.7 101.6 0)
+		(uuid "7b41ec60-e1e6-4381-bd5a-bffacb02f582")
+		(property "Reference" "#FLG02"
+			(at 20.32 113.665 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4649,8 +3772,8 @@
 				)
 			)
 		)
-		(property "Value" "+9V"
-			(at 12.7 94.234 0)
+		(property "Value" "PWR_FLAG"
+			(at 20.32 111.76 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4660,7 +3783,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 12.7 97.79 0)
+			(at 20.32 115.57 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4671,7 +3794,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 12.7 97.79 0)
+			(at 20.32 115.57 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4681,85 +3804,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"+9V\""
-			(at 12.7 97.79 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "19823544-2d8d-42ae-8aba-c19c2673a5a5")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR08")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 121.92 99.06 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "8e5e7792-9b53-4aca-ba91-738b179ddd07")
-		(property "Reference" "#PWR04"
-			(at 121.92 105.41 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 121.92 102.87 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 121.92 99.06 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 121.92 99.06 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 121.92 99.06 0)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 20.32 115.57 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4770,12 +3816,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "78b6c9da-0bdf-4d35-ba44-a6333b7c8b9d")
+			(uuid "8b11975c-6484-4140-8f34-04379eb7edc5")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR04")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#FLG02")
 					(unit 1)
 				)
 			)
@@ -4783,7 +3829,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 78.74 52.07 0)
+		(at 55.88 57.15 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -4791,9 +3837,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "8ee6d441-fd1d-4004-905a-a87d240ed9c4")
-		(property "Reference" "R4"
-			(at 80.772 52.07 90)
+		(uuid "7e1f4657-bdd8-47bf-8d9c-d231067a3892")
+		(property "Reference" "R7"
+			(at 57.912 57.15 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4802,8 +3848,8 @@
 				)
 			)
 		)
-		(property "Value" "10k"
-			(at 78.74 52.07 90)
+		(property "Value" "22k"
+			(at 55.88 57.15 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4813,7 +3859,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 76.962 52.07 90)
+			(at 54.102 57.15 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4824,7 +3870,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 78.74 52.07 0)
+			(at 55.88 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4835,7 +3881,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 78.74 52.07 0)
+			(at 55.88 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4846,15 +3892,246 @@
 			)
 		)
 		(pin "1"
-			(uuid "2b43d23d-98fe-4081-a396-c15882089c85")
+			(uuid "79df9937-8ac3-4820-b978-d1822bcd82b0")
 		)
 		(pin "2"
-			(uuid "7f6f4237-9a28-400d-a042-2d5c6b8f88bc")
+			(uuid "7d066926-8cc6-4758-896a-f044f90670a6")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R4")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+9V")
+		(at 55.88 50.8 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "81acbc65-7f35-48c6-92bc-9b9a9a4523ab")
+		(property "Reference" "#PWR05"
+			(at 55.88 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+9V"
+			(at 55.88 47.244 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 55.88 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 55.88 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+9V\""
+			(at 55.88 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fc27e000-7515-4fc9-820a-1789f8051b1c")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR05")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 12.7 118.11 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "8667619b-9e73-4566-a127-364481fa5457")
+		(property "Reference" "#PWR09"
+			(at 12.7 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 12.7 121.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 12.7 118.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 12.7 118.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 12.7 118.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "b1575f2e-a421-4643-9f0a-92bee2bf4463")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR09")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 129.54 58.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "86c09fe7-d661-4f48-9059-7b10d0b54376")
+		(property "Reference" "#PWR17"
+			(at 129.54 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 129.54 62.23 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 129.54 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 129.54 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 129.54 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "241ab1f2-ccb2-44a2-95b3-28f5b0741c9b")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR17")
 					(unit 1)
 				)
 			)
@@ -4870,7 +4147,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "a445dd6c-a6aa-449f-9896-ee550e0ef52b")
+		(uuid "8efd119a-4975-42ee-ae94-392076640049")
 		(property "Reference" "#PWR13"
 			(at 48.26 120.65 0)
 			(hide yes)
@@ -4926,11 +4203,11 @@
 			)
 		)
 		(pin "1"
-			(uuid "9a9df449-dd87-4dbf-a80d-25b58a87fcad")
+			(uuid "9cdb1843-5241-4370-91d4-1da976a64ce4")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "#PWR13")
 					(unit 1)
 				)
@@ -4938,8 +4215,8 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 121.92 92.71 0)
+		(lib_id "Device:C_Polarized")
+		(at 78.74 110.49 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -4947,88 +4224,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "a4d0c26f-b46c-4d15-b71a-a24f951095d6")
-		(property "Reference" "R10"
-			(at 123.952 92.71 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "10k"
-			(at 121.92 92.71 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 120.142 92.71 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 121.92 92.71 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 121.92 92.71 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "93a32852-472e-4a2b-9086-f94cf04bc721")
-		)
-		(pin "2"
-			(uuid "09a0c3d3-14d7-41cd-a9bf-3b88979683c6")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R10")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Amplifier_Operational:NJM4556A")
-		(at 38.1 107.95 0)
-		(unit 3)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "aa5e0236-0ad8-4ed4-9ac7-8a7e16a7f495")
-		(property "Reference" "U1"
-			(at 38.1 102.87 0)
+		(uuid "90df87c0-a3e5-49a5-8411-76fad389273d")
+		(property "Reference" "C8"
+			(at 79.375 107.95 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5038,8 +4236,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "NJM4556A"
-			(at 38.1 113.03 0)
+		(property "Value" "22u"
+			(at 79.375 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5050,105 +4248,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 38.1 107.95 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" "http://www.njr.com/semicon/PDF/NJM4556A_E.pdf"
-			(at 38.1 107.95 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Dual High Current Operational Amplifier, DIP-8/DMP-8/SIP-8/SSOP-8"
-			(at 38.1 107.95 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "90ceeb51-af96-4424-bf71-1513bc0d6e84")
-		)
-		(pin "2"
-			(uuid "7948147d-e04b-484f-85ee-e6bc1f4d59d7")
-		)
-		(pin "3"
-			(uuid "296f7caf-0669-4feb-a6bc-14087dcbd880")
-		)
-		(pin "5"
-			(uuid "595caf62-19f6-426b-8f8e-64ffc99c563c")
-		)
-		(pin "6"
-			(uuid "22db1c4b-ca83-45bf-b383-f9d9d4ed562c")
-		)
-		(pin "7"
-			(uuid "850f5482-4878-4b29-88eb-a05d3d59ef38")
-		)
-		(pin "4"
-			(uuid "4bf1c23e-ed4f-426d-a611-3fe86a947f53")
-		)
-		(pin "8"
-			(uuid "dc77480f-43a3-4d6f-9ba5-e3d2d3e4b56b")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "U1")
-					(unit 3)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 19.05 60.96 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "b15e6cff-fd49-43b4-8e98-a4700ac1f8bc")
-		(property "Reference" "#PWR16"
-			(at 25.4 60.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 22.86 60.96 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 19.05 60.96 0)
+			(at 79.7052 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5159,7 +4259,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 19.05 60.96 0)
+			(at 78.74 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5169,84 +4269,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 19.05 60.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "02d3fc22-f7b2-4ef9-9ec8-25b194a64d3d")
-		)
-		(instances
-			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR16")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 45.72 82.55 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "b640ebab-2980-4e3f-8ef7-59573c4d6d44")
-		(property "Reference" "R2"
-			(at 47.752 82.55 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "100k"
-			(at 45.72 82.55 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 43.942 82.55 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 45.72 82.55 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 45.72 82.55 0)
+		(property "Description" "Polarized capacitor"
+			(at 78.74 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5257,15 +4281,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "f29cdd48-7a1b-4e5e-8628-aea2d76bc7d2")
+			(uuid "1885df20-5b0b-458f-8f0b-a6494be565bc")
 		)
 		(pin "2"
-			(uuid "91850533-d501-4745-8058-52737a77d601")
+			(uuid "1f1c722b-8a51-42bd-ac0f-5392f12c34ac")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R2")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "C8")
 					(unit 1)
 				)
 			)
@@ -5281,7 +4305,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "beb6caf2-3ef4-4e6e-ac3c-21f25b757970")
+		(uuid "9a3caf69-a547-4099-bcbd-ab4d759e55bd")
 		(property "Reference" "C9"
 			(at 106.68 88.265 0)
 			(show_name no)
@@ -5338,14 +4362,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "49836d64-2611-430a-a577-78f43122e385")
+			(uuid "05e60217-5d78-4113-8820-bb4b7586200b")
 		)
 		(pin "2"
-			(uuid "c721bcff-d0c9-4eb8-ae1c-a02d11cb16f0")
+			(uuid "c5fe677f-386f-4065-b861-d811692440cb")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "C9")
 					(unit 1)
 				)
@@ -5353,8 +4377,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 20.32 100.33 0)
+		(lib_id "Device:R")
+		(at 78.74 52.07 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5362,10 +4386,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "c8b1b1d3-d0fe-4c30-a07a-fda2380dc388")
-		(property "Reference" "#FLG01"
-			(at 20.32 98.425 0)
-			(hide yes)
+		(uuid "a1e4957e-071f-4d27-8d21-5d6d1b205260")
+		(property "Reference" "R4"
+			(at 80.772 52.07 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5374,8 +4397,8 @@
 				)
 			)
 		)
-		(property "Value" "PWR_FLAG"
-			(at 20.32 96.52 0)
+		(property "Value" "10k"
+			(at 78.74 52.07 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5385,7 +4408,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 20.32 100.33 0)
+			(at 76.962 52.07 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5396,7 +4419,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 20.32 100.33 0)
+			(at 78.74 52.07 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5406,8 +4429,8 @@
 				)
 			)
 		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 20.32 100.33 0)
+		(property "Description" "Resistor"
+			(at 78.74 52.07 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5418,12 +4441,15 @@
 			)
 		)
 		(pin "1"
-			(uuid "a23802c1-f8b6-404c-bfc3-277ddc00a529")
+			(uuid "5b1b3588-f759-4f6d-bed2-f64c19df30ed")
+		)
+		(pin "2"
+			(uuid "aa5c0687-0e58-4002-8f31-6ea6b89c5e51")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#FLG01")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R4")
 					(unit 1)
 				)
 			)
@@ -5431,7 +4457,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 12.7 118.11 0)
+		(at 58.42 114.3 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5439,9 +4465,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "cb690136-fe5a-47f4-999a-9e4aae424729")
-		(property "Reference" "#PWR09"
-			(at 12.7 124.46 0)
+		(uuid "b68dd8c5-e310-45d3-9866-6ce1e9447e16")
+		(property "Reference" "#PWR15"
+			(at 58.42 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5452,7 +4478,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 12.7 121.92 0)
+			(at 58.42 118.11 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5462,7 +4488,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 12.7 118.11 0)
+			(at 58.42 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5473,7 +4499,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 12.7 118.11 0)
+			(at 58.42 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5484,7 +4510,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 12.7 118.11 0)
+			(at 58.42 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5495,12 +4521,89 @@
 			)
 		)
 		(pin "1"
-			(uuid "0fae7ea5-e0f9-40cb-9561-d0b1a8deeb4a")
+			(uuid "3c3ca56b-a87e-4263-9243-06b12ebedef8")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "#PWR09")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR15")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 55.88 71.12 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "ba776232-a170-4b03-a8d5-790f1720d51a")
+		(property "Reference" "#PWR06"
+			(at 55.88 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 55.88 74.93 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 55.88 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 55.88 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 55.88 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "db8fb187-d03d-4436-961a-b615e1cf71e9")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)
@@ -5516,7 +4619,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "d9178378-48d8-4042-bec2-c127a0f0c4ed")
+		(uuid "bacdcc58-11a2-4b22-b9cf-5235571d82bc")
 		(property "Reference" "C1"
 			(at 30.48 34.925 0)
 			(show_name no)
@@ -5573,14 +4676,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "fa0abf37-80f0-4365-8c56-02693d17e246")
+			(uuid "68a7cc76-c378-459b-8023-fbf262cefcaa")
 		)
 		(pin "2"
-			(uuid "8fd0fd05-8e6f-49d9-9a70-31ea473b9c72")
+			(uuid "a2ad01cf-9fe7-4c3f-af57-147b69f6c10b")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "C1")
 					(unit 1)
 				)
@@ -5597,7 +4700,7 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "dccccc0d-9dd1-4647-a5eb-8450a18adbd6")
+		(uuid "bbe10366-286c-49b9-90c9-89d73941e64f")
 		(property "Reference" "C2"
 			(at 30.48 85.725 0)
 			(show_name no)
@@ -5654,14 +4757,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "25d61fcf-4b13-4c31-aaf6-baf15642d946")
+			(uuid "b877c3c0-96a9-4393-92ad-77343bd2d66f")
 		)
 		(pin "2"
-			(uuid "2747d86c-10c3-4927-a4db-7126baeafb32")
+			(uuid "7dd4a0ea-2f17-41dc-a158-35e7af6a9a9e")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
 					(reference "C2")
 					(unit 1)
 				)
@@ -5669,38 +4772,40 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 88.9 48.26 90)
-		(unit 1)
+		(lib_id "Amplifier_Operational:NJM4556A")
+		(at 88.9 88.9 0)
+		(unit 2)
 		(body_style 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "f8bb4348-bbbf-4d36-b040-dfc6fad32ae5")
-		(property "Reference" "R3"
-			(at 88.9 46.228 90)
+		(uuid "d8eef293-600a-4bc4-affe-efa59bf9ed15")
+		(property "Reference" "U1"
+			(at 88.9 83.82 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
-		(property "Value" "22k"
-			(at 88.9 48.26 90)
+		(property "Value" "NJM4556A"
+			(at 88.9 93.98 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify left)
 			)
 		)
 		(property "Footprint" ""
-			(at 88.9 50.038 90)
+			(at 88.9 88.9 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5710,8 +4815,8 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
-			(at 88.9 48.26 0)
+		(property "Datasheet" "http://www.njr.com/semicon/PDF/NJM4556A_E.pdf"
+			(at 88.9 88.9 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5721,8 +4826,8 @@
 				)
 			)
 		)
-		(property "Description" "Resistor"
-			(at 88.9 48.26 0)
+		(property "Description" "Dual High Current Operational Amplifier, DIP-8/DMP-8/SIP-8/SSOP-8"
+			(at 88.9 88.9 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5733,23 +4838,41 @@
 			)
 		)
 		(pin "1"
-			(uuid "6498b8b2-0c5c-43a0-9e9e-2b1a44ef8eb1")
+			(uuid "33cf6731-f24c-4619-8a73-3581b012678d")
 		)
 		(pin "2"
-			(uuid "546e0652-616d-46a6-8e66-afb71d4d6e58")
+			(uuid "6843cfdb-b226-4268-be1b-930e52e79f45")
+		)
+		(pin "3"
+			(uuid "31e0c9c5-2641-4f51-b93e-783825b84ab0")
+		)
+		(pin "5"
+			(uuid "a96fbe6b-b501-4535-81de-416b7545a82b")
+		)
+		(pin "6"
+			(uuid "79f807f5-536b-42de-95d6-e478200c1aa8")
+		)
+		(pin "7"
+			(uuid "918067f5-66f9-43bb-9368-1aa558392411")
+		)
+		(pin "4"
+			(uuid "48da101f-b791-416a-b27e-b485456c84b7")
+		)
+		(pin "8"
+			(uuid "d5518e9b-165b-4c44-89de-ddc1ddb58d1a")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R3")
-					(unit 1)
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "U1")
+					(unit 2)
 				)
 			)
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 78.74 102.87 0)
+		(lib_id "power:GND")
+		(at 121.92 99.06 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5757,9 +4880,86 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(uuid "fe9b8313-dd45-4ae1-8f17-388dd929c346")
-		(property "Reference" "R6"
-			(at 80.772 102.87 90)
+		(uuid "d99aac56-c16b-4b19-94db-550269799f7c")
+		(property "Reference" "#PWR04"
+			(at 121.92 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 121.92 102.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 121.92 99.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 121.92 99.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 121.92 99.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8aa96d3f-e25e-4a83-95ba-329f9d83589d")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR04")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 121.92 41.91 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "dc8adfc1-9d19-4470-b2cd-179059de4a66")
+		(property "Reference" "R9"
+			(at 123.952 41.91 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5769,7 +4969,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at 78.74 102.87 90)
+			(at 121.92 41.91 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5779,7 +4979,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 76.962 102.87 90)
+			(at 120.142 41.91 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5790,7 +4990,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 78.74 102.87 0)
+			(at 121.92 41.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5801,7 +5001,7 @@
 			)
 		)
 		(property "Description" "Resistor"
-			(at 78.74 102.87 0)
+			(at 121.92 41.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5812,15 +5012,815 @@
 			)
 		)
 		(pin "1"
-			(uuid "066a0f3e-378d-4388-8f73-43fe49396c97")
+			(uuid "fd222342-1010-42eb-bbd8-33ef23aea1e4")
 		)
 		(pin "2"
-			(uuid "46ff00ef-2ceb-4b87-b978-218efd303c7c")
+			(uuid "08b39624-73de-40f8-8929-3696d37bdc51")
 		)
 		(instances
 			(project "headphone_amp"
-				(path "/852235ad-451c-4306-b17e-4b65c2ba5b1e"
-					(reference "R6")
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R9")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 20.32 100.33 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e2155cf2-c8a6-41a6-94ac-d906e68dbcd1")
+		(property "Reference" "#FLG01"
+			(at 20.32 98.425 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 20.32 96.52 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 20.32 100.33 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 20.32 100.33 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 20.32 100.33 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2f094194-8d69-40fa-9388-2e74da8a0130")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#FLG01")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 45.72 39.37 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e54ff239-8fe6-42af-85f6-742de177a6ab")
+		(property "Reference" "R1"
+			(at 47.752 39.37 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "100k"
+			(at 45.72 39.37 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 43.942 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 45.72 39.37 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 45.72 39.37 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "35deae4f-b3c4-4ac8-8d31-4e42a4af8696")
+		)
+		(pin "2"
+			(uuid "3b3e5b35-366c-4368-8808-3600a1ade9f9")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Polarized")
+		(at 109.22 38.1 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e6fc38d2-f01a-4fa1-8a85-9973c8fdd29a")
+		(property "Reference" "C7"
+			(at 106.68 37.465 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1000u"
+			(at 111.76 37.465 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 113.03 37.1348 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 109.22 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Polarized capacitor"
+			(at 109.22 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "983f5fbd-89d1-4f1a-afc4-101f96d647b2")
+		)
+		(pin "2"
+			(uuid "40b06ebd-fe1f-4158-866b-d0074e78bc33")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "C7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 78.74 66.04 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e7f3a8b8-98e6-4a2b-b96c-1f9281b6f22b")
+		(property "Reference" "#PWR01"
+			(at 78.74 72.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 78.74 69.85 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 78.74 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 78.74 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 78.74 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "11b64e94-1218-44aa-8b69-72db2093d754")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR01")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Amplifier_Operational:NJM4556A")
+		(at 38.1 107.95 0)
+		(unit 3)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e83ac529-6d82-4edb-922f-ba9d3ff11eff")
+		(property "Reference" "U1"
+			(at 38.1 102.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "NJM4556A"
+			(at 38.1 113.03 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 38.1 107.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "http://www.njr.com/semicon/PDF/NJM4556A_E.pdf"
+			(at 38.1 107.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Dual High Current Operational Amplifier, DIP-8/DMP-8/SIP-8/SSOP-8"
+			(at 38.1 107.95 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9226196d-bb19-43ed-bb2a-6084eac4db93")
+		)
+		(pin "2"
+			(uuid "84990998-bf1a-4aae-8326-60f4612d2603")
+		)
+		(pin "3"
+			(uuid "cb627e82-778c-4f31-824f-26d996f75d7e")
+		)
+		(pin "5"
+			(uuid "d45c6e17-4dcf-4802-a095-44e8e0754a76")
+		)
+		(pin "6"
+			(uuid "ded13efe-1d84-46d4-8da1-4dba0bd7efb7")
+		)
+		(pin "7"
+			(uuid "e7232178-acb0-4b96-9f4c-1504cd35ec5f")
+		)
+		(pin "4"
+			(uuid "45e61ff4-adfb-419e-b359-45d54db1ebbe")
+		)
+		(pin "8"
+			(uuid "2147ab64-6841-4ec7-812b-8647212f33a7")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "U1")
+					(unit 3)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 35.56 118.11 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "ea25a4da-60cf-4e26-9912-e21df5cc563d")
+		(property "Reference" "#PWR11"
+			(at 35.56 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 35.56 121.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 35.56 118.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 35.56 118.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 35.56 118.11 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "23fa7688-8030-4a62-a6b6-0bab55f0e2de")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR11")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 19.05 60.96 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "ea74527d-7a50-4a7d-856c-e81782923a33")
+		(property "Reference" "#PWR16"
+			(at 25.4 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 22.86 60.96 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 19.05 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 19.05 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 19.05 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7d49a472-f309-412e-828c-7dffd20df238")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR16")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 78.74 116.84 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "eee92f82-8ff4-4681-9c7d-dd61cb0ac2d2")
+		(property "Reference" "#PWR03"
+			(at 78.74 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 78.74 120.65 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 78.74 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 78.74 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 78.74 116.84 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e2e366ee-70c5-41df-93e8-54f4f290d6fa")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR03")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 66.04 71.12 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "fd0f65a8-7f12-46c6-a271-bdd8f8574a69")
+		(property "Reference" "#PWR07"
+			(at 66.04 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 66.04 74.93 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 66.04 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 66.04 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 66.04 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2497793c-ec6d-423f-8aa0-b9b9e62340a8")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "#PWR07")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 55.88 64.77 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "ff348ab7-0ac2-4e99-bd4d-171f9bd296f1")
+		(property "Reference" "R8"
+			(at 57.912 64.77 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "22k"
+			(at 55.88 64.77 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 54.102 64.77 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 55.88 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 55.88 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "99d85498-4b3e-4855-9a98-163658ba68d1")
+		)
+		(pin "2"
+			(uuid "6512266c-cfa3-45f1-8daa-5bb1f56b72cf")
+		)
+		(instances
+			(project "headphone_amp"
+				(path "/9d55ee48-3cb0-4981-b48f-a8f624b84935"
+					(reference "R8")
 					(unit 1)
 				)
 			)

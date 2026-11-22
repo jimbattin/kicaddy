@@ -504,7 +504,7 @@
       {
         "filename": "headphone_amp_hier.kicad_sch",
         "name": "",
-        "uuid": "423c6d97-16e2-4772-a5a0-7f884b4fe22a"
+        "uuid": "73fa56d8-c92c-474b-ac66-54a818493bf1"
       }
     ],
     "used_designators": "",
@@ -512,15 +512,15 @@
   },
   "sheets": [
     [
-      "423c6d97-16e2-4772-a5a0-7f884b4fe22a",
+      "73fa56d8-c92c-474b-ac66-54a818493bf1",
       ""
     ],
     [
-      "eb1e73f7-a960-40e0-9400-9a371070c4b2",
+      "e1a1d276-f755-40c1-b645-c43fb09d276a",
       "amp"
     ],
     [
-      "0c7943a3-5bb7-4f78-ac4a-a9a98d9b088c",
+      "3557ffe2-e82f-4a00-8460-dffdc8370648",
       "power"
     ]
   ],

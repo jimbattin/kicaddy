@@ -487,7 +487,7 @@
       {
         "filename": "buzzer.kicad_sch",
         "name": "",
-        "uuid": "2a899b60-0216-4b46-a449-a8e6e694d1ee"
+        "uuid": "dc84a2c9-86f3-4290-bc60-70633deaa1a6"
       }
     ],
     "used_designators": "",
@@ -495,7 +495,7 @@
   },
   "sheets": [
     [
-      "2a899b60-0216-4b46-a449-a8e6e694d1ee",
+      "dc84a2c9-86f3-4290-bc60-70633deaa1a6",
       ""
     ]
   ],
