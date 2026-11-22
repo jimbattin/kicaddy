@@ -159,11 +159,13 @@ Without the tools, the CLI workflow below is unchanged.
    its own, a crop split into tiles, or a wrong fact in the note. This first clean build and its one review end
    the drawing work. Rebuild only to fix one of those three, then read the crop once more; otherwise do not
    rebuild and do not read the crop again: no moving fields, parts, or wires that LINT passed, no rewording the
-   note, no added decorations, no tighter spacing.
-7. **Circuit check.** A build that exits 0 already proves the drawing has the declared nets and passes ERC. When
-   the task also asks to verify how the circuit behaves, simulate it this way, from the output directory:
-   - With the `kicad` and `spice` skills (kicad-happy) installed, simulate the saved schematic, so the
-     simulation matches the drawing:
+   note, no added decorations, no tighter spacing. These limits apply to your own review only: layout changes
+   the user asks for are always made.
+7. **Circuit check.** A build that exits 0 proves the drawing has the declared nets and passes ERC; it says
+   nothing about how the circuit behaves. When the task asks for that too, check it in this order, from the
+   output directory:
+   - With the `kicad` and `spice` skills (kicad-happy) installed, simulate the saved schematic first; its test
+     circuits are built from the drawing itself:
 
      ```sh
      python3 "$(realpath skill://kicad)/scripts/analyze_schematic.py" <name>.kicad_sch --analysis-dir analysis/
@@ -171,14 +173,20 @@ Without the tools, the CLI workflow below is unchanged.
      python3 -c "import json,glob; d=json.load(open(sorted(glob.glob('analysis/*/spice.json'))[-1])); [print(r['subcircuit_type'], r['status'], ' '.join(r['components']), r.get('simulated') or r.get('note', '')) for r in d['simulation_results']]"
      ```
 
-     The second command prints one summary line; the third prints each subcircuit with its measured values. It
-     covers RC filters, voltage dividers, and decoupling. On a headphone amp it simulated no op-amp gain stage
-     (it saw only the NJM4556A's power unit) and nothing that depends on a load missing from the schematic,
-     skipped some RC pairs, and reported two bias resistors as a divider: check each line against the circuit
-     before citing it.
-   - For what it does not cover (an op-amp stage's gain, an output into its load), or without kicad-happy: at
-     most one hand-written ngspice deck in the output directory and at most two `ngspice -b` runs. Then stop and
-     report which parts were simulated and which were not; do not debug the deck further.
+     The second command prints one summary line; the third prints each subcircuit it recognised, its status,
+     and its measured values. It looks for common blocks in the netlist (RC and LC filters, dividers, op-amp
+     stages, regulators, crystals, transistor stages, decoupling, …), so what it covers depends on the circuit:
+     a block missing from the list was not simulated, a `skip` was not measured, and a detection can be wrong.
+     Check each line against the circuit before citing it. Example, a headphone amp: it measured the RC corners
+     and the bias divider, skipped four RC pairs, reported two bias resistors as a divider, saw only the
+     op-amp's power unit (so no gain stage), and could not simulate the output into the headphones, which are
+     not in the schematic.
+   - Write your own ngspice deck, one in the output directory, only for behaviour the task needs that the list
+     does not cover (or for everything, without kicad-happy). Size the effort to the task. When that behaviour
+     is the purpose of the design (a filter's response, an oscillator's frequency, a regulator's output), get
+     the deck to run and measure it; if it still fails after a few fixes, report it as not simulated. When it
+     only confirms hand calculations, run `ngspice -b` at most twice, then stop.
+   - Report what was simulated, with the numbers, and what was not.
 
 ## Build script contract
 
