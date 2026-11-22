@@ -61,7 +61,6 @@ def build(s):
         # access gates up to the word line
         s.wire(f"{a1}.G", (x0 - 14, y0 - 16))
         s.wire(f"{a2}.G", (x0 + 33, y0 - 16))
-        s.junction((x0, y0), (x0, y0 + 2), (x2, y0), (x2, y0 - 2))
         return [{f"{p1}.D", f"{n1}.D", f"{a1}.D", f"{n2}.G", f"{p2}.G"},
                 {f"{p2}.D", f"{n2}.D", f"{a2}.S", f"{p1}.G", f"{n1}.G"}]
 
@@ -77,14 +76,12 @@ def build(s):
         s.symbol(f"J{r + 1}", "Connector_Generic:Conn_01x01", (x_left - 12, y), value="WL driver", rotation=180)
         s.wire(f"J{r + 1}.1", (x_end, y))
         s.label(f"WL{r}", (x_left, y), spin="left")
-        s.junction(*((X0 + c * PX + dx, y) for c in range(COLS) for dx in (-14, 33) if (c, dx) != (COLS - 1, 33)))
         nets.append({f"J{r + 1}.1"} | {f"{q[r, c][i]}.G" for c in range(COLS) for i in (0, 5)})
     for c in range(COLS):  # bit-line pairs, labelled at the top
         x_top = Y0 - 22
         for name, x, i, pin in ((f"BL{c}", X0 + c * PX - 20, 0, "S"), (f"BL{c}B", X0 + c * PX + 39, 5, "D")):
             s.wire((x, x_top), (x, y_last))
             s.label(name, (x, x_top), spin="up")
-            s.junction(*((x, Y0 + r * PY) for r in range(ROWS - 1)))
             nets.append({f"{q[r, c][i]}.{pin}" for r in range(ROWS)})
     nets.append({f"{q[r, c][i]}.S" for r in range(ROWS) for c in range(COLS) for i in (1, 3)})  # VDD
     nets.append({f"{q[r, c][i]}.S" for r in range(ROWS) for c in range(COLS) for i in (2, 4)})  # GND

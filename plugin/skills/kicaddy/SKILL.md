@@ -45,14 +45,26 @@ On a `FAIL` line:
 2. **Net intent.** Write down the expected nets (sets of `"REF.PIN"`) before any layout. This list is what
    `build()` returns and what the build checks against.
 3. **Layout on the grid.** Pick a page, place symbols so that the pins you connect line up on X or Y, and route
-   orthogonal wires between them (see Geometry and Rules).
+   orthogonal wires between them (see Geometry and Rules). Put everything the drawing needs in this first
+   `build.py`: the note right next to the circuit (not at a far edge of the page), and any section titles.
 4. **Build.** Write `build.py` in the user's project directory, then run `kicaddy run build.py [--out DIR]`. It
-   prints every net, the ERC violations with positions, and the output paths. Exit 0 only when the netlist
-   matches the declared nets and ERC reports 0 violations; on `NETLIST MISMATCH` it lists missing and
-   unexpected nets.
-5. **Review.** Read `<name>_crop.png` (or the tiles `<name>_crop_r<r>c<c>.png` for a large drawing). Fix
-   overlaps, crossings, and unreadable text in `build.py`, and rebuild. Two or three build-and-review rounds
-   are normal; stop when the image is clean.
+   prints every net, the ERC violations with positions, `LINT: n issue(s)` with one line per layout issue, and
+   the output paths. Exit 0 only when the netlist matches the declared nets, ERC reports 0 violations, and
+   LINT reports 0 issues; on `NETLIST MISMATCH` it lists missing and unexpected nets. A LINT line reads
+   `kind: a / b @ (x, y)` (grid units, the centre of the clash); kinds:
+   - `body-body`: two symbol bodies overlap.
+   - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
+   - `text-body`: a text overlaps another symbol's body.
+   - `text-pin`: a pin runs through a text.
+   - `text-wire`: a wire runs through a text (a label on its own wire is fine).
+   - `wire-body`: a wire runs through a symbol body it is not attached to.
+   - `wire-pin`: a wire runs along a pin or crosses it away from its connection point.
+5. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
+   wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read
+   `<name>_crop.png` (or the tiles `<name>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
+   no overlaps; the review looks only for what LINT cannot see: text that sits closer to the wrong part than to
+   its own, or a crop split into tiles. If the image has neither, stop: do not rebuild to add decorations, to
+   nudge text that does not touch anything, or to tighten spacing. Aim for one image review.
 
 ## Build script contract
 
@@ -82,9 +94,10 @@ Coordinates are in units of the 1.27 mm connection grid, Y down. A point given a
 pin's connection point (pin number, not name).
 
 - `run(build, name, page="A4", title="", comments=(), out_dir=None)`: entry point for a design script. Exit
-  status 1 on netlist mismatch or any ERC violation. `page` is one of `A5 A4 A3 A2 A B` (`A`, `B`: ANSI);
-  the sheet is landscape. `comments` fill up to 4 title-block comment lines. The command-line option `--out DIR`
-  overrides `out_dir`; the default is the script's directory.
+  status 1 on netlist mismatch, any ERC violation, or any LINT issue; the plots are written either way.
+  `page` is one of `A5 A4 A3 A2 A B` (`A`, `B`: ANSI); the sheet is landscape. `comments` fill up to 4
+  title-block comment lines. The command-line option `--out DIR` overrides `out_dir`; the default is the
+  script's directory.
 - `build(s)` returns a list of sets of `"REF.PIN"`, one set per net. Power-symbol and `PWR_FLAG` pins are
   excluded. A pin connected to nothing (including every pin with a `no_connect`) is its own single-pin set.
 - Outputs, in the output directory: `<name>.kicad_sch`, `<name>.kicad_pro`, `<name>.png`, `<name>.svg`,
@@ -92,24 +105,35 @@ pin's connection point (pin number, not name).
 
 Methods on `s`:
 
-- `s.symbol(ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None)`: place a library symbol with
-  its origin at grid point `at`; returns `{pin number: (x, y)}`. Each pin is also available as `"REF.PIN"`
-  (and in `s.pins`). Fails if a pin lands off the connection grid.
+- `s.symbol(ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None, datasheet=None,
+  fields=None)`: place a library symbol with its origin at grid point `at`; returns `{pin number: (x, y)}`.
+  Each pin is also available as `"REF.PIN"` (and in `s.pins`). Fails if a pin lands off the connection grid.
+  `mirror="x"` flips the symbol top-bottom, `mirror="y"` left-right (see Geometry). `datasheet` sets the
+  Datasheet field; `fields` is a dict of extra hidden fields, e.g. `{"MPN": "RC0603FR-0710KL",
+  "Manufacturer": "Yageo"}` (not `Reference`, `Value`, `Footprint`, `Datasheet`, `Description`).
+- `s.field(ref, name, at=None, visible=None, unit=None)`: move a field of a placed symbol to grid point `at`
+  (half units such as `(40, 33.5)` are fine) and/or show or hide it. `name` is `Reference`, `Value`,
+  `Footprint`, `Datasheet`, `Description`, or a name from `fields`. Pass `unit=` for a multi-unit symbol.
+  Call it after `s.symbol`.
 - `s.power(name, at, rotation=0)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with an automatic
-  `#PWR`/`#FLG` reference; its pin is at `at`. Returns the reference.
+  `#PWR`/`#FLG` reference; its pin is at `at`, a grid point or `"REF.PIN"`. Returns the reference.
 - `s.wire(*points)`: polyline through grid points and/or `"REF.PIN"` names; one wire segment per leg. Legs must
   be horizontal or vertical and non-zero.
-- `s.junction(*points)`: a junction dot at each point.
 - `s.label(text, at, spin="right")`: local net label; `spin` is the side the text extends to: `left`, `right`,
   `up`, `bottom`.
+- `s.global_label(text, at, spin="right", shape="passive")`: global net label, same `spin`; `shape` is `input`,
+  `output`, `bidirectional`, `tri_state`, or `passive`.
 - `s.no_connect(at)`: no-connect marker on an unused pin (`"REF.PIN"`).
-- `s.note(text, at, size=1.27)`: left-aligned text; `size` in mm; `\n` for new lines.
+- `s.note(text, at, size=1.27)`: left-aligned text; `size` in mm; `\n` for new lines. Multi-line notes are
+  centred vertically on `at`.
+- `s.junction(*points)`: explicit dot for a deliberate four-way connection; T junctions are automatic.
 
 ## Geometry
 
 - 1 unit = 1.27 mm, Y down. Pins are addressed by number, not name.
-- Connection point = symbol position + T(pin offset), where `rotation` turns the symbol counter-clockwise on
-  screen:
+- Connection point = symbol position + M(T(pin offset)): `rotation` turns the symbol counter-clockwise on
+  screen, then `mirror` flips the result: `"x"` top-bottom, M(x, y) = (x, −y); `"y"` left-right,
+  M(x, y) = (−x, y).
 
   | `rotation` | T(x, y) |
   |---|---|
@@ -118,6 +142,8 @@ Methods on `s`:
   | `180` | (−x, −y) |
   | `270` | (−y, x) |
 
+  Example: offset (−4, 0) at `rotation=90, mirror="x"` → T = (0, 4) → M = (0, −4).
+- Fields move with the symbol when it is mirrored; `s.field(..., at=...)` takes absolute grid points.
 - Multi-unit symbols (e.g. a dual op-amp): place each unit with the same `ref` and `unit=1`, `unit=2`, …;
   they become `U1A`, `U1B`, … of one `U1`. The dual op-amps above have 3 units: 1 and 2 are the amplifiers,
   3 carries V+ and V−; place unit 3 too and wire its supply pins. In `kicaddy pins` output, unit `0` or `*`
@@ -130,9 +156,13 @@ Methods on `s`:
 ## Rules that keep the build and image clean
 
 - Wires are orthogonal.
-- Add a `junction` at every T and wherever a wire ends on the middle of another wire; the builder adds none.
-- Keep values short: library field positions can collide with pins (`100k log` on a potentiometer overlapped a
-  pin number).
+- Junction dots are automatic wherever 3 or more wire directions or pins meet, including a wire end or a pin
+  on the middle of another wire. A pin or wire end that touches the middle of a wire connects to it, so route
+  wires around pins they must not join. Two wires crossing middle to middle do not connect.
+- A field that collides with a pin, wire, or another text: move it with `s.field(ref, "Value", at=...)`.
+- Put the part number in `fields={"MPN": ..., "Manufacturer": ...}` and the datasheet URL in `datasheet=`
+  when known.
+- A global label alone on a one-pin net gives the ERC warning `Label connected to only one pin`.
 - `Device:Q_NMOS` / `Q_PMOS` gates are input pins: drive a gate net from an output or passive pin, or ERC
   reports `Input pin not driven`. These symbols have three pins (D, G, S) and no bulk pin.
 - Put a `PWR_FLAG` on each supply net fed only by passive pins (a battery, a connector), or ERC reports the
@@ -140,6 +170,6 @@ Methods on `s`:
 
 ## Example
 
-`skill://kicaddy/examples/ne555_blinker.py`: NE555 astable LED blinker on A5 with power flags, junctions,
-rotation, and a note. Build it with `kicaddy run <path> --out <dir>`. Read it before writing `build.py`; you do
-not need the engine source.
+`skill://kicaddy/examples/ne555_blinker.py`: NE555 astable LED blinker on A5 with power flags, automatic T
+junctions, rotation, and a note. Build it with `kicaddy run <path> --out <dir>`. Read it before writing
+`build.py`; you do not need the engine source.

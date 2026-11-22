@@ -16,16 +16,24 @@ Coordinates are in units of the 1.27 mm connection grid, Y down. A point given a
 to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...` prints pin offsets
 in grid units for planning a layout.
 
+Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move
+or show a field), `power`, `wire`, `label`, `global_label`, `no_connect`, `note`, and `junction` for a
+deliberate four-way dot. `commit` adds junctions where KiCad's rule finds 3+ wire directions or pins
+meeting (sch_geometry.junctions). `lint` reports overlapping bodies and text and wires crossing pins,
+bodies, and text (sch_geometry.lint).
+
 Requires the runtime set up by `kicaddy doctor`; run a design script with `kicaddy run build.py [--out DIR]`.
 """
 
 import argparse
+import math
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
-from . import bootstrap, crop, runtime
+from . import bootstrap, crop, runtime, sch_geometry
 
 GRID_MM = 1.27
 PLOT_DPI = 300  # source resolution for the cropped PNG; crop downsamples to fit
@@ -48,13 +56,8 @@ def _server(project_dir=None):
     return runtime.server(current["launcher"], Path(current["config_home"]), project_dir)
 
 
-def rotate(x, y, degrees):
-    """Pin offset (Y down) after rotating the symbol counter-clockwise on screen."""
-    return {0: (x, y), 90: (y, -x), 180: (-x, -y), 270: (-y, x)}[degrees]
-
-
-def _pins(definition, rotation, unit):
-    """Yield (pin, dx, dy), offsets in grid units, for the pins of `unit` (None: unit 1)."""
+def _pins(definition, unit):
+    """Yield (pin, dx, dy), library offsets in grid units, for the pins of `unit` (None: unit 1)."""
     sch = _proto.sch
     for child in definition.items:
         if not child.item.Is(sch.SchematicPin.DESCRIPTOR):
@@ -63,12 +66,57 @@ def _pins(definition, rotation, unit):
             continue
         pin = sch.SchematicPin()
         child.item.Unpack(pin)
-        x, y = rotate(pin.position.x_nm / 1e6 / GRID_MM, pin.position.y_nm / 1e6 / GRID_MM, rotation)
-        yield pin, x, y
+        yield pin, pin.position.x_nm / 1e6 / GRID_MM, pin.position.y_nm / 1e6 / GRID_MM
+
+
+def _shape_points(shape):
+    """(x_nm, y_nm) points whose bounding box covers a library GraphicShape (arcs: start, mid, end)."""
+    kind = shape.WhichOneof("geometry")
+    g = getattr(shape, kind) if kind else None
+    if kind in ("segment", "rectangle", "arc", "bezier"):
+        names = {"segment": ("start", "end"), "rectangle": ("top_left", "bottom_right"),
+                 "arc": ("start", "mid", "end"), "bezier": ("start", "control1", "control2", "end")}[kind]
+        vectors = [getattr(g, n) for n in names]
+    elif kind == "polygon":
+        vectors = [v for polygon in g.polygons for node in polygon.outline.nodes
+                   for v in ([node.point] if node.HasField("point") else [node.arc.start, node.arc.mid, node.arc.end])]
+    elif kind in ("circle", "ellipse", "ellipse_arc"):
+        c = g.center
+        r = (math.hypot(g.radius_point.x_nm - c.x_nm, g.radius_point.y_nm - c.y_nm) if kind == "circle"
+             else g.major_radius.value_nm)
+        return [(c.x_nm - r, c.y_nm - r), (c.x_nm + r, c.y_nm + r)]
+    else:
+        return []
+    return [(v.x_nm, v.y_nm) for v in vectors]
+
+
+@dataclass
+class _Placement:
+    """One placed symbol item (each unit of a multi-unit symbol is its own item)."""
+    name: str  # R1, or U1A, U1B, ... for multi-unit symbols
+    ref: str
+    unit: int
+    origin: tuple  # grid point
+    rotation: int
+    mirror: object  # None, "x", "y"
+    instance: object  # SchematicSymbolInstance, definition cleared
+    definition: object  # SchematicSymbol
+    pins: dict  # pin number -> grid point
+    # True until commit() sends the instance. Every new symbol goes through UpdateItems once: one placed by
+    # PlaceSymbolFromLibrary alone has pins the server's junction cleanup does not see, and the cleanup then
+    # deletes every junction dot that depends on them (observed headless, KiCad 10.99.0-6860).
+    dirty: bool = True
+
+
+MANDATORY = {"Reference": "reference_field", "Value": "value_field", "Footprint": "footprint_field",
+             "Datasheet": "datasheet_field", "Description": "description_field"}
 
 
 class Schematic:
     PAGES = {"A5": "PS_A5", "A4": "PS_A4", "A3": "PS_A3", "A2": "PS_A2", "A": "PS_ANSI_A", "B": "PS_ANSI_B"}
+    LABEL_SIZE = 1_270_000  # nm
+    SHAPES = {"input": "SLSH_INPUT", "output": "SLSH_OUTPUT", "bidirectional": "SLSH_BIDI",
+              "tri_state": "SLSH_TRISTATE", "passive": "SLSH_PASSIVE"}
 
     def __init__(self, api, path, page="A4", title="", comments=()):
         t = _proto.types
@@ -89,8 +137,13 @@ class Schematic:
         api(_proto.editor.SetTitleBlockInfo(document=self.sheet, title_block=block))
         self.pins = {}  # "REF.PIN" -> (x, y) grid
         self.pin_ids = {}  # pin KIID -> "REF.PIN"
-        self._items = []
-        self._updates = []
+        self.placements = {}  # (ref, unit) -> _Placement
+        self._items = []  # protos for the next CreateItems
+        self._wires = []  # ((x1, y1), (x2, y2)) grid segments
+        self._labels = []  # (kind, text, point, spin, shape)
+        self._notes = []  # (at, Text proto)
+        self._junctions = set()  # explicit junction points
+        self._junctions_created = set()
         self._auto = {"#PWR": 0, "#FLG": 0}
         self._libraries_ready = set()
 
@@ -104,9 +157,17 @@ class Schematic:
         return self.pins[point] if isinstance(point, str) else point
 
     # -- symbols ----------------------------------------------------------------------------------
-    def symbol(self, ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None):
-        """Place a library symbol with its origin at grid point `at`; return {pin number: (x, y)}."""
+    def symbol(self, ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None,
+               datasheet=None, fields=None):
+        """Place a library symbol with its origin at grid point `at`; return {pin number: (x, y)}.
+        `mirror` ("x": top-bottom, "y": left-right) applies to the library drawing before `rotation`;
+        `fields` adds or sets hidden user fields (MPN, Manufacturer, ...)."""
         sch, t = _proto.sch, _proto.types
+        rotation, mirror = sch_geometry.canonical(rotation, mirror)
+        sch_geometry.orient(0, 0, rotation, mirror)  # validates both
+        for name in fields or {}:
+            if name in MANDATORY:
+                raise ValueError(f"{name} is a mandatory field; use value=, footprint=, datasheet=")
         library, entry = lib_id.split(":", 1)
         if library not in self._libraries_ready:
             runtime.wait_for_symbol_libraries(self.api, {library})
@@ -122,31 +183,79 @@ class Schematic:
             request.unit.unit = unit
         placed = sch.SchematicSymbolInstance()
         self.api(request).item.Unpack(placed)
+        definition = sch.SchematicSymbol()
+        definition.CopyFrom(placed.definition)
+        placed.ClearField("definition")  # keeps the instance matching its library symbol on update
         result = {}
-        for pin, dx, dy in _pins(placed.definition, rotation, unit):
+        for pin, dx, dy in _pins(definition, unit):
+            dx, dy = sch_geometry.orient(dx, dy, rotation, mirror)
             if abs(dx - round(dx)) > 1e-6 or abs(dy - round(dy)) > 1e-6:
                 raise RuntimeError(f"{ref}.{pin.number} is off the connection grid")
             point = (at[0] + round(dx), at[1] + round(dy))
             self.pins[f"{ref}.{pin.number}"] = result[pin.number] = point
             self.pin_ids[pin.id.value] = f"{ref}.{pin.number}"
-        changed = False
-        if value is not None and placed.value_field.text.text != value:
-            placed.value_field.text.text = value
-            changed = True
-        if footprint is not None and placed.footprint_field.text.text != footprint:
-            placed.footprint_field.text.text = footprint
-            changed = True
-        if changed:
-            placed.ClearField("definition")  # keeps the instance matching its library symbol
-            self._updates.append(placed)
+        name = ref + chr(64 + (unit or 1)) if definition.unit_count > 1 else ref
+        p = _Placement(name, ref, unit or 1, tuple(at), rotation, mirror, placed, definition, result)
+        self.placements[(ref, p.unit)] = p
+
+        if mirror:
+            placed.transform.mirror_x = mirror == "x"
+            placed.transform.mirror_y = mirror == "y"
+            origin = self.mm(at)
+            for field in self._fields(placed):  # move the fields with the drawing, as the GUI does
+                rel = (field.text.position.x_nm - origin.x_nm, field.text.position.y_nm - origin.y_nm)
+                x, y = sch_geometry.orient(*sch_geometry.unorient(*rel, rotation), rotation, mirror)
+                field.text.position.x_nm, field.text.position.y_nm = origin.x_nm + x, origin.y_nm + y
+
+        for field, text in ((placed.value_field, value), (placed.footprint_field, footprint),
+                            (placed.datasheet_field, datasheet)):
+            if text is not None:
+                field.text.text = text
+        for name, text in (fields or {}).items():
+            field = next((f for f in placed.user_fields if f.name == name), None)
+            if field is None:
+                field = placed.user_fields.add(name=name, visible=False, show_name=False)
+                field.text.CopyFrom(placed.value_field.text)
+                field.text.position.CopyFrom(self.mm(at))
+                field.text.attributes.visible = False
+            field.text.text = text
         return result
 
+    @staticmethod
+    def _fields(instance):
+        return [getattr(instance, attr) for attr in MANDATORY.values()] + list(instance.user_fields)
+
+    def field(self, ref, name, at=None, visible=None, unit=None):
+        """Move (`at`: absolute grid point, half-grid allowed) or show/hide a field of a placed symbol."""
+        units = sorted(u for r, u in self.placements if r == ref)
+        if not units:
+            raise ValueError(f"no symbol {ref}")
+        if unit is None:
+            if len(units) > 1:
+                raise ValueError(f"{ref} has units {units}; pass unit=")
+            unit = units[0]
+        if (ref, unit) not in self.placements:
+            raise ValueError(f"{ref} has units {units}; no unit {unit}")
+        p = self.placements[(ref, unit)]
+        if name in MANDATORY:
+            field = getattr(p.instance, MANDATORY[name])
+        else:
+            field = next((f for f in p.instance.user_fields if f.name == name), None)
+            if field is None:
+                raise ValueError(f"{ref} has no field {name!r}")
+        if at is not None:
+            field.text.position.CopyFrom(self.mm(at))
+        if visible is not None:
+            field.visible = field.text.attributes.visible = visible
+        p.dirty = True
+
     def power(self, name, at, rotation=0):
-        """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference."""
+        """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference; its pin lands
+        on `at`, a grid point or "REF.PIN"."""
         prefix = "#FLG" if name == "PWR_FLAG" else "#PWR"
         self._auto[prefix] += 1
         ref = f"{prefix}{self._auto[prefix]:02d}"
-        self.symbol(ref, f"power:{name}", at, rotation=rotation)
+        self.symbol(ref, f"power:{name}", self.at(at), rotation=rotation)
         return ref
 
     # -- connections and annotations ------------------------------------------------------------
@@ -159,18 +268,32 @@ class Schematic:
             if a[0] != b[0] and a[1] != b[1]:
                 raise ValueError(f"diagonal wire {a} -> {b}")
             self._items.append(_proto.sch.SchematicLine(start=self.mm(a), end=self.mm(b), type=_proto.sch.SLT_WIRE))
+            self._wires.append((tuple(a), tuple(b)))
 
     def junction(self, *points):
-        for p in points:
-            self._items.append(_proto.sch.Junction(position=self.mm(self.at(p))))
+        """Explicit junction dot, for a deliberate four-way connection; T junctions are automatic."""
+        self._junctions.update(tuple(self.at(p)) for p in points)
+
+    def _label(self, item, kind, text, at, spin, shape=None):
+        sch = _proto.sch
+        point = tuple(self.at(at))
+        item.position.CopyFrom(self.mm(point))
+        item.spin_style = sch.SchematicLabelSpinStyle.Value(f"SLSS_{spin.upper()}")
+        item.text.text = text
+        item.text.attributes.size.CopyFrom(_proto.types.Vector2(x_nm=self.LABEL_SIZE, y_nm=self.LABEL_SIZE))
+        self._items.append(item)
+        self._labels.append((kind, text, point, spin, shape))
 
     def label(self, text, at, spin="right"):
         """Local net label; `spin` is the side the text extends to: left, right, up, bottom."""
-        sch = _proto.sch
-        item = sch.LocalLabel(position=self.mm(self.at(at)),
-                              spin_style=sch.SchematicLabelSpinStyle.Value(f"SLSS_{spin.upper()}"))
-        item.text.text = text
-        self._items.append(item)
+        self._label(_proto.sch.LocalLabel(), "label", text, at, spin)
+
+    def global_label(self, text, at, spin="right", shape="passive"):
+        """Global net label; `shape`: input, output, bidirectional, tri_state, passive."""
+        if shape not in self.SHAPES:
+            raise ValueError(f"shape must be one of {', '.join(self.SHAPES)}, not {shape!r}")
+        item = _proto.sch.GlobalLabel(shape=_proto.sch.SchematicLabelShape.Value(self.SHAPES[shape]))
+        self._label(item, "global", text, at, spin, shape)
 
     def no_connect(self, at):
         self._items.append(_proto.sch.NoConnectMarker(position=self.mm(self.at(at))))
@@ -182,6 +305,7 @@ class Schematic:
         item.text.attributes.horizontal_alignment = _proto.enums.HA_LEFT
         item.text.attributes.size.CopyFrom(_proto.types.Vector2(x_nm=round(size * 1e6), y_nm=round(size * 1e6)))
         self._items.append(item)
+        self._notes.append((tuple(at), item.text))
 
     # -- finishing --------------------------------------------------------------------------------
     def commit(self):
@@ -201,15 +325,26 @@ class Schematic:
                 if r.status.code != e.ISC_OK:
                     raise RuntimeError(f"{what}: {r.status}")
 
-        if self._updates:
-            result = self.api(e.UpdateItems(header=self.header, items=[pack(s) for s in self._updates]))
+        dirty = [p for p in self.placements.values() if p.dirty]
+        if dirty:
+            result = self.api(e.UpdateItems(header=self.header, items=[pack(p.instance) for p in dirty]))
             check(result.updated_items, result.status, "UpdateItems")
+            for p, updated in zip(dirty, result.updated_items):  # the server's version, for lint
+                updated.item.Unpack(p.instance)
+                p.instance.ClearField("definition")
+                p.dirty = False
+        points = self._junctions | sch_geometry.junctions(
+            self._wires, [set(p.pins.values()) for p in self.placements.values()],
+            {point for _, _, point, _, _ in self._labels})
+        for point in sorted(points - self._junctions_created):
+            self._items.append(_proto.sch.Junction(position=self.mm(point)))
+        self._junctions_created |= points
         if self._items:
             commit = self.api(e.BeginCommit(header=self.header))
             result = self.api(e.CreateItems(header=self.header, items=[pack(i) for i in self._items]))
             check(result.created_items, result.status, "CreateItems")
             self.api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message="build", header=self.header))
-        self._updates, self._items = [], []
+        self._items = []
         self.api(_proto.project.SaveDocument(document=self.sheet))
 
     def netlist(self):
@@ -232,6 +367,119 @@ class Schematic:
         if status.state != tasks.TS_COMPLETED:
             raise RuntimeError(f"ERC task: {tasks.TaskState.Name(status.state)} {status.error_message}")
         return list(self.api(_proto.sch_tasks.GetErcTaskResult(token=token)).violations)
+
+    # -- lint -------------------------------------------------------------------------------------
+    def _extents(self, text, ink=True):
+        """Box (x0, y0, x1, y1) in nm of a Text at its position, rotated by its angle: KiCad's text box
+        (EDA_TEXT::GetTextBox), or with `ink` that box less its stroke-font padding: KiCad inflates the
+        glyph box by 1.5 pen widths where the ink reaches 0.5, then adds 17 % of that height. Stock
+        symbols stack Reference and Value so that the padded boxes overlap with no ink touching."""
+        box = self.api(_proto.base.GetTextExtents(text=text))
+        x0, y0 = box.position.x_nm, box.position.y_nm
+        x1, y1 = x0 + box.size.x_nm, y0 + box.size.y_nm
+        if not ink:
+            return (x0, y0, x1, y1)
+        a = text.attributes
+        size = min(a.size.x_nm, a.size.y_nm)
+        pen = a.stroke_width.value_nm if a.stroke_width.value_nm > 1 else round(a.size.x_nm / 8)
+        pen = min(pen, round(size * 0.25))  # GetEffectiveTextPenWidth, ClampTextPenSize
+        along, across = pen, pen + round(0.17 * (a.size.y_nm + 3 * pen)) / 2
+        if round(a.angle.value_degrees / 90) % 2:  # vertical text: its height runs along x
+            along, across = across, along
+        return (x0 + along, y0 + across, x1 - along, y1 - across)
+
+    def _field_box(self, p, field):
+        """SCH_FIELD::GetBoundingBox: the text box in library coordinates, then the symbol transform."""
+        origin = self.mm(p.origin)
+        rel = (field.text.position.x_nm - origin.x_nm, field.text.position.y_nm - origin.y_nm)
+        text = _proto.types.Text()
+        text.CopyFrom(field.text)
+        local = sch_geometry.unorient(*rel, p.rotation, p.mirror)
+        text.position.x_nm, text.position.y_nm = round(local[0]), round(local[1])
+        x0, y0, x1, y1 = self._extents(text)
+        corners = [sch_geometry.orient(x, y, p.rotation, p.mirror) for x in (x0, x1) for y in (y0, y1)]
+        xs = [(origin.x_nm + x) / 1e6 / GRID_MM for x, _ in corners]
+        ys = [(origin.y_nm + y) / 1e6 / GRID_MM for _, y in corners]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def _label_box(self, kind, text, anchor, spin, shape):
+        enums = _proto.enums
+        ax, ay = anchor
+        item = _proto.types.Text(text=text, position=self.mm(anchor))
+        item.attributes.size.CopyFrom(_proto.types.Vector2(x_nm=self.LABEL_SIZE, y_nm=self.LABEL_SIZE))
+        item.attributes.vertical_alignment = enums.VA_BOTTOM
+        h = self.LABEL_SIZE / 1e6 / GRID_MM
+        vertical = spin in ("up", "bottom")
+        if kind == "global":
+            item.attributes.horizontal_alignment = enums.HA_LEFT
+            x0, _, x1, _ = (v / 1e6 / GRID_MM for v in self._extents(item, ink=False))  # as the outline
+            margin = 0.375 * h  # label size ratio, eeschema/default_values.h
+            half = h / 2 + margin
+            length = x1 - x0 + 2 * margin + {"passive": 0, "input": half, "output": half,
+                                              "bidirectional": 2 * half, "tri_state": 2 * half}[shape]
+            lo, hi = {"right": (0, length), "left": (-length, 0), "up": (-length, 0), "bottom": (0, length)}[spin]
+            if vertical:
+                return (ax - half, ay + lo, ax + half, ay + hi)
+            return (ax + lo, ay - half, ax + hi, ay + half)
+        item.attributes.horizontal_alignment = enums.HA_LEFT if spin in ("right", "up") else enums.HA_RIGHT
+        if vertical:
+            item.attributes.angle.value_degrees = 90
+        x0, y0, x1, y1 = (v / 1e6 / GRID_MM for v in self._extents(item))
+        dist = 0.15 * h + 0.1524 / GRID_MM  # text offset ratio and default line width
+        if vertical:
+            x0, x1 = x0 - dist, x1 - dist
+        else:
+            y0, y1 = y0 - dist, y1 - dist
+        return (min(x0, ax), min(y0, ay), max(x1, ax), max(y1, ay))
+
+    def lint(self):
+        """Layout issues: overlapping bodies and text, wires over pins, bodies, and text (sch_geometry.lint)."""
+        sch, enums, g = _proto.sch, _proto.enums, sch_geometry
+        directions = {sch.SPO_RIGHT: (1, 0), sch.SPO_LEFT: (-1, 0), sch.SPO_UP: (0, -1), sch.SPO_DOWN: (0, 1)}
+        bodies, texts, pin_lines = [], [], []
+        for p in self.placements.values():
+            def place(x, y):  # library nm -> screen grid point
+                dx, dy = g.orient(x / 1e6 / GRID_MM, y / 1e6 / GRID_MM, p.rotation, p.mirror)
+                return (p.origin[0] + dx, p.origin[1] + dy)
+
+            points = []
+            for child in p.definition.items:
+                if child.HasField("unit") and child.unit.unit not in (0, p.unit):
+                    continue
+                if child.HasField("body_style") and child.body_style.style not in (0, 1):
+                    continue
+                if child.item.Is(sch.SchematicGraphicShape.DESCRIPTOR):
+                    shape = sch.SchematicGraphicShape()
+                    child.item.Unpack(shape)
+                    points += [place(x, y) for x, y in _shape_points(shape.shape)]
+                elif child.item.Is(sch.SchematicPin.DESCRIPTOR):
+                    pin = sch.SchematicPin()
+                    child.item.Unpack(pin)
+                    if not pin.visible or pin.length.value_nm <= 0 or pin.orientation not in directions:
+                        continue
+                    dx, dy = directions[pin.orientation]
+                    n = pin.length.value_nm
+                    start = place(pin.position.x_nm, pin.position.y_nm)
+                    end = place(pin.position.x_nm + dx * n, pin.position.y_nm + dy * n)
+                    pin_lines.append(g.PinLine(f"pin {p.ref}.{pin.number}", start, end))
+            if points:
+                xs, ys = [x for x, _ in points], [y for _, y in points]
+                bodies.append(g.Body(p.name, (min(xs), min(ys), max(xs), max(ys)), frozenset(p.pins.values())))
+            fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
+            for name, field in fields + [(f.name, f) for f in p.instance.user_fields]:
+                if field.visible and field.text.text:
+                    texts.append(g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None))
+        for kind, text, anchor, spin, shape in self._labels:
+            texts.append(g.TextBox(f"{kind} {text!r}", self._label_box(kind, text, anchor, spin, shape), None, anchor))
+        for at, note in self._notes:
+            text = _proto.types.Text()
+            text.CopyFrom(note)
+            text.attributes.multiline = True
+            if text.attributes.vertical_alignment == enums.VA_UNKNOWN:
+                text.attributes.vertical_alignment = enums.VA_CENTER  # multi-line notes centre vertically
+            box = tuple(v / 1e6 / GRID_MM for v in self._extents(text))
+            texts.append(g.TextBox(f"note ({at[0]:g}, {at[1]:g})", box, None, None))
+        return g.lint(bodies, texts, pin_lines, self._wires)
 
     def plot(self, kind, output, drawing_sheet=True, dpi=None):
         sj = _proto.sch_jobs
@@ -291,7 +539,8 @@ def _arguments(extra=None):
 
 
 def run(build, name, page="A4", title="", comments=(), out_dir=None):
-    """Entry point for a design script. Exit status 1 on netlist mismatch or any ERC violation."""
+    """Entry point for a design script. Exit status 1 on netlist mismatch, any ERC violation, or any lint
+    issue; the plots are written either way."""
     args = _arguments(lambda p: p.add_argument("--out", default=out_dir, help="output directory"))
     out = Path(args.out or Path(sys.argv[0]).resolve().parent).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -315,11 +564,16 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
             print(f"  {_proto.types.RuleSeverity.Name(v.severity)} {v.description} @ "
                   f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g})")
 
+        issues = sch.lint()
+        print(f"LINT: {len(issues)} issue(s)")
+        for issue in issues:
+            print(f"  {issue}")
+
         for kind in ("png", "svg", "pdf"):
             print(f"{kind}: {sch.plot(kind, out / f'{name}.{kind}')}")
         for path in sch.plot_cropped(out / f"{name}_crop.png"):
             print(f"crop: {path}")
-    return 0 if ok and not violations else 1
+    return 0 if ok and not violations and not issues else 1
 
 
 if __name__ == "__main__":

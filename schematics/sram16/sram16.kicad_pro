@@ -487,7 +487,7 @@
       {
         "filename": "sram16.kicad_sch",
         "name": "",
-        "uuid": "fe6e57a7-e65a-40cd-912b-0efb4af830e5"
+        "uuid": "d46360ef-6757-46a3-a8e3-6945fbf5aed6"
       }
     ],
     "used_designators": "",
@@ -495,7 +495,7 @@
   },
   "sheets": [
     [
-      "fe6e57a7-e65a-40cd-912b-0efb4af830e5",
+      "d46360ef-6757-46a3-a8e3-6945fbf5aed6",
       ""
     ]
   ],

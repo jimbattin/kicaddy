@@ -101,8 +101,6 @@ def build(s):
     s.wire("BT1.2", p(20, 78))
     s.wire(p(20, 76), p(40, 76))
     s.wire(p(30, 76), "C7.2")
-    s.junction(*(p(x, y) for x, y in [(32, 30), (42, 30), (32, 44), (36, 44), (61, 30),
-                                      (94, 23), (108, 38), (20, 64), (30, 64), (20, 76), (30, 76)]))
 
     s.note("AM receiver, 530-1700 kHz, 9 V battery\n"
            "Tank: f = 1 / (2 pi sqrt(L1 C)), L1 = 240 uH\n"
@@ -113,7 +111,7 @@ def build(s):
            "  tau = RV1 x C3 = 100k x 330 pF = 33 us, audio -3 dB 4.8 kHz\n"
            "C4: 1 / (2 pi x 50k R_in x 100 nF) = 32 Hz\n"
            "LM386 gain 20 (pins 1, 8 open); C8: 1 / (2 pi x 8R x 220 uF) = 90 Hz\n"
-           "Zobel R3 + C9 = 10R + 47 nF", p(50, 64))
+           "Zobel R3 + C9 = 10R + 47 nF", p(47, 64))
 
     return [
         {"J1.2", "C1.1"},

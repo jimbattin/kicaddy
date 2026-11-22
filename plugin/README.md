@@ -3,12 +3,14 @@
 Headless KiCad schematic building for pi / oh-my-pi agents. An agent writes
 a Python `build.py` that places library symbols and wires them by pin; kicaddy runs it against KiCad's IPC API
 (`kicad-cli api-server`, no GUI), saves `.kicad_sch`/`.kicad_pro`, checks the netlist against the nets the script
-declares, runs ERC, and plots PNG/SVG/PDF plus a cropped PNG the agent can read.
+declares, runs ERC and a layout lint (overlapping symbols and text, wires over pins), and plots PNG/SVG/PDF plus a
+cropped PNG the agent can read.
 
 The plugin ships:
 
 - `bin/kicaddy`: the command line (stdlib Python; the runtime it sets up lives in its own venv).
-- `engine/kicaddy/`: the engine (runtime bootstrap, IPC client, schematic builder, crop tool).
+- `engine/kicaddy/`: the engine (runtime bootstrap, IPC client, schematic builder, schematic geometry and lint,
+  crop tool).
 - `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`) and a worked example.
 
 ## Prerequisites

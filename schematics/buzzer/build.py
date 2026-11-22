@@ -47,7 +47,6 @@ def build(s):
     s.wire("BZ1.2", "Q1.3")
     s.wire(p(76, 38), p(92, 38), "D1.1")
     s.wire("D1.2", p(92, 46), p(76, 46))
-    s.junction(*(p(x, y) for x, y in [(40, 54), (40, 66), (68, 52), (76, 38), (76, 46)]))
 
     s.note("Push-button buzzer, 6 V (4 x AA), 5 V magnetic buzzer ~40 mA\n"
            "I_B = (6 - 0.75) V / 2.2 k - 0.75 V / 47 k = 2.4 mA\n"

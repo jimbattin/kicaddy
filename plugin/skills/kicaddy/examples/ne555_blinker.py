@@ -52,7 +52,6 @@ def build(s):
     s.wire(p(62, 54), p(56, 54))
     s.wire("BT1.2", p(62, 67), p(62, 70))
     s.wire(p(62, 67), p(56, 67))
-    s.junction(*(p(x, y) for x, y in [(80, 44), (80, 58), (80, 68), (88, 64), (112, 48), (62, 54), (62, 67)]))
 
     s.note("NE555 astable, 9 V battery, LED blinks at ~5 Hz\n"
            "t_on  = 0.693 (R1 + R2) C1 = 0.693 x 16.7 k x 10 uF = 116 ms\n"

@@ -127,7 +127,7 @@ Package `kiapi.schematic.commands` · `api/proto/schematic/schematic_commands.pr
 |---|---|---|---|---|---|
 | `GetSchematicHierarchy` | `SchematicHierarchyResponse` | sch | yes | ✔ | Sheet tree with `SheetPath`s; needs `project` in the specifier. |
 | `GetSchematicNetlist` | `SchematicNetlistResponse` | sch | yes | ✔ | Net name → item KIIDs per sheet; `types=[KOT_SCH_PIN]` gives pins only. |
-| `PlaceSymbolFromLibrary` | `PlaceFromLibraryResponse` | sch | yes | ✔ | Optional orientation, unit, reference. Fails `symbol … not found` while libraries are still loading. |
+| `PlaceSymbolFromLibrary` | `PlaceFromLibraryResponse` | sch | yes | ✔ | Optional orientation, unit, reference; no mirror (set `transform.mirror_x`/`mirror_y` on an `UpdateItems`). Fails `symbol … not found` while libraries are still loading. Junctions that need the placed symbol's pins are deleted by the commit cleanup until the symbol has been through `UpdateItems` ([04](04-workflows.md#behaviors-to-know)). |
 
 ### Schematic tasks
 

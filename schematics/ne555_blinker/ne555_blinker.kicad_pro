@@ -487,7 +487,7 @@
       {
         "filename": "ne555_blinker.kicad_sch",
         "name": "",
-        "uuid": "bee61605-582a-49f4-8dff-08c8183126b4"
+        "uuid": "966450f3-57ea-4fb9-a961-bcdf9c928d5e"
       }
     ],
     "used_designators": "",
@@ -495,7 +495,7 @@
   },
   "sheets": [
     [
-      "bee61605-582a-49f4-8dff-08c8183126b4",
+      "966450f3-57ea-4fb9-a961-bcdf9c928d5e",
       ""
     ]
   ],

@@ -102,7 +102,11 @@ units, Y down:
 | `SSO_270` | (−y, x) | `sram16` access transistors, buzzer D1 |
 
 Each design's netlist matched the intended connectivity, confirming the mapping. Mirroring (`transform.mirror_x`,
-`mirror_y` on an update) not tested.
+`mirror_y` on an `UpdateItems`, tested for every orientation): the mirror applies after the rotation, so the screen
+offset is M(R(library offset)) with `mirror_x` flipping Y and `mirror_y` flipping X. Orientation 180 with
+`mirror_x` is lost on the server (`SCH_SYMBOL::Deserialize` decodes it as mirror-Y at 0, then clears it); send the
+same matrix as orientation 0 with `mirror_y`. Field positions in the message are absolute and are read after the
+transform, so a field keeps its sent position. `user_fields` added on an update are saved with the symbol.
 
 Multi-unit symbols: `PlaceSymbolFromLibrary` with `unit` set places one unit. `NJM4556A` units 1, 2, 3 placed with
 the same `reference` gave `U1A`, `U1B`, `U1C` (the power unit) of one `U1`. In `definition.items` a pin child's
@@ -318,7 +322,8 @@ coordinates, ignored `field_mask`, closing without saving, shutdown leftovers) a
 | Updating a footprint with `definition` cleared deletes its pads and graphics | R1 had no pads afterwards | Never clear `definition` on a `FootprintInstance`; send all children ([Move footprints](#move-footprints)) |
 | Pins cannot be fetched by id or by type | `GetItemsById` skipped pin ids; `KOT_SCH_PIN` filter rejected | Read pins from the symbol's `definition.items` |
 | Placement races the library load | `symbol 'Timer:NE555P' not found` right after start | `LoadAllLibraries`, then poll `GetLibraryStatuses` until the needed rows are `LLS_LOADED` |
-| Library field positions come from the symbol and can collide with pins | `Device:R_Potentiometer` value `100k log` overlapped the pin-3 number | Keep values short, or move the field by updating `value_field.text.position` (not tested) |
+| Library field positions come from the symbol and can collide with pins | `Device:R_Potentiometer` value `100k log` overlapped the pin-3 number | Move the field: set `value_field.text.position` (absolute) on an `UpdateItems`; kicaddy's `s.field(ref, "Value", at=...)` (tested in M3) |
+| Junctions that depend on a pin vanish when the symbol was only placed | A junction where a pin meets a wire's middle, created after `PlaceSymbolFromLibrary` without an `UpdateItems` of that symbol, is deleted by the commit's cleanup (all 5 in a probe; 2 of 7 in the old NE555 build); after one `UpdateItems` of every symbol all survive | Send every placed symbol through `UpdateItems` before creating junctions |
 | MOSFET gates in `Device:Q_NMOS` / `Q_PMOS` are input pins | ERC `Input pin not driven` on word lines driven only by gates | Drive such nets from an output or passive pin, e.g. a connector |
 | The stock `Device:Q_NMOS` / `Q_PMOS` have three pins, D, G, S | No bulk pin in the library | Bulk is implicit; note the assumption |
 
