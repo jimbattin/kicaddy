@@ -26,7 +26,7 @@ project scaffold (.kicad_pro, empty board, library tables, datasheets/ and analy
 `move`, `remove`, `remove_wire`, `remove_label`, `remove_no_connect` items already in the document and
 `Project.rename_net`. `commit` adds junctions where KiCad's rule finds 3+ wire directions or pins meeting
 (sch_geometry.junctions) and deletes the dots an edit leaves without one. `lint` reports overlapping bodies and
-text and wires crossing pins, bodies, and text (sch_geometry.lint).
+text, fields over their own symbol's drawing, and wires crossing pins, bodies, and text (sch_geometry.lint).
 
 Requires the runtime set up by `kicaddy doctor`; run a design script with `kicaddy run build.py [--out DIR]`.
 """
@@ -133,6 +133,29 @@ def _shape_points(shape):
     else:
         return []
     return [(v.x_nm, v.y_nm) for v in vectors]
+
+
+def _shape_strokes(shape):
+    """((x_nm, y_nm), (x_nm, y_nm)) segments approximating the outline a library GraphicShape draws: arcs and
+    beziers as chords through their points, circles and ellipses as 16-gons."""
+    kind = shape.WhichOneof("geometry")
+    g = getattr(shape, kind) if kind else None
+    if kind == "rectangle":
+        (x0, y0), (x1, y1) = (g.top_left.x_nm, g.top_left.y_nm), (g.bottom_right.x_nm, g.bottom_right.y_nm)
+        chains = [[(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]]
+    elif kind in ("segment", "arc", "bezier"):
+        chains = [_shape_points(shape)]
+    elif kind == "polygon":
+        chains = [[(v.x_nm, v.y_nm) for node in polygon.outline.nodes
+                   for v in ([node.point] if node.HasField("point") else [node.arc.start, node.arc.mid, node.arc.end])]
+                  for polygon in g.polygons]
+    elif kind in ("circle", "ellipse", "ellipse_arc"):
+        (x0, y0), (x1, _) = _shape_points(shape)
+        cx, cy, r = (x0 + x1) / 2, y0 + (x1 - x0) / 2, (x1 - x0) / 2
+        chains = [[(cx + r * math.cos(k * math.pi / 8), cy + r * math.sin(k * math.pi / 8)) for k in range(17)]]
+    else:
+        return []
+    return [(a, b) for chain in chains for a, b in zip(chain, chain[1:]) if a != b]
 
 
 @dataclass
@@ -1155,7 +1178,8 @@ class Schematic:
         return (min(x0, ax), min(y0, ay), max(x1, ax), max(y1, ay))
 
     def lint(self):
-        """Layout issues: overlapping bodies and text, wires over pins, bodies, and text (sch_geometry.lint)."""
+        """Layout issues: overlapping bodies and text, fields over their own symbol's lines, wires over pins,
+        bodies, and text (sch_geometry.lint)."""
         sch, enums, g = _proto.sch, _proto.enums, sch_geometry
         directions = {sch.SPO_RIGHT: (1, 0), sch.SPO_LEFT: (-1, 0), sch.SPO_UP: (0, -1), sch.SPO_DOWN: (0, 1)}
         bodies, texts, pin_lines = [], [], []
@@ -1164,7 +1188,7 @@ class Schematic:
                 dx, dy = g.orient(x / 1e6 / GRID_MM, y / 1e6 / GRID_MM, p.rotation, p.mirror)
                 return (p.origin[0] + dx, p.origin[1] + dy)
 
-            points = []
+            points, strokes = [], []
             for child in p.definition.items:
                 if child.HasField("unit") and child.unit.unit not in (0, p.unit):
                     continue
@@ -1174,6 +1198,7 @@ class Schematic:
                     shape = sch.SchematicGraphicShape()
                     child.item.Unpack(shape)
                     points += [place(x, y) for x, y in _shape_points(shape.shape)]
+                    strokes += [(place(*a), place(*b)) for a, b in _shape_strokes(shape.shape)]
                 elif child.item.Is(sch.SchematicPin.DESCRIPTOR):
                     pin = sch.SchematicPin()
                     child.item.Unpack(pin)
@@ -1186,7 +1211,8 @@ class Schematic:
                     pin_lines.append(g.PinLine(f"pin {p.ref}.{pin.number}", start, end))
             if points:
                 xs, ys = [x for x, _ in points], [y for _, y in points]
-                bodies.append(g.Body(p.name, (min(xs), min(ys), max(xs), max(ys)), frozenset(p.pins.values())))
+                bodies.append(g.Body(p.name, (min(xs), min(ys), max(xs), max(ys)), frozenset(p.pins.values()),
+                                     tuple(strokes)))
             fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
             for name, field in fields + [(f.name, f) for f in p.instance.user_fields]:
                 if field.visible and field.text.text:

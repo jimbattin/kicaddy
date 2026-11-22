@@ -5,10 +5,10 @@ a Python `build.py` that places library symbols and wires them by pin, optionall
 (one build function per sheet); kicaddy runs it against KiCad's IPC API (`kicad-cli api-server`, no GUI), saves a
 KiCad project (`.kicad_pro`, every `.kicad_sch`, net classes, an empty `.kicad_pcb` created once, project-local
 library tables, `datasheets/` and `analysis/` for kicad-happy), checks the netlist against the nets the script
-declares, runs ERC and a layout lint (overlapping symbols and text, wires over pins), and, when all three pass,
-plots PNG/SVG plus a cropped PNG per sheet the agent can read, and one multi-page PDF (a failing build removes the
-plots of an earlier one). Parts missing from the stock libraries get a
-symbol generated from a pin table (JSON) into a project library. Through the omp extension, existing projects
+declares, runs ERC and a layout lint (overlapping symbols and text, text over a symbol's own lines, wires over
+pins), and, when all three pass, plots PNG/SVG plus a cropped PNG per sheet the agent can read, and one
+multi-page PDF (a failing build removes the plots of an earlier one). Parts missing from the stock libraries get
+a symbol generated from a pin table (JSON) into a project library. Through the omp extension, existing projects
 (built or not) can be edited in batches whose netlist change is checked against the change the agent declares.
 
 The plugin ships:

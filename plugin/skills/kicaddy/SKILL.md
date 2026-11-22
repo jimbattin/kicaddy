@@ -144,6 +144,8 @@ Without the tools, the CLI workflow below is unchanged.
    - `body-body`: two symbol bodies (or sheet boxes) overlap.
    - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
    - `text-body`: a text overlaps another symbol's body.
+   - `text-own`: a symbol's own field crosses a line of its drawing (an LED's arrows, a capacitor's plates).
+     Move the field clear of the symbol.
    - `text-pin`: a pin runs through a text.
    - `text-wire`: a wire runs through a text (a label on its own wire is fine).
    - `wire-body`: a wire runs through a symbol body it is not attached to.
@@ -155,12 +157,12 @@ Without the tools, the CLI workflow below is unchanged.
 6. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
    wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read each sheet's
    `<stem>_crop.png` (or the tiles `<stem>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
-   no overlaps; the review looks only for what LINT cannot see: text that sits closer to the wrong part than to
-   its own, a crop split into tiles, or a wrong fact in the note. This first clean build and its one review end
-   the drawing work. Rebuild only to fix one of those three, then read the crop once more; otherwise do not
-   rebuild and do not read the crop again: no moving fields, parts, or wires that LINT passed, no rewording the
-   note, no added decorations, no tighter spacing. These limits apply to your own review only: layout changes
-   the user asks for are always made.
+   no overlaps, including a field over its own symbol's lines. The review looks only for what a reader would
+   misread and LINT cannot see: text that sits closer to another part than to its own, a crop split into tiles,
+   or a wrong fact in the note. This first clean build and its one review end the drawing work. Rebuild only to
+   fix such a misreading, then read the crop once more; otherwise do not rebuild and do not read the crop again:
+   no moving fields, parts, or wires that LINT passed, no rewording the note, no added decorations, no tighter
+   spacing. These limits apply to your own review only: layout changes the user asks for are always made.
 7. **Circuit check.** A build that exits 0 proves the drawing has the declared nets and passes ERC; it says
    nothing about how the circuit behaves. When the task asks for that too, check it in this order, from the
    output directory:

@@ -108,6 +108,7 @@ class Body(NamedTuple):
     name: str
     box: tuple  # (x0, y0, x1, y1), normalized
     pins: frozenset  # connection points of this item
+    strokes: tuple = ()  # ((x1, y1), (x2, y2)) segments of the item's own drawing (symbols only)
 
 
 class TextBox(NamedTuple):
@@ -144,6 +145,24 @@ def _hit(segment, box):
     return hit if hit[0] <= hit[2] and hit[1] <= hit[3] else None
 
 
+def _clip(segment, box):
+    """Part of any segment inside `box` shrunk by EPS, as a box, or None (Liang-Barsky)."""
+    (x1, y1), (x2, y2) = segment
+    dx, dy = x2 - x1, y2 - y1
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x1 - box[0] - EPS), (dx, box[2] - EPS - x1), (-dy, y1 - box[1] - EPS), (dy, box[3] - EPS - y1)):
+        if p == 0:
+            if q < 0:
+                return None
+        elif p < 0:
+            t0 = max(t0, q / p)
+        else:
+            t1 = min(t1, q / p)
+        if t0 > t1:
+            return None
+    return _box((x1 + t0 * dx, y1 + t0 * dy), (x1 + t1 * dx, y1 + t1 * dy))
+
+
 def _meet(a, b):
     """Common part of two axis-aligned segments, as a box, or None."""
     s, t = _box(*a), _box(*b)
@@ -177,6 +196,10 @@ def lint(bodies, texts, pins, wires):
         for body in bodies:
             if a.owner != body.name and (box := _overlap(a.box, body.box)):
                 issues.append(_line("text-body", a.name, body.name, box))
+            elif a.owner == body.name:
+                hit = next((box for s in body.strokes if (box := _clip(s, a.box))), None)
+                if hit:
+                    issues.append(_line("text-own", a.name, body.name, hit))
         for pin in pins:
             if box := _hit((pin.start, pin.end), a.box):
                 issues.append(_line("text-pin", a.name, pin.name, box))
