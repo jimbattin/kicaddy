@@ -199,6 +199,27 @@ Found while building M4 (`Schematic.sheet` in `plugin/engine/kicaddy/schematic.p
 - **Plots.** A child specifier with `SJSM_SINGLE_SHEET` plots that child alone; the root with `SJSM_ALL_SHEETS`
   and a file `output_path` writes one multi-page PDF.
 
+### Edit an existing schematic
+
+Found while building M7 (`Project.open`, `Schematic.load`, and the edit operations in
+`plugin/engine/kicaddy/schematic.py`) on a copy of `pic_programmer`:
+
+- **Pin points of an opened file.** The connection-point rule above holds for symbols the API did not place:
+  `transform.orientation`, then `mirror_x` (flip Y) or `mirror_y` (flip X). Pins are filtered by the instance's
+  `unit` and `body_style` (pin children carry their own `unit` and `body_style`; `0` or absent means all). Every
+  visible connected pin landed on a wire, pin, label, or sheet pin of its own net, and each of the 77 no-connects
+  on exactly one pin, across rotations 0/90/180/270, `mirror_x` (Q2, Q3), and `mirror_y` (U2 unit 4). No symbol
+  in the demo sets both flags.
+- **Labels per net.** `GetSchematicNetlist` with `types=[KOT_SCH_PIN, KOT_SCH_LABEL, KOT_SCH_GLOBAL_LABEL]` lists
+  the label KIIDs of each net per sheet path (match `path.path` KIIDs against a sheet's `sheet_path`). Changing a
+  label's `text.text` with `UpdateItems` renamed the net (`/VPP_ON` → `/VPP_EN` in `kicad-cli`'s netlist too). The
+  call answered inside an open commit.
+- **Moving and deleting existing items.** Inside one commit, `UpdateItems` of a `SchematicSymbolInstance` with a new
+  `position` and every field position shifted by the same amount (definition cleared), of `SchematicLine`
+  endpoints, and of label and `NoConnectMarker` positions moved them; the netlist after moving C2, Q2 (mirrored),
+  and R1 (rotated) was unchanged. `DeleteItems` of a symbol, its power symbol, a wire, and a local label in one
+  commit returned `IDS_OK` for each; `kicad-cli sch export netlist` on the saved file then matched the original.
+
 ### Check and export
 
 ```python
@@ -358,7 +379,7 @@ Not provided by the API in this build, headless:
 |---|---|---|
 | Routing | No interactive router or autorouter command | Raw `Track`, `Arc`, `Via` creation; `RunBoardJobExportSpecctraDsn` and `ImportSpecctraSession` for an external autorouter (registered, not exercised) |
 | Schematic → board sync | No one-step update, no back-annotation | Netlist export job, then `ImportNetlist` |
-| Annotation | No "annotate schematic" command | `reference` on `PlaceSymbolFromLibrary`; editing `reference_field` (not exercised) |
+| Annotation | No "annotate schematic" command | `reference` on `PlaceSymbolFromLibrary`; editing `reference_field` (not exercised; kicaddy removes and places instead) |
 | Stackup | `UpdateBoardStackup` has no handler | `GetBoardStackup`, `SetBoardEnabledLayers`, design-rule and netclass setters |
 | Library tables | No list, add, update, delete, or search | Edit the table files before `CreateDocument` (project rows are read only when the document opens; `ReloadLibrary` does not add them); `GetLibraryItems` |
 | Library authoring | Whole-symbol create and update rejected **[src]** | Write the `.kicad_sym` file (`kicaddy symbol`); child-item edits on an existing symbol or footprint (not exercised) |

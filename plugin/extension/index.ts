@@ -217,7 +217,7 @@ export default function kicaddy(pi: HostAPI): void {
 				if (held.files.includes(full)) {
 					return {
 						block: true,
-						reason: `kicaddy holds ${full} open (project ${held.project_dir}). Change build.py and run kicaddy_build, or use kicaddy_edit; a direct edit would be overwritten by the next save.`,
+						reason: `kicaddy holds ${full} open (project ${held.project_dir}). Use kicaddy_edit (for a project from kicaddy_build, or change build.py and rebuild); a direct edit would be overwritten by the next save.`,
 					};
 				}
 			}

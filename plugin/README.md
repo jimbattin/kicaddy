@@ -7,13 +7,15 @@ KiCad project (`.kicad_pro`, every `.kicad_sch`, net classes, an empty `.kicad_p
 library tables, `datasheets/` and `analysis/` for kicad-happy), checks the netlist against the nets the script
 declares, runs ERC and a layout lint (overlapping symbols and text, wires over pins), and plots PNG/SVG plus a
 cropped PNG per sheet the agent can read, and one multi-page PDF. Parts missing from the stock libraries get a
-symbol generated from a pin table (JSON) into a project library.
+symbol generated from a pin table (JSON) into a project library. Through the omp extension, existing projects
+(built or not) can be edited in batches whose netlist change is checked against the change the agent declares.
 
 The plugin ships:
 
 - `bin/kicaddy`: the command line (stdlib Python; the runtime it sets up lives in its own venv).
-- `engine/kicaddy/`: the engine (runtime bootstrap, IPC client, schematic builder, schematic geometry and lint,
-  pin-table symbol generator, crop tool, and the session daemon behind the extension).
+- `engine/kicaddy/`: the engine (runtime bootstrap, IPC client, schematic builder and read model of existing
+  projects, schematic geometry and lint, netlist diff, pin-table symbol generator, crop tool, and the session daemon
+  behind the extension).
 - `extension/index.ts`: the omp / pi extension: tools on a KiCad server kept warm per session, a guard on the
   schematic files it holds open, and `/kicaddy`.
 - `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`), a worked example design, and an example pin table.
@@ -140,10 +142,10 @@ session ends or omp exits. A session start also runs `kicaddy sweep`, which stop
 | Tool | What it does |
 |---|---|
 | `kicaddy_build` | run a design `build.py` on the warm server: same output and files as `kicaddy run` |
-| `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query and render |
+| `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query, render, and edit |
 | `kicaddy_query` | placed symbols, nets, ERC, or library pin offsets of the open project |
 | `kicaddy_render` | cropped PNGs of every sheet (or one), returned as images |
-| `kicaddy_edit` | builder calls on the project built this session, as one batch: any exception drops the batch and leaves the document unchanged; a committed batch is saved (not into `build.py`; a rebuild discards it) |
+| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
 
 While a project is open, the agent's `edit`/`write` calls on its `.kicad_sch`/`.kicad_pro` files are blocked.
 

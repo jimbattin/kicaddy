@@ -59,7 +59,7 @@ Package `kiapi.common.commands` · `api/proto/common/commands/editor_commands.pr
 | `EndCommit` | `EndCommitResponse` | sch, pcb, sym, fp | yes | ✔ | `CMA_COMMIT` or `CMA_DROP`. |
 | `CreateItems` | `CreateItemsResponse` | sch, pcb, sym, fp | yes | ✔ | Items are `Any`; optional `container` = existing symbol/footprint id. |
 | `UpdateItems` | `UpdateItemsResponse` | sch, pcb, sym, fp | yes | ✔ | Whole-item replace; `field_mask` is ignored. |
-| `DeleteItems` | `DeleteItemsResponse` | sch, pcb, sym, fp | yes | ✔ | By KIID. |
+| `DeleteItems` | `DeleteItemsResponse` | sch, pcb, sym, fp | yes | ✔ | By KIID; one `deleted_items` status per id. A schematic symbol, power symbol, wire, and local label in one commit: all `IDS_OK` (M7). |
 | `HitTest` | `HitTestResponse` | sch, pcb, sym, fp | yes |  |  |
 | `GetDocumentModifiedState` | `GetDocumentModifiedStateResponse` | sch, pcb, sym, fp | yes | ✔ |  |
 | `GetTitleBlockInfo` | `TitleBlockInfo` | sch, pcb, sym, fp | yes | ✔ |  |
@@ -126,7 +126,7 @@ Package `kiapi.schematic.commands` · `api/proto/schematic/schematic_commands.pr
 | Request | Response | Needs | Headless | Live | Notes |
 |---|---|---|---|---|---|
 | `GetSchematicHierarchy` | `SchematicHierarchyResponse` | sch | yes | ✔ | Sheet tree with `SheetPath`s; needs `project` in the specifier. |
-| `GetSchematicNetlist` | `SchematicNetlistResponse` | sch | yes | ✔ | Net name → item KIIDs per sheet; `types=[KOT_SCH_PIN]` gives pins only. Covers the whole hierarchy whatever the `sheet_path`. |
+| `GetSchematicNetlist` | `SchematicNetlistResponse` | sch | yes | ✔ | Net name → item KIIDs per sheet; `types=[KOT_SCH_PIN]` gives pins only, adding `KOT_SCH_LABEL`/`KOT_SCH_GLOBAL_LABEL` lists each net's label KIIDs (M7). Covers the whole hierarchy whatever the `sheet_path`. |
 | `PlaceSymbolFromLibrary` | `PlaceFromLibraryResponse` | sch | yes | ✔ | Optional orientation, unit, reference; no mirror (set `transform.mirror_x`/`mirror_y` on an `UpdateItems`). Fails `symbol … not found` while libraries are still loading. Junctions that need the placed symbol's pins are deleted by the commit cleanup until the symbol has been through `UpdateItems` ([04](04-workflows.md#behaviors-to-know)). |
 
 ### Schematic tasks

@@ -1,6 +1,6 @@
 ---
 name: kicaddy
-description: Create KiCad projects (.kicad_pro, .kicad_sch, hierarchical sheets) from a Python build script, headless through KiCad's IPC API - place library symbols, generate custom symbols from a pin table, wire by pin, split a design into sheets, check the netlist against declared intent and ERC, render cropped PNGs. Use to draw, design, or build a new schematic; not for reviewing or analyzing an existing one.
+description: Create KiCad projects (.kicad_pro, .kicad_sch, hierarchical sheets) from a Python build script, headless through KiCad's IPC API - place library symbols, generate custom symbols from a pin table, wire by pin, split a design into sheets, check the netlist against declared intent and ERC, render cropped PNGs; with the kicaddy tools, also edit an existing schematic (add, move, remove parts, change values, rename nets) with the netlist change checked. Use to draw, design, build, or edit a schematic; not for reviewing or analyzing one.
 ---
 
 # kicaddy: headless KiCad schematics from a build script
