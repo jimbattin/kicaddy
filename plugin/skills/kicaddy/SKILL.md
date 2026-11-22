@@ -172,7 +172,7 @@ def build(s):
     s.symbol("R1", "Device:R", (40, 30), value="10k")  # pins 1 (40, 27) and 2 (40, 33)
     s.no_connect("R1.1")
     s.power("GND", (40, 36))
-    s.power("PWR_FLAG", (44, 36))  # GND is fed only by passive pins
+    s.power("PWR_FLAG", (44, 36))  # GND is fed only by passive pins; GND's value is below, the flag's above
     s.wire("R1.2", (40, 36), (44, 36))
     return [{"R1.1"}, {"R1.2"}]  # expected nets as sets of "REF.PIN"; power-symbol pins are ignored
 
@@ -288,6 +288,10 @@ Methods on `s`:
 - Junction dots are automatic wherever 3 or more wire directions or pins meet, including a wire end or a pin
   on the middle of another wire. A pin or wire end that touches the middle of a wire connects to it, so route
   wires around pins they must not join. Two wires crossing middle to middle do not connect.
+- Two pins on the same point connect without a wire. `s.wire` fails with `zero-length wire at (x, y)` when two
+  consecutive points coincide: a wire between pins that already touch (e.g. a resistor placed with its pin on a
+  capacitor's pin), or a corner point equal to the pin the wire starts or ends at. Work out each pin's absolute
+  point (Geometry) before choosing corner points.
 - A field that collides with a pin, wire, or another text: move it with `s.field(ref, "Value", at=...)`.
 - Put the part number in `fields={"MPN": ..., "Manufacturer": ...}` and the datasheet URL in `datasheet=`
   when known.
@@ -296,6 +300,9 @@ Methods on `s`:
   reports `Input pin not driven`. These symbols have three pins (D, G, S) and no bulk pin.
 - Put a `PWR_FLAG` on each supply net fed only by passive pins (a battery, a connector), or ERC reports the
   power input pins as not driven. The example flags both battery nets.
+- `PWR_FLAG` and the upward power symbols (`+5V`, `+9V`, `+12V`, `VCC`) all print their value above the pin. On
+  one rail, keep a flag at least 6 units left or right of such a symbol: 5 or fewer gives
+  `text-text: #PWR…Value / #FLG…Value`. Next to `GND` (value below the pin) 4 units is enough.
 
 ## After a clean build: BOM and handoff
 
