@@ -28,6 +28,9 @@ On a `FAIL` line from `doctor`:
 - `bindings`: needs `git` and network access (first run per KiCad build).
 - `server`: show the user the message.
 
+A `warn  tested` line is not a failure: this KiCad build is not one the plugin's design corpus was rebuilt on.
+Continue; if a build then fails in a way its output does not explain, tell the user the KiCad build is untested.
+
 ## kicaddy tools (omp extension)
 
 When the `kicaddy_build` tool is available, the plugin's extension keeps one KiCad server warm for the session:
@@ -293,6 +296,25 @@ Methods on `s`:
   reports `Input pin not driven`. These symbols have three pins (D, G, S) and no bulk pin.
 - Put a `PWR_FLAG` on each supply net fed only by passive pins (a battery, a connector), or ERC reports the
   power input pins as not driven. The example flags both battery nets.
+
+## After a clean build: BOM and handoff
+
+- **BOM.** `kicaddy bom <project dir | .kicad_pro | root .kicad_sch> [-o FILE]` writes `<name>_bom.csv` next to
+  the root sheet from the saved files, so it includes `kicaddy_edit` batches and works on projects from
+  `kicaddy_open`. One row per group of parts with the same Value, Footprint, and MPN; columns Reference,
+  Value, Footprint, Qty, MPN, Manufacturer, Datasheet, DNP. It is not part of the build: run it again after
+  any change.
+- **Review, simulation, sourcing.** kicaddy does not review a design. When the user asks for a design review,
+  a SPICE check, or sourcing, and the `kicad`, `spice`, or `bom` skills (kicad-happy) are available, read that
+  skill and run its scripts from the project directory, which already has `analysis/` and `datasheets/`:
+  - `python3 <kicad skill>/scripts/analyze_schematic.py <name>.kicad_sch --analysis-dir analysis/`
+  - `python3 <spice skill>/scripts/simulate_subcircuits.py --analysis-dir analysis/`
+  - `python3 <bom skill>/scripts/bom_manager.py export <name>.kicad_sch -o bom/bom.csv --recursive`
+
+  The analyzer reports the file format as newer than it has tested (`FV-001`, info), and names a net on a
+  child sheet by the sheet's UUID (`/e1a1…/IN_R` for `/amp/IN_R`). Its sourcing checks read the `MPN`,
+  `Manufacturer`, and Datasheet fields set in `build.py`. Always give these scripts a real output path: they
+  also write `analysis/capability_mode.json` under the current directory.
 
 ## Example
 

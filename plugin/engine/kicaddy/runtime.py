@@ -202,7 +202,30 @@ def wait_for_symbol_libraries(api, nicknames, timeout=60):
         time.sleep(0.1)
 
 
-# -- orphan servers: stdlib only, Python 3.9 (bin/kicaddy imports this module on the system python3) ---------
+# -- stdlib only, Python 3.9 (bin/kicaddy imports this module on the system python3) -----------------------------
+def project_root(path) -> Path:
+    """The root .kicad_sch for a project directory, a .kicad_pro, or a root .kicad_sch; ValueError otherwise."""
+    path = Path(path).expanduser().resolve()
+    if path.is_dir():
+        projects = sorted(path.glob("*.kicad_pro"))
+        if len(projects) != 1:
+            names = ", ".join(p.name for p in projects) or "none"
+            raise ValueError(f"{path}: {len(projects)} .kicad_pro files ({names}); pass one")
+        root = projects[0].with_suffix(".kicad_sch")
+    elif path.suffix == ".kicad_pro":
+        root = path.with_suffix(".kicad_sch")
+    elif path.suffix == ".kicad_sch":
+        if not path.with_suffix(".kicad_pro").exists():
+            raise ValueError(f"not a root schematic: no {path.stem}.kicad_pro")
+        root = path
+    else:
+        raise ValueError(f"{path}: pass a project directory, a .kicad_pro, or a root .kicad_sch")
+    if not root.exists():
+        raise ValueError(f"no such file: {root}")
+    return root
+
+
+# orphan servers
 def _processes():
     """[(pid, args)] of every process."""
     lines = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True).stdout.splitlines()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import shlex
@@ -14,6 +15,9 @@ from . import bootstrap, config
 
 ENV_KEYS = (("KICADDY_PYTHON", "python"), ("KICADDY_KICAD_PATH", "kicad"),
             ("KICAD_API_BINDINGS", "bindings"), ("KICAD_CONFIG_HOME", "config_home"))
+BOM_FIELDS = "Reference,Value,Footprint,${QUANTITY},MPN,Manufacturer,Datasheet,${DNP}"
+BOM_LABELS = "Reference,Value,Footprint,Qty,MPN,Manufacturer,Datasheet,DNP"
+BOM_GROUP_BY = "Value,Footprint,MPN"
 
 
 def _exec_venv(args: list) -> int:
@@ -65,6 +69,46 @@ def _view(file: str) -> int:
     return 0
 
 
+def _bom(path: str, output: str | None) -> int:
+    """Grouped BOM CSV of the saved project, from `kicad-cli sch export bom`."""
+    from . import runtime
+
+    try:
+        current = bootstrap.load_current()
+    except bootstrap.SetupError as e:
+        print(e, file=sys.stderr)
+        return 1
+    try:
+        root = runtime.project_root(path)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    out = Path(output).expanduser().resolve() if output else root.with_name(f"{root.stem}_bom.csv")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    argv, env = bootstrap.kicad_command(current["launcher"], [
+        "sch", "export", "bom", "--fields", BOM_FIELDS, "--labels", BOM_LABELS, "--group-by", BOM_GROUP_BY,
+        "--ref-range-delimiter", "", "--output", str(out), str(root)], Path(current["config_home"]),
+        paths=(root.parent, out.parent))
+    try:
+        result = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=120)
+        code, text = result.returncode, result.stderr + result.stdout
+    except subprocess.TimeoutExpired:
+        code, text = "timeout", "timed out after 120 s"
+    except OSError as e:
+        code, text = "none", str(e)
+    if code != 0 or not out.exists():
+        print(f"error: kicad-cli sch export bom failed (exit {code})", file=sys.stderr)
+        lines = [line for line in text.splitlines() if line.strip() and not line.startswith("Fontconfig ")]
+        for line in lines[-10:]:
+            print(f"  {line}", file=sys.stderr)
+        return 1
+    with open(out, newline="") as f:
+        rows = list(csv.reader(f))[1:]
+    parts = sum(int(row[3]) for row in rows if len(row) > 3 and row[3].isdigit())
+    print(f"bom: {out} ({len(rows)} rows, {parts} parts)")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="kicaddy")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -95,6 +139,9 @@ def main(argv=None) -> int:
     commands.add_parser("sweep", help="stop api-servers left by killed kicaddy processes")
     view = commands.add_parser("view", help="open a schematic in eeschema (isolated KiCad config)")
     view.add_argument("file")
+    bom = commands.add_parser("bom", help="write a grouped BOM CSV of a saved project")
+    bom.add_argument("path", help="project directory, .kicad_pro, or root .kicad_sch")
+    bom.add_argument("-o", "--output", help="CSV path; default <root stem>_bom.csv next to the root sheet")
     commands.add_parser("daemon")  # no help: internal (the omp extension's session daemon)
 
     smoke = commands.add_parser("_smoke")
@@ -133,6 +180,8 @@ def main(argv=None) -> int:
         return 0
     if args.command == "view":
         return _view(args.file)
+    if args.command == "bom":
+        return _bom(args.path, args.output)
     if args.command == "daemon":
         return _exec_venv(["-m", "kicaddy.daemon"])
     try:

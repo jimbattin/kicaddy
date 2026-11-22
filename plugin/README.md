@@ -32,20 +32,27 @@ The plugin ships:
 
 | Platform | Status |
 |---|---|
-| Linux | tested |
+| Linux | tested (this machine, and a clean Debian container with only an extracted AppImage) |
 | macOS | expected to work, untested |
 | Flatpak KiCad | supported, untested |
 | Windows | not supported |
 
 ## Install
 
-oh-my-pi:
+oh-my-pi, from the repository's marketplace catalog (`.omp-plugin/marketplace.json`):
+
+```sh
+omp plugin marketplace add <clone>
+omp plugin install kicaddy@kicaddy
+```
+
+or linked to a working copy:
 
 ```sh
 omp plugin link <clone>/plugin
 ```
 
-Upstream pi (untested):
+Upstream pi (smoke-tested: tools, guard, and commands with a scripted model):
 
 ```sh
 pi install <clone>/plugin
@@ -94,13 +101,14 @@ the choice and writes it there. `--kicad` and `KICADDY_KICAD` override it for on
 | `platform` | Linux or macOS |
 | `kicad` | resolves the choice to a `kicad-cli` launcher |
 | `api-server` | reads the KiCad version, requires `kicad-cli api-server`, and finds the build's source commit (or its release tag) |
+| `tested` | not a check: `warn` when this KiCad build is not on the plugin's tested-builds list (`engine/kicaddy/tested_builds.json`, the builds the design corpus was rebuilt on), `ok` when it is |
 | `config` | an isolated `KICAD_CONFIG_HOME` with the stock library tables, so your own KiCad settings are untouched |
 | `venv` | a pinned venv (pynng, protobuf, grpcio-tools, Pillow), created with `uv` |
 | `bindings` | Python bindings generated from the `api/proto` tree of that KiCad build |
 | `server` | starts the headless server, checks version, settings directory, and libraries, and builds, saves, and reads back the netlist of a two-resistor schematic |
 
 `--refresh` rebuilds the venv and bindings even if cached. On success doctor records the runtime and prints the
-`cli:` line to use. Afterwards, `run`, `pins`, `symbol`, `view`, and `env` refuse to start if the KiCad file (or
+`cli:` line to use. Afterwards, `run`, `pins`, `symbol`, `bom`, `view`, and `env` refuse to start if the KiCad file (or
 Flatpak commit) changed, or if the config file's `kicad` changed, until doctor runs again.
 
 Locations:
@@ -123,6 +131,7 @@ Locations:
 | `kicaddy env` | print shell exports: `KICADDY_PYTHON`, `KICADDY_KICAD_PATH`, `KICAD_API_BINDINGS`, `KICAD_CONFIG_HOME` |
 | `kicaddy view FILE` | open a schematic in eeschema on the isolated KiCad config (your own settings stay untouched; the first launch shows KiCad's startup wizard once) |
 | `kicaddy sweep` | stop `api-server`s whose kicaddy process was killed, and remove their socket directories |
+| `kicaddy bom PROJECT [-o FILE]` | write a grouped BOM CSV (Reference, Value, Footprint, Qty, MPN, Manufacturer, Datasheet, DNP; one row per Value, Footprint, and MPN) of a saved project (directory, `.kicad_pro`, or root `.kicad_sch`) with `kicad-cli sch export bom`; default `<root stem>_bom.csv` next to the root sheet |
 
 `kicaddy` here means `python3 <clone>/plugin/bin/kicaddy`.
 

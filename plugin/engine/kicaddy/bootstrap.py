@@ -30,6 +30,7 @@ SYSTEM_CANDIDATES = {
 }
 DIR_CANDIDATES = ("bin/kicad-cli", "kicad-cli", "Contents/MacOS/kicad-cli", "KiCad.app/Contents/MacOS/kicad-cli")
 APPIMAGE_MAGIC = b"AI\x02"  # type-2 AppImage marker at byte offset 8
+TESTED_BUILDS = Path(__file__).with_name("tested_builds.json")
 
 
 class SetupError(RuntimeError):
@@ -318,6 +319,23 @@ def smoke_server(py: Path, launcher: list, bindings: Path, home: Path, settings_
 
 
 # -- doctor and current.json ---------------------------------------------------------------------
+def tested_line(key: str, full_version: str) -> str:
+    """The doctor line saying whether the design corpus was rebuilt on this KiCad build (`tools/corpus.py`)."""
+    try:
+        data = json.loads(TESTED_BUILDS.read_text())
+    except (OSError, ValueError):
+        data = {}
+    builds = data.get("builds") if isinstance(data, dict) else None
+    if not isinstance(builds, list):
+        builds = []
+    for entry in builds:
+        if isinstance(entry, dict) and entry.get("key") == key:
+            return f"ok    {'tested':<10} corpus rebuilt on this build {entry['date']} (kicaddy {entry['kicaddy']})"
+    latest = f"latest tested: {builds[-1]['version']}" if builds else "no builds listed"
+    return (f"warn  {'tested':<10} KiCad {full_version} is not on kicaddy's tested-builds list ({latest}); "
+            "the design corpus was not rebuilt on it")
+
+
 def doctor(kicad_arg: str | None, refresh: bool) -> int:
     from . import config
 
@@ -377,6 +395,8 @@ def doctor(kicad_arg: str | None, refresh: bool) -> int:
     for name, step in steps:
         if not check(name, step):
             return 1
+        if name == "api-server":
+            print(tested_line(state["bindings_key"], state["full_version"]), flush=True)
 
     current = {key: state[key] for key in ("mode", "kicad", "launcher", "kicad_fingerprint", "choice",
                                             "config_kicad", "full_version", "settings_version", "bindings_key")}

@@ -211,23 +211,10 @@ class Session:
         return {"output": "\n".join(lines), "fingerprint": self.fingerprint() if document else None}
 
     def op_open(self, request):
-        path = Path(request["path"]).expanduser().resolve()
-        if path.is_dir():
-            projects = sorted(path.glob("*.kicad_pro"))
-            if len(projects) != 1:
-                names = ", ".join(p.name for p in projects) or "none"
-                raise OpError(f"{path}: {len(projects)} .kicad_pro files ({names}); pass one")
-            root = projects[0].with_suffix(".kicad_sch")
-        elif path.suffix == ".kicad_pro":
-            root = path.with_suffix(".kicad_sch")
-        elif path.suffix == ".kicad_sch":
-            if not path.with_suffix(".kicad_pro").exists():
-                raise OpError(f"not a root schematic: no {path.stem}.kicad_pro")
-            root = path
-        else:
-            raise OpError(f"{path}: pass a project directory, a .kicad_pro, or a root .kicad_sch")
-        if not root.exists():
-            raise OpError(f"no such file: {root}")
+        try:
+            root = runtime.project_root(request["path"])
+        except ValueError as e:
+            raise OpError(str(e)) from None
         self._check_server()
         if self.project is not None and self.built and self.project.root.path.resolve() == root:
             return {"output": "already open (built this session)"}
