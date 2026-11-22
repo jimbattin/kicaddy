@@ -34,7 +34,7 @@ and no selection, view, or `RunAction` commands in headless mode. See [04-workfl
 | [06-method-comparison-headphone-amp.md](06-method-comparison-headphone-amp.md) | Time and token cost of the KiCad IPC method against a free-choice method, on the same headphone-amp task |
 | [examples/minimal_client.py](examples/minimal_client.py) | Self-contained client: starts the headless server, reads a document, shuts down |
 | [../plugin/](../plugin/) | The `kicaddy` plugin: `bin/kicaddy` (`doctor` resolves the chosen KiCad and sets up cached bindings, pinned venv, isolated config; `run`, `pins`, `config`), the engine (`engine/kicaddy/`: runtime, project and schematic builder `schematic.py` with hierarchical sheets, net classes, automatic junctions, and a layout lint, geometry `sch_geometry.py`, crop tool `crop.py`), and the `kicaddy` skill |
-| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM, headphone amp, and the headphone amp as a three-sheet project (`headphone_amp_hier`) |
+| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM, headphone amp, and the headphone amp as a three-sheet project (`headphone_amp_hier`). The KiCad files are tracked; the plots (PNG, SVG, PDF, crops) are git-ignored and written by `kicaddy run` |
 
 ## Evidence labels
 

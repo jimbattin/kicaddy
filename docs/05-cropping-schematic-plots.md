@@ -119,15 +119,16 @@ hard constraint.
   block not bottom-right, defeats structural detection; plot without the sheet instead.
 - **Non-uniform backgrounds.** Placed bitmaps reaching the page edge, or a theme background differing from the
   top-left pixel, break the ink test.
-- **Very large designs.** Produce many tiles. Plot hierarchical sheets one at a time (`plot_pages`,
-  `SJSM_ALL_SHEETS`) rather than cramming one page.
+- **Very large designs.** Produce many tiles. Split the design into hierarchical sheets rather than cramming one
+  page: `kicaddy run` plots and crops each sheet on its own (the child's specifier, `SJSM_SINGLE_SHEET`).
 - **Terminal-specific numbers.** 1600 × 1200 and 150 dpi are tuned for this session's viewer. Change `MAX_SIZE` and
   `MIN_DPI` in `crop.py` for another viewer.
 
 ## Usage
 
 ```sh
-# Part of a design build (writes <name>_crop.png or tiles next to the plots); runtime from kicaddy doctor
+# Part of a design build (writes <stem>_crop.png or tiles per sheet next to the plots); runtime from kicaddy doctor.
+# Under schematics/ the plots are git-ignored: build to see them.
 python3 plugin/bin/kicaddy run schematics/<design>/build.py
 
 # Standalone, on a PNG plotted without the drawing sheet at 300 dpi
