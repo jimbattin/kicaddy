@@ -241,7 +241,7 @@ export default function kicaddy(pi: HostAPI): void {
 		name: "kicaddy_open",
 		label: "kicaddy open",
 		description:
-			"Open an existing KiCad project (directory, .kicad_pro, or root .kicad_sch) for kicaddy_query and kicaddy_render; not editable with kicaddy_edit.",
+			"Open an existing KiCad project (directory, .kicad_pro, or root .kicad_sch) for kicaddy_query, kicaddy_render, and kicaddy_edit.",
 		parameters: Type.Object({ path: Type.String({ description: "project directory, .kicad_pro, or root .kicad_sch" }) }),
 		execute: (_id, params, _signal, _onUpdate, ctx) => call(ctx, "open", { path: resolve(ctx.cwd, params.path) }),
 	});
@@ -266,17 +266,38 @@ export default function kicaddy(pi: HostAPI): void {
 		execute: (_id, params, _signal, _onUpdate, ctx) => call(ctx, "render", params.sheet ? { sheet: params.sheet } : {}),
 	});
 
-	pi.registerTool<{ code: string; sheet?: string }>({
+	const pins = (description: string) => Type.Record(Type.String(), Type.String(), { description });
+	const refs = (description: string) => Type.Array(Type.String(), { description });
+	pi.registerTool<{ code: string; sheet?: string; expect?: Record<string, unknown> }>({
 		name: "kicaddy_edit",
 		label: "kicaddy edit",
 		description:
-			"Run Python builder calls on the project built this session as one batch: `s` is the sheet (file stem `sheet`, default the root), `sheets` maps file stems to sheets. Any exception drops the whole batch and leaves the document unchanged. Saves the schematic files but not build.py: copy every change you keep into build.py, since a rebuild discards batches. s.sheet, s.net_class, and commit() are not available.",
+			"Run Python builder calls as one batch on the open project, from kicaddy_build or kicaddy_open: `s` is the sheet (file stem `sheet`, default the root), `sheets` maps file stems to sheets, `project` is the project. Besides the build.py methods (s.symbol, s.wire, s.label, s.power, s.no_connect, ...), items already in the document can be changed: s.move(ref, at) (wires follow), s.remove(ref), s.remove_wire(a, b), s.remove_label(text, at=None), s.remove_no_connect(at), s.field(ref, name, text=...), project.rename_net(full_name, new_label_text). Reports the netlist change, new ERC and LINT issues. `expect` declares the netlist change; it is required for opened projects ({} for none), and a batch whose change differs is dropped. Any exception drops the whole batch and leaves the document unchanged. Saves the schematic files: for a built project copy every change you keep into build.py, since a rebuild discards batches. s.sheet, s.net_class, and commit() are not available.",
 		parameters: Type.Object({
 			code: Type.String({ description: "Python, e.g. s.symbol(\"R5\", \"Device:R\", (60, 30), value=\"1k\")" }),
 			sheet: Type.Optional(Type.String({ description: "sheet file stem; default the root sheet" })),
+			expect: Type.Optional(
+				Type.Object(
+					{
+						add: Type.Optional(pins("new components: {ref: value}")),
+						remove: Type.Optional(refs("removed components: their pins leave every net")),
+						values: Type.Optional(pins("changed values: {ref: new value}")),
+						connect: Type.Optional(
+							pins("{\"REF.PIN\": target}: the pin joins target, a \"REF.PIN\", an existing net name, or a new net name"),
+						),
+						disconnect: Type.Optional(refs("\"REF.PIN\" pins that leave their net")),
+						rename: Type.Optional(pins("{old full net name: new full net name}, as kicaddy_query nets prints them")),
+					},
+					{ additionalProperties: false, description: "the netlist change the batch makes; {} for none" },
+				),
+			),
 		}),
 		execute: (_id, params, _signal, _onUpdate, ctx) =>
-			call(ctx, "edit", params.sheet ? { code: params.code, sheet: params.sheet } : { code: params.code }),
+			call(ctx, "edit", {
+				code: params.code,
+				...(params.sheet ? { sheet: params.sheet } : {}),
+				...(params.expect !== undefined ? { expect: params.expect } : {}),
+			}),
 	});
 
 	pi.registerCommand("kicaddy", {

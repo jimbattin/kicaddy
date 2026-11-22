@@ -90,6 +90,18 @@ def junctions(wires, pin_groups, label_points):
     return found
 
 
+def crossing(wires, p):
+    """True when one wire runs horizontally and another vertically through `p`, both with `p` strictly
+    inside: a middle-to-middle crossing, connected only by an explicit junction."""
+    def through(w, axis):  # axis 0: horizontal run, 1: vertical
+        a, b = w
+        if a[1 - axis] != p[1 - axis] or b[1 - axis] != p[1 - axis]:
+            return False
+        return min(a[axis], b[axis]) < p[axis] < max(a[axis], b[axis])
+
+    return any(through(w, 0) for w in wires) and any(through(w, 1) for w in wires)
+
+
 # -- lint -----------------------------------------------------------------------------------------
 
 class Body(NamedTuple):

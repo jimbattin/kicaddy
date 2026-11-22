@@ -17,14 +17,16 @@ to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...
 in grid units for planning a layout; `kicaddy symbol TABLE.json --dir DIR` writes a custom symbol from a
 pin table into the project's library (symbols.py) and prints its offsets.
 
-Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move
-or show a field), `power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction`
-for a deliberate four-way dot, `sheet` (a child sheet drawn by its own build function, with sheet pins from
-its hierarchical labels), and `net_class`. `Project` holds what the sheets share and writes the project
-scaffold (.kicad_pro, empty board, library tables, datasheets/ and analysis/); `run()` builds into it.
-`commit` adds junctions where KiCad's rule finds 3+ wire directions or pins meeting
-(sch_geometry.junctions). `lint` reports overlapping bodies and text and wires crossing pins, bodies, and
-text (sch_geometry.lint).
+Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move,
+show, or change the text of a field), `power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`,
+`note`, `junction` for a deliberate four-way dot, `sheet` (a child sheet drawn by its own build function, with
+sheet pins from its hierarchical labels), and `net_class`. `Project` holds what the sheets share and writes the
+project scaffold (.kicad_pro, empty board, library tables, datasheets/ and analysis/); `run()` builds into it.
+`Project.open` loads an existing project into the same model (`Schematic.load`), where an edit batch may also
+`move`, `remove`, `remove_wire`, `remove_label`, `remove_no_connect` items already in the document and
+`Project.rename_net`. `commit` adds junctions where KiCad's rule finds 3+ wire directions or pins meeting
+(sch_geometry.junctions) and deletes the dots an edit leaves without one. `lint` reports overlapping bodies and
+text and wires crossing pins, bodies, and text (sch_geometry.lint).
 
 Requires the runtime set up by `kicaddy doctor`; run a design script with `kicaddy run build.py [--out DIR]`.
 """
@@ -50,7 +52,7 @@ _live = None  # the omp extension's session daemon (daemon.Session): run() build
 
 PROJECT_STATE = ("pin_ids", "units", "auto", "libraries_ready", "net_classes", "files")  # edit-batch rollback
 SHEET_STATE = ("pins", "placements", "_items", "_wires", "_labels", "_notes", "_sheets", "_junctions",
-               "_junctions_created")
+               "_junctions_created", "_existing", "_no_connects", "_updates", "_deletes", "_touched")
 BATCH_ERROR = "{} is not available in an edit batch; add it to build.py and rebuild"
 
 
@@ -69,17 +71,47 @@ def _server(project_dir=None, paths=()):
     return runtime.server(current["launcher"], Path(current["config_home"]), project_dir, paths)
 
 
-def _pins(definition, unit):
-    """Yield (pin, dx, dy), library offsets in grid units, for the pins of `unit` (None: unit 1)."""
+def _pins(definition, unit, body_style=1):
+    """Yield (pin, dx, dy), library offsets in grid units, for the pins of `unit` (None: unit 1) in
+    `body_style` (1: the normal body, 2: De Morgan)."""
     sch = _proto.sch
     for child in definition.items:
         if not child.item.Is(sch.SchematicPin.DESCRIPTOR):
             continue
         if child.HasField("unit") and child.unit.unit not in (0, unit or 1):  # 0: shared by all units
             continue
+        if child.HasField("body_style") and child.body_style.style not in (0, body_style):
+            continue
         pin = sch.SchematicPin()
         child.item.Unpack(pin)
         yield pin, pin.position.x_nm / 1e6 / GRID_MM, pin.position.y_nm / 1e6 / GRID_MM
+
+
+def _grid(v):
+    """nm -> grid units; an int when on the grid."""
+    g = round(v / 1e6 / GRID_MM, 6)
+    return int(g) if g == int(g) else g
+
+
+def _point(vector):
+    return (_grid(vector.x_nm), _grid(vector.y_nm))
+
+
+def _unpack(item, kind):
+    message = kind()
+    item.Unpack(message)
+    return message
+
+
+def _spin(style):
+    """SchematicLabelSpinStyle -> "left", "up", "right", "bottom"."""
+    return _proto.sch.SchematicLabelSpinStyle.Name(style)[5:].lower()
+
+
+def _shape(shape):
+    """SchematicLabelShape -> a Schematic.SHAPES key; "passive" for the shapes the builder does not draw."""
+    name = _proto.sch.SchematicLabelShape.Name(shape)
+    return next((k for k, v in Schematic.SHAPES.items() if v == name), "passive")
 
 
 def _shape_points(shape):
@@ -119,6 +151,7 @@ class _Placement:
     # PlaceSymbolFromLibrary alone has pins the server's junction cleanup does not see, and the cleanup then
     # deletes every junction dot that depends on them (observed headless, KiCad 10.99.0-6860).
     dirty: bool = True
+    existing: bool = False  # loaded from the document (Schematic.load), not placed by this batch
 
 
 SHEET_SIDES = {"left": "SHS_LEFT", "right": "SHS_RIGHT", "top": "SHS_TOP", "bottom": "SHS_BOTTOM"}
@@ -186,10 +219,7 @@ class Project:
 
     def __init__(self, api, directory, name, page="A4", title="", comments=()):
         t = _proto.types
-        self.api = api
-        self.directory = Path(directory)
-        self.name = name
-        self.page = page
+        self._state(api, directory, name, page)
         path = self.directory / f"{name}.kicad_sch"
         for suffix in (".kicad_sch", ".kicad_pro", ".kicad_prl"):  # never the board
             path.with_suffix(suffix).unlink(missing_ok=True)
@@ -199,6 +229,18 @@ class Project:
                 file.write_text(f"({table}\n  (version 7)\n)\n")
         for sub in ("datasheets", "analysis"):  # where kicad-happy looks
             (self.directory / sub).mkdir(exist_ok=True)
+        self.title_block = (time.strftime("%Y-%m-%d"), "1", tuple(comments[:4]))
+        doc = api(_proto.project.CreateDocument(type=t.DOCTYPE_SCHEMATIC, path=str(path))).document
+        root = api(_proto.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0].path
+        spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=root, project=doc.project)
+        self.root = Schematic(self, spec, name, path, "/")
+        self.root._page(page, title)
+
+    def _state(self, api, directory, name, page):
+        self.api = api
+        self.directory = Path(directory)
+        self.name = name
+        self.page = page
         self.pin_ids = {}  # pin KIID -> "REF.PIN", every sheet
         self.units = {}  # (ref, unit) -> name of the sheet it is placed on
         self.auto = {"#PWR": 0, "#FLG": 0}
@@ -207,11 +249,87 @@ class Project:
         self.sheets = []  # every Schematic, root first, in creation order
         self.files = {name}  # sheet file stems in use
         self.in_batch = False  # set by the daemon while an edit batch runs
-        self.title_block = (time.strftime("%Y-%m-%d"), "1", tuple(comments[:4]))
-        doc = api(_proto.project.CreateDocument(type=t.DOCTYPE_SCHEMATIC, path=str(path))).document
-        root = api(_proto.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0].path
-        spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=root, project=doc.project)
-        self.root = Schematic(self, spec, name, path, "/", page, title)
+
+    @classmethod
+    def open(cls, api, root):
+        """The project whose root sheet is the existing file `root` (.kicad_sch), opened and loaded."""
+        t = _proto.types
+        root = Path(root)
+        self = cls.__new__(cls)
+        self._state(api, root.parent, root.stem, None)
+        doc = api(_proto.project.OpenDocument(type=t.DOCTYPE_SCHEMATIC, path=str(root))).document
+        top = api(_proto.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0]
+
+        def walk(node, stem):
+            spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=node.path, project=doc.project)
+            Schematic(self, spec, stem, root.parent / node.filename, node.path.path_human_readable or "/")
+            self.files.add(stem)
+            for child in node.children:
+                walk(child, Path(child.filename).stem)
+
+        walk(top, root.stem)
+        self.root = self.sheets[0]
+        self.load()
+        return self
+
+    def load(self):
+        """Read every sheet from the document (Schematic.load) and rebuild the pin, unit, and power-symbol
+        numbering tables from it."""
+        sch = _proto.sch
+        for s in self.sheets:
+            s.load()
+        self.pin_ids, self.units = {}, {}
+        self.auto = {"#PWR": 0, "#FLG": 0}
+        for s in self.sheets:
+            for p in s.placements.values():
+                self.units[(p.ref, p.unit)] = s.name
+                for child in p.definition.items:  # every unit's pins: the netlist reports any of them
+                    if child.item.Is(sch.SchematicPin.DESCRIPTOR):
+                        pin = _unpack(child.item, sch.SchematicPin)
+                        self.pin_ids[pin.id.value] = f"{p.ref}.{pin.number}"
+                m = re.fullmatch(r"#(PWR|FLG)(\d+)", p.ref)
+                if m:
+                    self.auto[f"#{m[1]}"] = max(self.auto[f"#{m[1]}"], int(m[2]))
+
+    def components(self):
+        """{ref: value} of every placed symbol, power symbols and flags excluded."""
+        found = {}
+        for s in self.sheets:
+            for key in sorted(s.placements):
+                p = s.placements[key]
+                if not p.ref.startswith("#"):
+                    found.setdefault(p.ref, p.instance.value_field.text.text)
+        return found
+
+    def rename_net(self, name, text):
+        """Rename net `name` (the full name kicaddy_query nets prints) by changing the text of the local or
+        global labels that name it to `text`. Labels placed in the same batch are not seen."""
+        en = _proto.enums
+        if not isinstance(text, str) or not text or any(c.isspace() for c in text):
+            raise ValueError(f"net label text {text!r}: a non-empty name without spaces")
+        nets = getattr(self, "_label_nets", None)
+        if nets is None:
+            nets = self.api(_proto.sch_cmd.GetSchematicNetlist(
+                document=self.root.document, types=[en.KOT_SCH_PIN, en.KOT_SCH_LABEL, en.KOT_SCH_GLOBAL_LABEL])).nets
+        net = next((n for n in nets if n.name == name), None)
+        if net is None:
+            raise ValueError(f"no net {name!r}; use the name kicaddy_query nets prints")
+        sheets = {tuple(k.value for k in s.document.sheet_path.path): s for s in self.sheets}
+        found = []
+        for contents in net.sheets:
+            s = sheets.get(tuple(k.value for k in contents.path.path))
+            for i in contents.items:
+                if self.pin_ids.get(i.value, "").startswith("#PWR"):
+                    raise ValueError(f"net {name} is named by a power symbol; replace the power symbols instead")
+                if s is not None and i.value in s._existing:
+                    found.append((s, i.value))
+        if not found:
+            raise ValueError(f"net {name} has no local or global label to rename")
+        texts = {s._existing[k].text.text for s, k in found}
+        if len(texts) > 1:
+            raise ValueError(f"net {name} has labels {sorted(texts)}; remove all but one name first")
+        for s, k in found:
+            s._change(k, lambda label: setattr(label.text, "text", text))
 
     def commit(self):
         """Create every sheet's pending items, send the net classes, create the board once, and save."""
@@ -263,23 +381,19 @@ class Schematic:
     SHAPES = {"input": "SLSH_INPUT", "output": "SLSH_OUTPUT", "bidirectional": "SLSH_BIDI",
               "tri_state": "SLSH_TRISTATE", "passive": "SLSH_PASSIVE"}
 
-    def __init__(self, project, spec, name, path, hier_path, page, title):
+    def __init__(self, project, spec, name, path, hier_path):
         """One sheet of `project`, addressed by `spec`; `hier_path` is "/" for the root, "/amp/" for a child."""
-        t = _proto.types
         self.project = project
         self.api = project.api
         self.document = spec  # DocumentSpecifier of this sheet
-        self.header = t.ItemHeader(document=spec)
+        self.header = _proto.types.ItemHeader(document=spec)
         self.name = name
         self.path = Path(path)
         self.hier_path = hier_path
-        self.api(_proto.editor.SetPageSettings(document=spec, page_settings=t.PageSettings(
-            page_size=t.PageSize.Value(self.PAGES[page]), orientation=t.PO_LANDSCAPE)))
-        date, revision, comments = project.title_block
-        block = t.TitleBlockInfo(title=title, date=date, revision=revision)
-        for i, comment in enumerate(comments, 1):
-            setattr(block, f"comment{i}", comment)
-        self.api(_proto.editor.SetTitleBlockInfo(document=spec, title_block=block))
+        self._reset()
+        project.sheets.append(self)
+
+    def _reset(self):
         self.pins = {}  # "REF.PIN" and "<sheet>.<LABEL>" -> (x, y) grid
         self.placements = {}  # (ref, unit) -> _Placement
         self._items = []  # protos for the next CreateItems
@@ -289,7 +403,140 @@ class Schematic:
         self._sheets = []  # child sheet boxes (_SheetBox)
         self._junctions = set()  # explicit junction points
         self._junctions_created = set()
-        project.sheets.append(self)
+        self._existing = {}  # KIID -> proto of a wire, label, no-connect marker, or junction in the document
+        self._no_connects = set()  # no-connect marker points
+        self._updates = {}  # KIID -> changed proto, for UpdateItems at commit
+        self._deletes = set()  # KIIDs to delete at commit
+        self._touched = set()  # points whose junction commit() decides again
+
+    def _page(self, page, title):
+        """Page size and title block of a sheet this builder creates."""
+        t = _proto.types
+        self.api(_proto.editor.SetPageSettings(document=self.document, page_settings=t.PageSettings(
+            page_size=t.PageSize.Value(self.PAGES[page]), orientation=t.PO_LANDSCAPE)))
+        date, revision, comments = self.project.title_block
+        block = t.TitleBlockInfo(title=title, date=date, revision=revision)
+        for i, comment in enumerate(comments, 1):
+            setattr(block, f"comment{i}", comment)
+        self.api(_proto.editor.SetTitleBlockInfo(document=self.document, title_block=block))
+
+    def load(self):
+        """Replace the model with this sheet as the document holds it: placements with absolute pin points,
+        wires, junctions, no-connect markers, labels, notes, and child sheet boxes. Everything loaded is
+        existing: an edit batch may move, change, or remove it."""
+        sch, en = _proto.sch, _proto.enums
+        self._reset()
+        kinds = [en.KOT_SCH_SYMBOL, en.KOT_SCH_LINE, en.KOT_SCH_JUNCTION, en.KOT_SCH_NO_CONNECT, en.KOT_SCH_LABEL,
+                 en.KOT_SCH_GLOBAL_LABEL, en.KOT_SCH_HIER_LABEL, en.KOT_SCH_TEXT, en.KOT_SCH_SHEET]
+        rotations = {sch.SSO_0: 0, sch.SSO_90: 90, sch.SSO_180: 180, sch.SSO_270: 270}
+        existing = (sch.SchematicLine, sch.Junction, sch.NoConnectMarker, sch.LocalLabel, sch.GlobalLabel,
+                    sch.HierarchicalLabel)
+        for item in self.api(_proto.editor.GetItems(header=self.header, types=kinds)).items:
+            if item.Is(sch.SchematicSymbolInstance.DESCRIPTOR):
+                instance = _unpack(item, sch.SchematicSymbolInstance)
+                definition = sch.SchematicSymbol()
+                definition.CopyFrom(instance.definition)
+                instance.ClearField("definition")
+                ref = instance.reference_field.text.text
+                unit = instance.unit.unit or 1
+                rotation = rotations.get(instance.transform.orientation, 0)
+                mirror = "x" if instance.transform.mirror_x else "y" if instance.transform.mirror_y else None
+                if instance.transform.mirror_x and instance.transform.mirror_y:
+                    rotation, mirror = (rotation + 180) % 360, None
+                body = instance.body_style.style if instance.HasField("body_style") else 1
+                origin = instance.position
+                pins = {}
+                for pin, _, _ in _pins(definition, unit, body or 1):
+                    dx, dy = sch_geometry.orient(pin.position.x_nm, pin.position.y_nm, rotation, mirror)
+                    pins[pin.number] = self.pins[f"{ref}.{pin.number}"] = (_grid(origin.x_nm + dx),
+                                                                           _grid(origin.y_nm + dy))
+                name = ref + chr(64 + unit) if definition.unit_count > 1 else ref
+                self.placements[(ref, unit)] = _Placement(name, ref, unit, _point(origin), rotation, mirror, instance,
+                                                          definition, pins, dirty=False, existing=True)
+            elif item.Is(sch.SheetSymbol.DESCRIPTOR):
+                sym = _unpack(item, sch.SheetSymbol)
+                (x, y), (w, h) = _point(sym.position), _point(sym.size)
+                name = sym.name_field.text.text
+                box = _SheetBox(name, (x, y, x + w, y + h), {}, [sym.name_field.text, sym.filename_field.text])
+                for pin in sym.pins:
+                    point = _point(pin.position)
+                    box.pins[pin.text.text] = (point, _spin(pin.spin_style), _shape(pin.shape))
+                    self.pins[f"{name}.{pin.text.text}"] = point
+                self._sheets.append(box)
+            elif item.Is(sch.SchematicText.DESCRIPTOR):
+                text = _unpack(item, sch.SchematicText).text
+                self._notes.append((_point(text.position), text))
+            else:
+                kind = next((k for k in existing if item.Is(k.DESCRIPTOR)), None)
+                if kind is None:  # directive labels
+                    continue
+                proto = _unpack(item, kind)
+                if kind is sch.SchematicLine and proto.type != sch.SLT_WIRE:  # buses, graphic lines
+                    continue
+                self._existing[proto.id.value] = proto
+                self._swap(*self._entry(proto), None)
+        self._junctions_created = {p for kind, p in map(self._entry, self._existing.values()) if kind == "junction"}
+        self._junctions_created |= self._auto_junctions()
+
+    def _auto_junctions(self):
+        """Points where KiCad's rule puts a junction (sch_geometry.junctions) in the model as it stands."""
+        return sch_geometry.junctions(
+            self._wires, [set(p.pins.values()) for p in self.placements.values()]
+            + [{p for p, _, _ in b.pins.values()} for b in self._sheets],
+            {point for _, _, point, _, _ in self._labels})
+
+    # -- existing items -----------------------------------------------------------------------------
+    @staticmethod
+    def _entry(proto):
+        """(kind, model entry) of an existing item: ("wire", (a, b)), ("label", (kind, text, point, spin,
+        shape)), ("no_connect", point), or ("junction", point)."""
+        sch = _proto.sch
+        if isinstance(proto, sch.SchematicLine):
+            return "wire", (_point(proto.start), _point(proto.end))
+        if isinstance(proto, sch.NoConnectMarker):
+            return "no_connect", _point(proto.position)
+        if isinstance(proto, sch.Junction):
+            return "junction", _point(proto.position)
+        kind = {sch.LocalLabel: "label", sch.GlobalLabel: "global", sch.HierarchicalLabel: "hier"}[type(proto)]
+        return "label", (kind, proto.text.text, _point(proto.position), _spin(proto.spin_style),
+                         None if kind == "label" else _shape(proto.shape))
+
+    def _swap(self, kind, new, old):
+        """Put model entry `new` in place of `old` (None: add `new`; `new` None: remove `old`)."""
+        if kind == "no_connect":
+            self._no_connects.discard(old)
+            if new is not None:
+                self._no_connects.add(new)
+            return
+        entries = {"wire": self._wires, "label": self._labels}.get(kind)
+        if entries is None:
+            return
+        if old is None:
+            entries.append(new)
+        elif new is None:
+            entries.remove(old)
+        else:
+            entries[entries.index(old)] = new
+
+    def _change(self, kiid, change):
+        """Apply `change(proto)` to the existing item `kiid`; commit() sends it."""
+        proto = self._existing[kiid]
+        kind, old = self._entry(proto)
+        change(proto)
+        self._updates[kiid] = proto
+        self._swap(kind, self._entry(proto)[1], old)
+
+    def _delete(self, kiid):
+        """Delete the existing item `kiid` at commit."""
+        proto = self._existing.pop(kiid)
+        self._updates.pop(kiid, None)
+        self._deletes.add(kiid)
+        kind, old = self._entry(proto)
+        self._swap(kind, None, old)
+
+    def _existing_of(self, kind):
+        """[(kiid, entry)] of the existing items of `kind` ("wire", "label", "no_connect", "junction")."""
+        return [(k, e) for k, (t, e) in ((k, self._entry(v)) for k, v in self._existing.items()) if t == kind]
 
     # -- geometry ---------------------------------------------------------------------------------
     @staticmethod
@@ -373,8 +620,7 @@ class Schematic:
     def _fields(instance):
         return [getattr(instance, attr) for attr in MANDATORY.values()] + list(instance.user_fields)
 
-    def field(self, ref, name, at=None, visible=None, unit=None):
-        """Move (`at`: absolute grid point, half-grid allowed) or show/hide a field of a placed symbol."""
+    def _placement(self, ref, unit=None):
         units = sorted(u for r, u in self.placements if r == ref)
         if not units:
             raise ValueError(f"no symbol {ref}")
@@ -384,18 +630,204 @@ class Schematic:
             unit = units[0]
         if (ref, unit) not in self.placements:
             raise ValueError(f"{ref} has units {units}; no unit {unit}")
-        p = self.placements[(ref, unit)]
+        return self.placements[(ref, unit)]
+
+    def field(self, ref, name, at=None, visible=None, unit=None, text=None):
+        """Move (`at`: absolute grid point, half-grid allowed), show/hide, or change the `text` of a field of
+        a placed symbol."""
+        p = self._placement(ref, unit)
         if name in MANDATORY:
             field = getattr(p.instance, MANDATORY[name])
         else:
             field = next((f for f in p.instance.user_fields if f.name == name), None)
             if field is None:
                 raise ValueError(f"{ref} has no field {name!r}")
+        if text is not None:
+            if name == "Reference":
+                raise ValueError("change a reference by removing and placing the symbol")
+            field.text.text = text
         if at is not None:
             field.text.position.CopyFrom(self.mm(at))
         if visible is not None:
             field.visible = field.text.attributes.visible = visible
         p.dirty = True
+
+    @staticmethod
+    def _new_in_batch(what, instead):
+        return ValueError(f"{what} was added in this batch; {instead}")
+
+    def _translate(self, p, d):
+        """Move placement `p` and its fields by `d` grid units."""
+        dx, dy = round(d[0] * GRID_MM * 1e6), round(d[1] * GRID_MM * 1e6)
+        for field in self._fields(p.instance):
+            field.text.position.x_nm += dx
+            field.text.position.y_nm += dy
+        p.instance.position.x_nm += dx
+        p.instance.position.y_nm += dy
+        p.origin = _point(p.instance.position)
+        p.pins = {n: (q[0] + d[0], q[1] + d[1]) for n, q in p.pins.items()}
+        for n, q in p.pins.items():
+            self.pins[f"{p.ref}.{n}"] = q
+        p.dirty = True
+
+    def move(self, ref, at, unit=None):
+        """Translate a symbol already in the document so its origin lands on grid point `at` (no rotation);
+        return {pin number: (x, y)}. On each pin: a wire ending there follows, stretched or with one dog-leg
+        corner (deleted when it would shrink to nothing); labels and no-connect markers there move with it; a
+        power symbol alone on the pin moves too; any other contact (a pin, a sheet pin, a wire passing
+        through) gets a stub wire from the old pin point. The netlist diff of the batch shows the result."""
+        sch = _proto.sch
+        p = self._placement(ref, unit)
+        if not p.existing:
+            raise self._new_in_batch(p.name, "place it at its final position instead")
+        at = tuple(at)
+        d = (at[0] - p.origin[0], at[1] - p.origin[1])
+        if d == (0, 0):
+            return dict(p.pins)
+        moved = set(p.pins.values())
+
+        def shift(q):
+            return (q[0] + d[0], q[1] + d[1])
+
+        fresh = {q for o in self.placements.values() if not o.existing for q in o.pins.values()}
+        for item in self._items:
+            if isinstance(item, sch.SchematicLine):
+                fresh |= {_point(item.start), _point(item.end)}
+            elif isinstance(item, (sch.LocalLabel, sch.GlobalLabel, sch.HierarchicalLabel, sch.NoConnectMarker)):
+                fresh.add(_point(item.position))
+        if moved & fresh:
+            raise ValueError(f"{p.name}: move it before wiring its pins in the same batch")
+
+        # classify on the model before any change
+        wires = [(k, e) for k, e in self._existing_of("wire")]
+        ends, followers, stubs = {}, [], []  # wire kiid -> moved ends; placements to translate; stub points
+        anchored = [k for kind in ("label", "no_connect") for k, e in self._existing_of(kind)
+                    if (e[2] if kind == "label" else e) in moved]
+        for q in moved:
+            ending = [k for k, (a, b) in wires if q in (a, b)]
+            for k in ending:
+                ends.setdefault(k, set()).add(q)
+            through = [k for k, w in wires if q not in w and sch_geometry._contains(w, q)]
+            others = [o for o in self.placements.values() if o is not p and q in o.pins.values()]
+            sheet_pins = [b for b in self._sheets if q in {pt for pt, _, _ in b.pins.values()}]
+            if (len(others) == 1 and not sheet_pins and not ending and not through and others[0].existing
+                    and others[0].ref.startswith("#") and set(others[0].pins.values()) == {q}):
+                followers.append(others[0])
+            elif others or sheet_pins or through:
+                stubs.append(q)
+
+        def set_end(line, old, new):
+            end = line.start if _point(line.start) == old else line.end
+            end.CopyFrom(self.mm(new))
+
+        for k, points in ends.items():
+            a, b = dict(wires)[k]
+            self._touched |= {a, b}
+            if len(points) == 2 or a == b:
+                self._change(k, lambda line: (line.start.CopyFrom(self.mm(shift(a))),
+                                              line.end.CopyFrom(self.mm(shift(b)))))
+                self._touched |= {shift(a), shift(b)}
+                continue
+            old = next(iter(points))
+            other = b if old == a else a
+            new = shift(old)
+            self._touched.add(new)
+            if new == other:
+                self._delete(k)
+            elif new[0] == other[0] or new[1] == other[1]:
+                self._change(k, lambda line: set_end(line, old, new))
+            else:
+                corner = (new[0], other[1]) if other[1] == old[1] else (other[0], new[1])
+                self._change(k, lambda line: set_end(line, old, corner))
+                self.wire(corner, new)
+                self._touched.add(corner)
+        for k in anchored:
+            self._change(k, lambda item: item.position.CopyFrom(self.mm(shift(_point(item.position)))))
+        for q in stubs:
+            new = shift(q)
+            if new[0] == q[0] or new[1] == q[1]:
+                self.wire(q, new)
+            else:
+                self.wire(q, (new[0], q[1]), new)
+                self._touched.add((new[0], q[1]))
+            self._touched |= {q, new}
+        for o in [p, *followers]:
+            self._translate(o, d)
+        self._touched |= moved | {shift(q) for q in moved}
+        return dict(p.pins)
+
+    def remove(self, ref, unit=None):
+        """Delete a symbol already in the document: every unit of `ref` on this sheet, or just `unit`, and the
+        no-connect markers on its pins. Wires and labels on its pins stay: remove them with remove_wire and
+        remove_label."""
+        keys = [k for k in self.placements if k[0] == ref and unit in (None, k[1])]
+        if not keys:
+            raise ValueError(f"no symbol {ref} on this sheet" if unit is None else f"no unit {unit} of {ref} on "
+                             "this sheet")
+        for key in keys:
+            if not self.placements[key].existing:
+                raise self._new_in_batch(self.placements[key].name, "leave it out of the batch instead")
+        for key in keys:
+            p = self.placements.pop(key)
+            self._deletes.add(p.instance.id.value)
+            points = set(p.pins.values())
+            for k, point in self._existing_of("no_connect"):
+                if point in points:
+                    self._delete(k)
+            kept = {n for o in self.placements.values() if o.ref == ref for n in o.pins}
+            for n in p.pins:
+                if n not in kept:
+                    self.pins.pop(f"{ref}.{n}", None)
+            self.project.units.pop(key, None)
+            self._touched |= points
+
+    def remove_wire(self, a, b):
+        """Delete the wires already in the document that lie on the straight run from `a` to `b` (grid points
+        or "REF.PIN"); a wire on that line reaching past either end is refused."""
+        a, b = tuple(self.at(a)), tuple(self.at(b))
+        if a == b:
+            raise ValueError(f"zero-length wire at {a}")
+        if a[0] != b[0] and a[1] != b[1]:
+            raise ValueError(f"diagonal wire {a} -> {b}")
+        axis = 0 if a[1] == b[1] else 1  # 0: horizontal
+        lo, hi = sorted((a[axis], b[axis]))
+        found = []
+        for k, w in self._existing_of("wire"):
+            if not all(q[1 - axis] == a[1 - axis] for q in w):
+                continue
+            wlo, whi = sorted((w[0][axis], w[1][axis]))
+            if lo <= wlo and whi <= hi:
+                found.append((k, w))
+            elif max(lo, wlo) < min(hi, whi):
+                raise ValueError(f"wire {w} extends past {a}-{b}; pass its full extent")
+        if not found:
+            raise ValueError(f"no wire between {a} and {b}")
+        for k, w in found:
+            self._delete(k)
+            self._touched |= set(w)
+        self._touched |= {a, b}
+
+    def remove_label(self, text, at=None):
+        """Delete the local or global labels `text` already in the document on this sheet; with `at`, only
+        the one anchored there."""
+        point = None if at is None else tuple(self.at(at))
+        found = [(k, e) for k, e in self._existing_of("label") if e[1] == text and point in (None, e[2])]
+        if any(e[0] == "hier" for _, e in found):
+            raise ValueError("hierarchical labels pair with sheet pins; not supported")
+        if not found:
+            raise ValueError(f"no label {text!r}" + ("" if point is None else f" at {point}") + " on this sheet")
+        for k, e in found:
+            self._delete(k)
+            self._touched.add(e[2])
+
+    def remove_no_connect(self, at):
+        """Delete the no-connect marker already in the document at `at`."""
+        point = tuple(self.at(at))
+        found = [k for k, e in self._existing_of("no_connect") if e == point]
+        if not found:
+            raise ValueError(f"no no-connect marker at {point} on this sheet")
+        for k in found:
+            self._delete(k)
 
     def power(self, name, at, rotation=0):
         """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference; its pin lands
@@ -454,7 +886,9 @@ class Schematic:
         self._label(item, "hier", text, at, spin, shape)
 
     def no_connect(self, at):
-        self._items.append(_proto.sch.NoConnectMarker(position=self.mm(self.at(at))))
+        point = tuple(self.at(at))
+        self._items.append(_proto.sch.NoConnectMarker(position=self.mm(point)))
+        self._no_connects.add(point)
 
     def note(self, text, at, size=1.27):
         item = _proto.sch.SchematicText()
@@ -517,8 +951,8 @@ class Schematic:
         if node is None:
             raise RuntimeError(f"sheet {name}: not in the hierarchy after create")
         spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=node.path, project=self.document.project)
-        child = Schematic(self.project, spec, name, self.path.parent / file, node.path.path_human_readable,
-                          page or self.project.page, title or name)
+        child = Schematic(self.project, spec, name, self.path.parent / file, node.path.path_human_readable)
+        child._page(page or self.project.page, title or name)
         if build(child) is not None:
             raise ValueError(f"sheet {name}: a sheet build function returns None; return every net from the "
                              "root build")
@@ -596,11 +1030,11 @@ class Schematic:
 
     # -- finishing --------------------------------------------------------------------------------
     def commit(self, staged=False):
-        """Send this sheet's pending field updates, items, and junctions; the project saves. `staged`: no
-        commit of its own, the caller (an edit batch) holds one."""
+        """Send this sheet's pending field updates, changed and deleted items, new items, and junctions; the
+        project saves. `staged`: no commit of its own, the caller (an edit batch) holds one."""
         if self.project.in_batch:
             raise ValueError("commit() runs when the batch ends; do not call it in an edit batch")
-        e = _proto.editor
+        e, t = _proto.editor, _proto.types
         dirty = [p for p in self.placements.values() if p.dirty]
         if dirty:
             result = self.api(e.UpdateItems(header=self.header, items=[_pack(p.instance) for p in dirty]))
@@ -609,22 +1043,33 @@ class Schematic:
                 updated.item.Unpack(p.instance)
                 p.instance.ClearField("definition")
                 p.dirty = False
-        points = self._junctions | sch_geometry.junctions(
-            self._wires, [set(p.pins.values()) for p in self.placements.values()]
-            + [{p for p, _, _ in b.pins.values()} for b in self._sheets],
-            {point for _, _, point, _, _ in self._labels})
+        points = self._junctions | self._auto_junctions()
+        for k, point in self._existing_of("junction"):  # dots an edit left without a T or a crossing
+            if point in self._touched and point not in points and not sch_geometry.crossing(self._wires, point):
+                self._delete(k)
+                self._junctions_created.discard(point)
         for point in sorted(points - self._junctions_created):
             self._items.append(_proto.sch.Junction(position=self.mm(point)))
         self._junctions_created |= points
-        if self._items and staged:
-            result = self.api(e.CreateItems(header=self.header, items=[_pack(i) for i in self._items]))
-            _check(result.created_items, result.status, "CreateItems")
-        elif self._items:
-            commit = self.api(e.BeginCommit(header=self.header))
-            result = self.api(e.CreateItems(header=self.header, items=[_pack(i) for i in self._items]))
-            _check(result.created_items, result.status, "CreateItems")
-            self.api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message="build", header=self.header))
-        self._items = []
+        if self._updates or self._deletes or self._items:
+            commit = None if staged else self.api(e.BeginCommit(header=self.header))
+            if self._updates:
+                result = self.api(e.UpdateItems(header=self.header, items=[_pack(i) for i in self._updates.values()]))
+                _check(result.updated_items, result.status, "UpdateItems")
+            if self._deletes:
+                result = self.api(e.DeleteItems(header=self.header,
+                                                item_ids=[t.KIID(value=k) for k in sorted(self._deletes)]))
+                if result.status != t.IRS_OK:
+                    raise RuntimeError(f"DeleteItems: {t.ItemRequestStatus.Name(result.status)}")
+                for r in result.deleted_items:
+                    if r.status != e.IDS_OK:
+                        raise RuntimeError(f"DeleteItems: {r.id.value} {e.ItemDeletionStatus.Name(r.status)}")
+            if self._items:
+                result = self.api(e.CreateItems(header=self.header, items=[_pack(i) for i in self._items]))
+                _check(result.created_items, result.status, "CreateItems")
+            if commit is not None:
+                self.api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message="build", header=self.header))
+        self._updates, self._deletes, self._touched, self._items = {}, set(), set(), []
 
     # -- lint -------------------------------------------------------------------------------------
     def _extents(self, text, ink=True):
@@ -783,12 +1228,16 @@ def print_nets(nets):
         print(f"net {net:28s} {' '.join(sorted(members))}")
 
 
+def format_violation(v):
+    return (f"{_proto.types.RuleSeverity.Name(v.severity)} {v.description} @ "
+            f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g}) "
+            f"on {v.sheet_specific_path.path_human_readable or '/'}")
+
+
 def print_erc(violations):
     print(f"ERC: {len(violations)} violation(s)")
     for v in violations:
-        print(f"  {_proto.types.RuleSeverity.Name(v.severity)} {v.description} @ "
-              f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g}) "
-              f"on {v.sheet_specific_path.path_human_readable or '/'}")
+        print(f"  {format_violation(v)}")
 
 
 def lint_issues(project):

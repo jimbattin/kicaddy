@@ -38,13 +38,39 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   plots the crops again and returns them as images.
 - **Query** with `kicaddy_query`: `what` = `symbols`, `nets` (`REF.PIN` sets), `erc`, or `pins` with `lib_ids`
   (as `kicaddy pins`). `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root
-  `.kicad_sch`) for query and render only.
-- **Small follow-up changes** with `kicaddy_edit`: `code` is Python run against the project built this session,
-  `s` the sheet (`sheet`: file stem, default the root), `sheets` maps stems to sheets. The builder methods work as
-  in `build.py` (`s.symbol`, `s.wire`, `s.field`, ...), except `s.sheet`, `s.net_class`, and `commit()`. Any
-  exception drops the whole batch and leaves the document unchanged; a committed batch saves the files and
-  reports the net changes, ERC, and LINT. A rebuild discards batches, so copy every change you keep into
-  `build.py` (the source of truth), then rebuild once at the end.
+  `.kicad_sch`) for query, render, and edit.
+- **Edit** with `kicaddy_edit`: `code` is Python run as one batch against the open project, `s` the sheet
+  (`sheet`: file stem, default the root), `sheets` maps stems to sheets, `project` the project. Before the batch
+  the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. The builder
+  methods work as in `build.py` (`s.symbol`, `s.wire`, `s.label`, `s.power`, ...), except `s.sheet`,
+  `s.net_class`, and `commit()`. Items already in the document can also be changed:
+  - `s.move(ref, at, unit=None)`: translate the symbol so its origin is `at` (no rotation); returns the new
+    pins. A wire ending on a pin follows it (stretched, or with one dog-leg corner); labels and no-connect
+    markers on its pins move with it; a power symbol alone on a pin moves too; any other contact gets a stub
+    wire from the old pin point. Move before wiring new items to its pins in the same batch.
+  - `s.remove(ref, unit=None)`: delete every unit of `ref` on the sheet (or one unit) and the no-connect
+    markers on its pins; its wires and labels stay.
+  - `s.remove_wire(a, b)`: delete the wires lying on the straight run from `a` to `b` (points or `"REF.PIN"`);
+    a wire reaching past either end is refused, so pass its full extent.
+  - `s.remove_label(text, at=None)`, `s.remove_no_connect(at)`: local or global labels; no-connect markers.
+  - `s.field(ref, name, text="330")`: change a field's text (not `Reference`; remove and place instead).
+  - `project.rename_net("/VPP_ON", "VPP_EN")`: give the local or global labels naming that net (full name, as
+    `kicaddy_query nets` prints it) the new text. A net named by a power symbol is refused.
+  These work only on items in the document when the batch started; a symbol placed in the batch is placed at
+  its final position instead.
+- **`expect`** declares the netlist change of a batch. Always pass it; `{}` for a layout-only change. It is
+  required for projects from `kicaddy_open`; when the change differs, the batch is dropped and the saved files
+  are reopened. Keys, all optional:
+  - `add` `{ref: value}`, `remove` `[ref]`, `values` `{ref: new value}`;
+  - `connect` `{"C8.1": target}`: the pin joins `target`, a `"REF.PIN"`, an existing net name, or a new net
+    name; `disconnect` `["R5.1"]`;
+  - `rename` `{"/VPP_ON": "/VPP_EN"}` (full net names).
+  Pins of added parts left unconnected need not be declared.
+- A committed batch saves the files and reports `netlist: …` (component and net changes, or `unchanged`),
+  `expect: matched`, and the ERC and LINT totals with the issues the batch added. Any exception drops the whole
+  batch and leaves the document unchanged. For a project from `kicaddy_build`, a rebuild discards batches, so
+  copy every change you keep into `build.py` (the source of truth), then rebuild once at the end. For a project
+  from `kicaddy_open`, the saved files are the only copy of the batches.
 - While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
   same directory fails as busy: use the tools.
 

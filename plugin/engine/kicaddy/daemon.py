@@ -4,10 +4,13 @@ Protocol: one JSON object per line. Request {"id", "op", ...}; response {"id", "
 (plus "fingerprint" for `status`). Ops: status, open, build, query, render, edit, shutdown. The daemon exits on
 stdin EOF (omp gone), SIGTERM, SIGHUP, or `shutdown`, and stops its server on the way out.
 
-An edit batch runs builder calls on the project built this session in two commits: the batch code runs inside
-the first, which holds the symbol placements (PlaceSymbolFromLibrary); the second sends the field updates and the
-new items (a symbol placed inside an open commit does not exist for UpdateItems until that commit ends). An
-exception in the code drops the first; a failure in the second drops it and deletes the placed symbols.
+An edit batch runs builder calls on the open project, built this session or opened, in two commits: the batch
+code runs inside the first, which holds the symbol placements (PlaceSymbolFromLibrary); the second sends the field
+updates, the changed and deleted items, and the new items (a symbol placed inside an open commit does not exist
+for UpdateItems until that commit ends). An exception in the code drops the first; a failure in the second drops
+it and deletes the placed symbols. The model is loaded from the document before and after each batch; the netlist
+difference is reported, and when the batch declares `expect` (required for opened projects) a difference from it
+drops the batch and reopens the saved files.
 """
 
 import builtins
@@ -23,11 +26,11 @@ import sys
 import traceback
 from pathlib import Path
 
-from . import bootstrap, runtime, schematic
+from . import bootstrap, netdiff, runtime, schematic
 
 NO_DOCUMENT = "no document: call kicaddy_build or kicaddy_open first"
-NO_PROJECT = ("kicaddy_edit needs a project built in this session with kicaddy_build; kicaddy_open is for query "
-              "and render only")
+NO_EXPECT = ("kicaddy_edit on a project opened with kicaddy_open needs expect: the netlist change the batch makes "
+             "({} for none)")
 GRID_NM = schematic.GRID_MM * 1e6
 
 
@@ -49,8 +52,8 @@ class Session:
         self.stack = None  # ExitStack holding runtime.server()
         self.api = None
         self.directory = None  # the server's project directory
-        self.project = None  # schematic.Project built this session
-        self.opened = None  # {"root": Path, "document": DocumentSpecifier, "sheets": [...]} from open
+        self.project = None  # schematic.Project: built this session (run() adopts it) or opened
+        self.built = False  # the project was built this session by kicaddy_build
         self.batches = 0
         self.notes = []  # lines put before the current op's output
 
@@ -83,7 +86,8 @@ class Session:
     def reset_documents(self):
         if self._server_alive():
             self.api(schematic._proto.project.CloseAllDocuments(force=True))
-        self.project = self.opened = None
+        self.project = None
+        self.built = False
         self.batches = 0
 
     @contextlib.contextmanager
@@ -95,37 +99,46 @@ class Session:
 
     def adopt(self, project):
         self.project = project
+        self.built = True
         self.batches = 0
+
+    def reopen(self):
+        """Close every document and open the project again from its saved files."""
+        root, built, batches = self.project.root.path.resolve(), self.built, self.batches
+        self.reset_documents()
+        self.project = schematic.Project.open(self.api, root)
+        self.built, self.batches = built, batches
 
     def close(self):
         stack, self.stack = self.stack, None
-        self.api = self.directory = self.project = self.opened = None
+        self.api = self.directory = self.project = None
+        self.built = False
         self.batches = 0
         if stack is not None:
             stack.close()
 
     def require_document(self):
         self._check_server()
-        if self.project is None and self.opened is None:
+        if self.project is None:
             raise OpError(NO_DOCUMENT)
 
     def root(self):
         """(root .kicad_sch path, root DocumentSpecifier) of the open document."""
-        if self.project is not None:
-            return self.project.root.path.resolve(), self.project.root.document
-        return self.opened["root"], self.opened["document"]
+        return self.project.root.path.resolve(), self.project.root.document
 
     def sheets(self):
         """[(file stem, hierarchical path, DocumentSpecifier, path)] of every sheet, root first."""
-        if self.project is not None:
-            return [(s.path.stem, s.hier_path, s.document, s.path.resolve()) for s in self.project.sheets]
-        return self.opened["sheets"]
+        return [(s.path.stem, s.hier_path, s.document, s.path.resolve()) for s in self.project.sheets]
 
     def files(self):
-        if self.project is None and self.opened is None:
+        if self.project is None:
             return []
         root, _ = self.root()
         return [str(path) for _, _, _, path in self.sheets()] + [str(root.with_suffix(".kicad_pro"))]
+
+    def _hashes(self):
+        """sha256 of every sheet file and the .kicad_pro on disk."""
+        return [hashlib.sha256(Path(f).read_bytes()).hexdigest() if Path(f).exists() else None for f in self.files()]
 
     def fingerprint(self):
         """sha256 over every sheet's items (symbol instances without their library definition)."""
@@ -151,11 +164,10 @@ class Session:
         return total.hexdigest()
 
     def state(self):
-        document = self.project is not None or self.opened is not None
-        root = str(self.root()[0]) if document else None
+        root = str(self.root()[0]) if self.project is not None else None
         return {"pid": os.getpid(), "server_pid": self.api.process.pid if self._server_alive() else None,
                 "project_dir": str(Path(root).parent) if root else None, "root": root, "files": self.files(),
-                "built": self.project is not None, "batches": self.batches, "kicad": self.current["full_version"]}
+                "built": self.built, "batches": self.batches, "kicad": self.current["full_version"]}
 
     def _instances(self, spec):
         p = schematic._proto
@@ -169,11 +181,11 @@ class Session:
     # -- ops ------------------------------------------------------------------------------------
     def op_status(self, request):
         self._check_server()
-        document = self.project is not None or self.opened is not None
+        document = self.project is not None
         lines = [f"daemon pid: {os.getpid()}",
                  f"server pid: {self.api.process.pid if self._server_alive() else 'none'}"]
         if document:
-            lines.append(f"project: {self.root()[0]} ({'built this session' if self.project else 'opened'})")
+            lines.append(f"project: {self.root()[0]} ({'built this session' if self.built else 'opened'})")
             lines.append(f"batches: {self.batches}")
         else:
             lines.append("project: none")
@@ -199,28 +211,16 @@ class Session:
         if not root.exists():
             raise OpError(f"no such file: {root}")
         self._check_server()
-        if self.project is not None and self.project.root.path.resolve() == root:
+        if self.project is not None and self.built and self.project.root.path.resolve() == root:
             return {"output": "already open (built this session)"}
 
-        p, t = schematic._proto, schematic._proto.types
         self.ensure_server(root.parent)
         self.reset_documents()
-        doc = self.api(p.project.OpenDocument(type=t.DOCTYPE_SCHEMATIC, path=str(root))).document
-        top = self.api(p.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0]
-        sheets = []
-
-        def walk(node, stem):
-            spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=node.path, project=doc.project)
-            sheets.append((stem, node.path.path_human_readable or "/", spec, (root.parent / node.filename).resolve()))
-            for child in node.children:
-                walk(child, Path(child.filename).stem)
-
-        walk(top, root.stem)
-        self.opened = {"root": root, "document": doc, "sheets": sheets}
-        symbols = sum(1 for _, _, spec, _ in sheets for i in self._instances(spec)
-                      if not i.reference_field.text.text.startswith("#"))
-        return {"output": f"opened {root} ({len(sheets)} sheet(s): {' '.join(h for _, h, _, _ in sheets)})\n"
-                          f"symbols: {symbols}\nedits need a project built with kicaddy_build in this session"}
+        self.project = schematic.Project.open(self.api, root)
+        sheets = self.project.sheets
+        symbols = sum(1 for s in sheets for p in s.placements.values() if not p.ref.startswith("#"))
+        return {"output": f"opened {root} ({len(sheets)} sheet(s): {' '.join(s.hier_path for s in sheets)})\n"
+                          f"symbols: {symbols}\nedit with kicaddy_edit; pass expect"}
 
     def op_build(self, request):
         script = Path(request["script"]).expanduser().resolve()
@@ -261,7 +261,6 @@ class Session:
     def op_query(self, request):
         self.require_document()
         what = request.get("what")
-        p = schematic._proto
         _, document = self.root()
         if what == "symbols":
             lines = []
@@ -276,20 +275,7 @@ class Session:
                                  f"{i.position.y_nm / GRID_NM:g})")
             return {"output": "\n".join(lines) or "no symbols"}
         if what == "nets":
-            if self.project is not None:
-                nets = self.project.netlist()
-            else:
-                pin_ids = {}
-                for _, _, spec, _ in self.sheets():
-                    for i in self._instances(spec):
-                        ref = i.reference_field.text.text
-                        for child in i.definition.items:
-                            if child.item.Is(p.sch.SchematicPin.DESCRIPTOR):
-                                pin = p.sch.SchematicPin()
-                                child.item.Unpack(pin)
-                                pin_ids[pin.id.value] = f"{ref}.{pin.number}"
-                nets = schematic.get_netlist(self.api, document, pin_ids)
-            return {"output": _capture(schematic.print_nets, nets)[1].rstrip() or "no nets"}
+            return {"output": _capture(schematic.print_nets, self.project.netlist())[1].rstrip() or "no nets"}
         if what == "erc":
             return {"output": _capture(schematic.print_erc, schematic.run_erc(self.api, document))[1].rstrip()}
         if what == "pins":
@@ -315,22 +301,37 @@ class Session:
             images += [str(path) for path in schematic.plot_cropped(self.api, spec, root.parent / f"{stem}_crop.png")]
         return {"output": "\n".join(f"crop: {path}" for path in images), "images": images}
 
+    @staticmethod
+    def _erc_key(v):
+        return (schematic._proto.types.RuleSeverity.Name(v.severity), v.description,
+                round(v.position.x_nm / GRID_NM, 2), round(v.position.y_nm / GRID_NM, 2),
+                v.sheet_specific_path.path_human_readable)
+
     def op_edit(self, request):
         self.require_document()
-        if self.project is None:
-            raise OpError(NO_PROJECT)
         project, api, e = self.project, self.api, schematic._proto.editor
         stems = {s.path.stem: s for s in project.sheets}
         target = stems.get(request.get("sheet") or project.root.path.stem)
         if target is None:
             raise OpError(f"no sheet {request.get('sheet')!r}; sheets: {', '.join(stems)}")
+        expect = request.get("expect")
+        if expect is None and not self.built:
+            raise OpError(NO_EXPECT)
         number = self.batches + 1
         code = request.get("code") or ""
         linecache.cache["<batch>"] = (len(code), None, code.splitlines(True), "<batch>")  # source in tracebacks
+        project.load()  # the model equals the document at batch start
+        before = netdiff.Snapshot(project.components(), project.netlist())
+        if expect is not None:
+            try:
+                want = netdiff.expected(before, expect)
+            except ValueError as err:
+                raise OpError(f"expect: {err}") from None
+        erc_before = {self._erc_key(v) for v in project.erc()}
+        lint_before = set(schematic.lint_issues(project))
         snapshot = project.snapshot()
-        before = self.fingerprint()
-        nets_before = {frozenset(m) for _, m in project.netlist()}
-        known = [set(s.placements) for s in project.sheets]
+        fingerprint = self.fingerprint()
+        hashes = self._hashes()
         header = project.root.header
         buf = io.StringIO()
         placed = []  # (sheet, instance KIID) of symbols committed by the first commit
@@ -345,8 +346,7 @@ class Session:
             api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message=f"kicaddy batch {number}: place",
                             header=header))
             commit = None
-            placed = [(s, p.instance.id) for s, keys in zip(project.sheets, known)
-                      for key, p in s.placements.items() if key not in keys]
+            placed = [(s, p.instance.id) for s in project.sheets for p in s.placements.values() if not p.existing]
             commit = api(e.BeginCommit(header=header))
             for s in project.sheets:
                 s.commit(staged=True)
@@ -362,25 +362,42 @@ class Session:
                 with contextlib.suppress(Exception):
                     api(e.DeleteItems(header=s.header, item_ids=[i for t, i in placed if t is s]))
             project.restore(snapshot)
-            if self.fingerprint() == before:
+            if self.fingerprint() == fingerprint:
                 raise OpError(f"{buf.getvalue()}{error}batch dropped: document unchanged") from None
-            self.reset_documents()
-            raise OpError(f"{buf.getvalue()}{error}batch dropped, but the document could not be restored; closed "
-                          "it: rebuild with kicaddy_build") from None
+            self.reopen()
+            raise OpError(f"{buf.getvalue()}{error}batch dropped; reopened the saved files "
+                          f"({'unchanged' if self._hashes() == hashes else 'CHANGED'})") from None
         finally:
             project.in_batch = False
 
+        project.load()
+        after = netdiff.Snapshot(project.components(), project.netlist())
+        changes = netdiff.diff(before, after)
+        lines = [buf.getvalue().rstrip()]
+        if changes:
+            report = [f"netlist: {len(after.nets)} nets, {len(changes)} change(s)", *(f"  {c}" for c in changes)]
+        else:
+            report = ["netlist: unchanged"]
+        if expect is not None:
+            mismatch = netdiff.check(want, after, set(expect.get("add", {})))
+            if mismatch:
+                self.reopen()
+                state = "unchanged" if self._hashes() == hashes else "CHANGED"
+                lines += [*report, "expect mismatch:", *(f"  {m}" for m in mismatch),
+                          f"batch dropped: the netlist change does not match expect; reopened the saved files ({state})"]
+                raise OpError("\n".join(line for line in lines if line))
+
         api(schematic._proto.project.SaveDocument(document=project.root.document))
         self.batches = number
-        nets = project.netlist()
-        after = {frozenset(m) for _, m in nets}
-        added, removed = after - nets_before, nets_before - after
-        lines = [buf.getvalue().rstrip(), f"batch {number} committed (sheet {target.hier_path})",
-                 f"nets: {len(nets)} (+{len(added)} -{len(removed)})"]
-        lines += [f"  + {' '.join(sorted(m))}" for m in sorted(added, key=sorted)]
-        lines += [f"  - {' '.join(sorted(m))}" for m in sorted(removed, key=sorted)]
-        lines.append(_capture(schematic.print_erc, project.erc())[1].rstrip())
-        lines.append(_capture(schematic.print_lint, schematic.lint_issues(project))[1].rstrip())
+        lines += [f"batch {number} committed (sheet {target.hier_path})", *report,
+                  "expect: matched" if expect is not None else "expect: not given"]
+        violations = project.erc()
+        new = [v for v in violations if self._erc_key(v) not in erc_before]
+        lines += [f"ERC: {len(violations)} violation(s), {len(new)} new", *(f"  {schematic.format_violation(v)}"
+                                                                         for v in new)]
+        issues = schematic.lint_issues(project)
+        fresh = [i for i in issues if i not in lint_before]
+        lines += [f"LINT: {len(issues)} issue(s), {len(fresh)} new", *(f"  {i}" for i in fresh)]
         lines.append(f"saved: {project.root.path.resolve()}")
         return {"output": "\n".join(line for line in lines if line)}
 
