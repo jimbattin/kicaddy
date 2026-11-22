@@ -151,7 +151,10 @@ Without the tools, the CLI workflow below is unchanged.
    sheet `amp`). A LINT line reads `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of
    the clash). A `text-*` line continues with `; <text> box (x0, y0)-(x1, y1) horizontal` (or `vertical`) for
    each text in it: the extent of that text on the sheet. That box is what has to clear the other item; take
-   the distance to move from it. Kinds:
+   the distance to move from it. `s.field(ref, name, at=…)` places the field's anchor, which is not always the
+   box centre: a `Device:R` Value is centred on it, a `Device:C` Value starts there (the left end of the box).
+   Moving across the text (up or down for horizontal text) works whatever the anchor; for a move along the
+   text, check the next build. Kinds:
    - `body-body`: two symbol bodies (or sheet boxes) overlap.
    - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
    - `text-body`: a text overlaps another symbol's body.
@@ -266,6 +269,8 @@ Methods on `s`:
   `dnp`, `exclude_from_bom`, `exclude_from_board` (`True` or `False`) set the part's flags: do not populate,
   leave out of the BOM, leave off the board. `None` keeps the library symbol's own (`Mechanical:MountingHole`
   is excluded from the BOM unless you pass `exclude_from_bom=False`). The units of one symbol share the flags.
+  A part excluded from the board keeps its pins in kicaddy's netlist (the build check, a batch's `netlist:`),
+  but the `kicad-cli` netlist export a board is updated from leaves it out.
 - `s.field(ref, name, at=None, visible=None, unit=None)`: move a field of a placed symbol to grid point `at`
   (half units such as `(40, 33.5)` are fine) and/or show or hide it. `name` is `Reference`, `Value`,
   `Footprint`, `Datasheet`, `Description`, or a name from `fields`. Pass `unit=` for a multi-unit symbol.
