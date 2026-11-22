@@ -178,6 +178,24 @@ call(editor.CreateItems(header=header, items=[pack(child)]))
 Afterwards `GetSchematicHierarchy` listed `/child/`, items could be created on it via its `SheetPath`, and
 `SaveDocument` wrote `child.kicad_sch`. Deleting the sheet symbol removed it from the hierarchy.
 
+Found while building M4 (`Schematic.sheet` in `plugin/engine/kicaddy/schematic.py`):
+
+- **Sheet pins** go in `SheetSymbol.pins`, on create or on an `UpdateItems` of the sheet symbol; an update after
+  the child has content keeps that content. `container` = the sheet symbol fails with `ISC_INVALID_TYPE`.
+- **Pin text side** follows `spin_style`, not `side`. Unset, it is `SLSS_LEFT` (text outside on a left pin). Text
+  inside the box: left `SLSS_RIGHT`, right `SLSS_LEFT`, top `SLSS_BOTTOM`, bottom `SLSS_UP`.
+- **Fields.** `name_field` and `filename_field` are hidden at (0, 0) by default. With `visible` and
+  `text.attributes.visible` set, the name at (x, y − 1) `HA_LEFT` `VA_BOTTOM` and the file at (x, y + h + 1)
+  `HA_LEFT` `VA_TOP` sit just above and below the box.
+- **Page numbers.** Unset, every child got page `2`; `page_number` set on create is kept.
+- **Stale files.** An existing `child.kicad_sch` is not loaded into a newly created sheet of that file name.
+- **Connectivity.** `GetSchematicNetlist` covers the whole hierarchy for any `sheet_path`; a hierarchical label's
+  net is named `/child/<label>`. ERC covers every sheet; `ErcMarker.sheet_specific_path.path_human_readable` names
+  the sheet. `kicad-cli sch erc` on the saved root agreed with the API's ERC on a clean three-sheet design (0 = 0)
+  and on designs with unconnected sheet pins and orphan hierarchical labels (same descriptions, severities, sheets).
+- **Plots.** A child specifier with `SJSM_SINGLE_SHEET` plots that child alone; the root with `SJSM_ALL_SHEETS`
+  and a file `output_path` writes one multi-page PDF.
+
 ### Check and export
 
 ```python

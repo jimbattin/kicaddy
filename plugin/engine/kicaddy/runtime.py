@@ -35,15 +35,16 @@ def load_bindings(path):
     from common import envelope_pb2, tasks_pb2
     from common.commands import (base_commands_pb2, editor_commands_pb2, library_commands_pb2,
                                  project_commands_pb2)
-    from common.types import base_types_pb2, enums_pb2, jobs_pb2, library_types_pb2
+    from common.types import base_types_pb2, enums_pb2, jobs_pb2, library_types_pb2, project_settings_pb2
     from schematic import (schematic_commands_pb2, schematic_jobs_pb2, schematic_tasks_pb2,
                            schematic_types_pb2)
 
     _proto = argparse.Namespace(
         envelope=envelope_pb2, tasks=tasks_pb2, base=base_commands_pb2, editor=editor_commands_pb2,
         library=library_commands_pb2, project=project_commands_pb2, types=base_types_pb2, enums=enums_pb2,
-        jobs=jobs_pb2, library_types=library_types_pb2, sch_cmd=schematic_commands_pb2,
-        sch_jobs=schematic_jobs_pb2, sch_tasks=schematic_tasks_pb2, sch=schematic_types_pb2,
+        jobs=jobs_pb2, library_types=library_types_pb2, project_settings=project_settings_pb2,
+        sch_cmd=schematic_commands_pb2, sch_jobs=schematic_jobs_pb2, sch_tasks=schematic_tasks_pb2,
+        sch=schematic_types_pb2,
     )
     return _proto
 

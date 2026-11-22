@@ -30,14 +30,15 @@ def run(launcher, bindings, config_home, settings_dir, expect_version):
             raise RuntimeError("no symbol libraries in the library tables")
 
         path = Path(tmp) / "smoke.kicad_sch"
-        sch = schematic.Schematic(api, path)
+        project = schematic.Project(api, Path(tmp), "smoke")
+        sch = project.root
         sch.symbol("R1", "Device:R", (20, 20))
         sch.symbol("R2", "Device:R", (20, 30))
         sch.wire("R1.2", "R2.1")
-        sch.commit()
+        project.commit()
         if not path.exists() or path.stat().st_size == 0:
             raise RuntimeError(f"schematic round trip: {path.name} not saved")
-        nets = sch.netlist()
+        nets = project.netlist()
         if not any(members == {"R1.2", "R2.1"} for _, members in nets):
             raise RuntimeError(f"schematic round trip: no net R1.2-R2.1 in {nets}")
     return {"full_version": version, "symbol_libraries": n_sym, "footprint_libraries": n_fp,

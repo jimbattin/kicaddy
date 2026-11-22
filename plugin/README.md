@@ -1,10 +1,12 @@
 # kicaddy
 
 Headless KiCad schematic building for pi / oh-my-pi agents. An agent writes
-a Python `build.py` that places library symbols and wires them by pin; kicaddy runs it against KiCad's IPC API
-(`kicad-cli api-server`, no GUI), saves `.kicad_sch`/`.kicad_pro`, checks the netlist against the nets the script
-declares, runs ERC and a layout lint (overlapping symbols and text, wires over pins), and plots PNG/SVG/PDF plus a
-cropped PNG the agent can read.
+a Python `build.py` that places library symbols and wires them by pin, optionally split into hierarchical sheets
+(one build function per sheet); kicaddy runs it against KiCad's IPC API (`kicad-cli api-server`, no GUI), saves a
+KiCad project (`.kicad_pro`, every `.kicad_sch`, net classes, an empty `.kicad_pcb` created once, project-local
+library tables, `datasheets/` and `analysis/` for kicad-happy), checks the netlist against the nets the script
+declares, runs ERC and a layout lint (overlapping symbols and text, wires over pins), and plots PNG/SVG plus a
+cropped PNG per sheet the agent can read, and one multi-page PDF.
 
 The plugin ships:
 
@@ -119,5 +121,5 @@ Locations:
 
 Ask the agent to draw or build a schematic; the `kicaddy` skill tells it to run `doctor`, look up pin offsets, write
 `build.py` in your project directory, build it with `kicaddy run build.py` until the netlist matches and ERC is
-clean, and review the cropped PNG. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad nightly
-to use and saves your answer with `kicaddy config kicad`.
+clean, and review each sheet's cropped PNG. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad
+nightly to use and saves your answer with `kicaddy config kicad`.

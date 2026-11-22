@@ -1,6 +1,6 @@
 ---
 name: kicaddy
-description: Create KiCad schematics (.kicad_sch/.kicad_pro) from a Python build script, headless through KiCad's IPC API - place library symbols, wire by pin, check the netlist against declared intent and ERC, render a cropped PNG. Use to draw, design, or build a new schematic; not for reviewing or analyzing an existing one.
+description: Create KiCad projects (.kicad_pro, .kicad_sch, hierarchical sheets) from a Python build script, headless through KiCad's IPC API - place library symbols, wire by pin, split a design into sheets, check the netlist against declared intent and ERC, render cropped PNGs. Use to draw, design, or build a new schematic; not for reviewing or analyzing an existing one.
 ---
 
 # kicaddy: headless KiCad schematics from a build script
@@ -50,26 +50,32 @@ On a `FAIL` line:
 4. **Build.** Write `build.py` in the user's project directory, then run `kicaddy run build.py [--out DIR]`. It
    prints every net, the ERC violations with positions, `LINT: n issue(s)` with one line per layout issue, and
    the output paths. Exit 0 only when the netlist matches the declared nets, ERC reports 0 violations, and
-   LINT reports 0 issues; on `NETLIST MISMATCH` it lists missing and unexpected nets. A LINT line reads
-   `kind: a / b @ (x, y)` (grid units, the centre of the clash); kinds:
-   - `body-body`: two symbol bodies overlap.
+   LINT reports 0 issues; on `NETLIST MISMATCH` it lists missing and unexpected nets. An ERC line ends in
+   `on <sheet path>` (`/` for the root, `/amp/` for child sheet `amp`). A LINT line reads
+   `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of the clash); kinds:
+   - `body-body`: two symbol bodies (or sheet boxes) overlap.
    - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
    - `text-body`: a text overlaps another symbol's body.
    - `text-pin`: a pin runs through a text.
    - `text-wire`: a wire runs through a text (a label on its own wire is fine).
    - `wire-body`: a wire runs through a symbol body it is not attached to.
    - `wire-pin`: a wire runs along a pin or crosses it away from its connection point.
+
+   Names in LINT lines: `R1.Value` (a field), `label 'X'`, `global 'X'`, `hier 'X'` (labels), `note (x, y)`,
+   `sheet <name>` (a child sheet's box), `sheet <name>.Sheetname` / `.Sheetfile` (its fields), and
+   `sheet pin <name>.<label>`.
 5. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
-   wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read
-   `<name>_crop.png` (or the tiles `<name>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
+   wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read each sheet's
+   `<stem>_crop.png` (or the tiles `<stem>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
    no overlaps; the review looks only for what LINT cannot see: text that sits closer to the wrong part than to
    its own, or a crop split into tiles. If the image has neither, stop: do not rebuild to add decorations, to
    nudge text that does not touch anything, or to tighten spacing. Aim for one image review.
 
 ## Build script contract
 
-A design script defines `build(s)` that places symbols and wires on a grid and returns the nets it expects;
-`run()` does the rest: headless server, save, connectivity check, ERC, plots, cropped PNG.
+A design script defines `build(s)` that places symbols and wires on the root sheet, adds child sheets, and
+returns the nets it expects; `run()` does the rest: headless server, project scaffold, save, connectivity check,
+ERC, plots, cropped PNGs.
 
 ```python
 import sys
@@ -98,15 +104,26 @@ pin's connection point (pin number, not name).
   `page` is one of `A5 A4 A3 A2 A B` (`A`, `B`: ANSI); the sheet is landscape. `comments` fill up to 4
   title-block comment lines. The command-line option `--out DIR` overrides `out_dir`; the default is the
   script's directory.
-- `build(s)` returns a list of sets of `"REF.PIN"`, one set per net. Power-symbol and `PWR_FLAG` pins are
-  excluded. A pin connected to nothing (including every pin with a `no_connect`) is its own single-pin set.
-- Outputs, in the output directory: `<name>.kicad_sch`, `<name>.kicad_pro`, `<name>.png`, `<name>.svg`,
-  `<name>.pdf`, and the crop `<name>_crop.png` (or tiles).
+- `build(s)` returns a list of sets of `"REF.PIN"`, one set per net, for the whole project (every sheet).
+  Power-symbol and `PWR_FLAG` pins are excluded. A pin connected to nothing (including every pin with a
+  `no_connect`) is its own single-pin set.
+- Outputs, in the output directory:
+  - `<name>.kicad_pro`, `<name>.kicad_sch` (root sheet), and one `<sheet>.kicad_sch` per child sheet,
+    rewritten on every build.
+  - `<name>.kicad_pcb`: an empty board, created on the first build and never overwritten.
+  - `sym-lib-table`, `fp-lib-table`: empty project-local library tables, created only if absent.
+  - `datasheets/`, `analysis/`: empty directories for kicad-happy.
+  - Per sheet (`<stem>` = `<name>` for the root, the sheet name for a child): `<stem>.png`, `<stem>.svg`, and
+    the crop `<stem>_crop.png` (or tiles).
+  - `<name>.pdf`: every sheet, one page each.
+- Every sheet gets the same title block (date, revision 1, `comments`); a child's title is its `title`.
 
 Methods on `s`:
 
 - `s.symbol(ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None, datasheet=None,
   fields=None)`: place a library symbol with its origin at grid point `at`; returns `{pin number: (x, y)}`.
+  `(ref, unit)` is unique across the project; the units of one symbol may sit on different sheets (e.g. the
+  amplifiers on one sheet, the supply unit on another).
   Each pin is also available as `"REF.PIN"` (and in `s.pins`). Fails if a pin lands off the connection grid.
   `mirror="x"` flips the symbol top-bottom, `mirror="y"` left-right (see Geometry). `datasheet` sets the
   Datasheet field; `fields` is a dict of extra hidden fields, e.g. `{"MPN": "RC0603FR-0710KL",
@@ -127,6 +144,29 @@ Methods on `s`:
 - `s.note(text, at, size=1.27)`: left-aligned text; `size` in mm; `\n` for new lines. Multi-line notes are
   centred vertically on `at`.
 - `s.junction(*points)`: explicit dot for a deliberate four-way connection; T junctions are automatic.
+- `s.sheet(name, build, at, size, pins=None, page=None, title=None)`: child sheet, drawn as a box with its
+  top-left corner at `at` and `size` (w, h) in grid units; returns `{label: (x, y)}` of its sheet pins.
+  - `name`: letters, digits, `_`, `-`; it is also the file name `<name>.kicad_sch`, so it is unique in the
+    project and differs from the project name.
+  - `build(child)` draws the child sheet with the same methods as `s` and returns nothing; the root `build`
+    returns every net in the project. `page` defaults to the project's page; `title` to `name`.
+  - Sheet pins come from the child's `hier_label`s, one per distinct text, with the label's `shape`.
+    Automatic (`pins=None`): `output` labels on the right edge, all others on the left, in the order the
+    labels were created, at offsets 2, 4, 6, … from the top edge; a side with n pins needs height ≥ 2n + 2.
+    Explicit: `pins={label: (side, offset)}` with one entry per label; `side` is `left`, `right`, `top`, or
+    `bottom`; `offset` is an integer counted from the top edge (left, right) or the left edge (top, bottom),
+    strictly inside the edge.
+  - Each pin is addressable on the parent as `"<sheet>.<LABEL>"`, e.g. `s.wire("J1.T", "amp.IN_L")`. The pin
+    text is drawn inside the box; the name is above the box and the file name below it, at `x`.
+  - Child sheets can contain sheets.
+- `s.hier_label(text, at, spin="right", shape="input")`: hierarchical label on a child sheet (fails on the
+  root): connects the net at `at` to the parent's sheet pin `text`. `spin` and `shape` as for `global_label`.
+  The label text and pin name are the same. A net named by a hierarchical label prints as
+  `<sheet path><text>` (`/amp/IN_L`); a net with several labels takes one of their names.
+- `s.net_class(name, nets, track_width=None, clearance=None)`: project net class, from any sheet. `nets` is a
+  list of net-name patterns matched against full net names: `"+9V"`, `"GND"`, `"/amp/OUT_L"`, with `*`
+  wildcards (`"/amp/*"`). `track_width` and `clearance` in mm; unset values inherit from `Default`.
+  `name` must be new and not `Default`. Saved in `<name>.kicad_pro`.
 
 ## Geometry
 

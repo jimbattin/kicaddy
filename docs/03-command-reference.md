@@ -37,9 +37,9 @@ Package `kiapi.common.commands` · `api/proto/common/commands/project_commands.p
 | Request | Response | Needs | Headless | Live | Notes |
 |---|---|---|---|---|---|
 | `GetNetClasses` | `NetClassesResponse` | — | yes | ✔ | Project netclasses; `project` optional. |
-| `SetNetClasses` | `Empty` | — | yes |  | `merge_mode` MMM_MERGE or MMM_REPLACE; `Default` is never erased. |
+| `SetNetClasses` | `Empty` | — | yes | ✔ | `merge_mode` MMM_MERGE or MMM_REPLACE; `Default` is never erased. Saved to `.kicad_pro` `net_settings.classes`; unset `board` fields are omitted (inherit from `Default`). `NetClass` is in `common.types.project_settings`. |
 | `GetNetClassAssignments` | `NetClassAssignmentsResponse` | — | yes |  | Net → netclass and pattern assignments. |
-| `SetNetClassAssignments` | `Empty` | — | yes |  |  |
+| `SetNetClassAssignments` | `Empty` | — | yes | ✔ | `pattern_assignments` (`NetClassPatternAssignment`) saved to `.kicad_pro` `net_settings.netclass_patterns`. |
 | `ExpandTextVariables` | `ExpandTextVariablesResponse` | — / sch, pcb, fp | yes |  | `${VAR}` expansion; handled per document type (project, board, schematic). |
 | `GetTextVariables` | `TextVariables` | — | yes | ✔ | Needs `type=DOCTYPE_PROJECT` and a full `project` (name and path). |
 | `SetTextVariables` | `Empty` | — | yes |  | Same specifier rules as `GetTextVariables`. |
@@ -126,7 +126,7 @@ Package `kiapi.schematic.commands` · `api/proto/schematic/schematic_commands.pr
 | Request | Response | Needs | Headless | Live | Notes |
 |---|---|---|---|---|---|
 | `GetSchematicHierarchy` | `SchematicHierarchyResponse` | sch | yes | ✔ | Sheet tree with `SheetPath`s; needs `project` in the specifier. |
-| `GetSchematicNetlist` | `SchematicNetlistResponse` | sch | yes | ✔ | Net name → item KIIDs per sheet; `types=[KOT_SCH_PIN]` gives pins only. |
+| `GetSchematicNetlist` | `SchematicNetlistResponse` | sch | yes | ✔ | Net name → item KIIDs per sheet; `types=[KOT_SCH_PIN]` gives pins only. Covers the whole hierarchy whatever the `sheet_path`. |
 | `PlaceSymbolFromLibrary` | `PlaceFromLibraryResponse` | sch | yes | ✔ | Optional orientation, unit, reference; no mirror (set `transform.mirror_x`/`mirror_y` on an `UpdateItems`). Fails `symbol … not found` while libraries are still loading. Junctions that need the placed symbol's pins are deleted by the commit cleanup until the symbol has been through `UpdateItems` ([04](04-workflows.md#behaviors-to-know)). |
 
 ### Schematic tasks
@@ -136,7 +136,7 @@ Package `kiapi.schematic.tasks` · `api/proto/schematic/schematic_tasks.proto`
 | Request | Response | Needs | Headless | Live | Notes |
 |---|---|---|---|---|---|
 | `StartErcTask` | `StartTaskResponse` | sch | yes | ✔ | Returns a task token. |
-| `GetErcTaskResult` | `ErcTaskResult` | sch | yes | ✔ | `ErcMarker` list with positions, items, severity. |
+| `GetErcTaskResult` | `ErcTaskResult` | sch | yes | ✔ | `ErcMarker` list with positions, items, severity; every sheet, with `sheet_specific_path` per marker. |
 
 ### Schematic export jobs
 
@@ -146,7 +146,7 @@ Package `kiapi.schematic.jobs` · `api/proto/schematic/schematic_jobs.proto`
 |---|---|---|---|---|---|
 | `RunSchematicJobExportSvg` | `RunJobResponse` | sch | yes | ✔ |  |
 | `RunSchematicJobExportDxf` | `RunJobResponse` | sch | yes |  |  |
-| `RunSchematicJobExportPdf` | `RunJobResponse` | sch | yes | ✔ |  |
+| `RunSchematicJobExportPdf` | `RunJobResponse` | sch | yes | ✔ | `SJSM_ALL_SHEETS` from the root with a file `output_path`: one multi-page PDF. |
 | `RunSchematicJobExportPs` | `RunJobResponse` | sch | yes |  |  |
 | `RunSchematicJobExportPng` | `RunJobResponse` | sch | yes | ✔ | `dpi`, `plot_background_color`; `plot_drawing_sheet=false` plots the drawing alone. The PNG has no dpi metadata. |
 | `RunSchematicJobExportNetlist` | `RunJobResponse` | sch | yes | ✔ |  |
@@ -277,7 +277,8 @@ server.
 | `SchematicSymbolInstance` ✔ (update) | Placement from a library is `PlaceSymbolFromLibrary` ✔ |
 | `SheetSymbol` ✔ | Creates a hierarchical sheet; the child file is written on save |
 
-`SchematicPin` and `SheetPin` are children of a symbol or sheet and are addressed through `container`.
+`SchematicPin` and `SheetPin` are children of a symbol or sheet. `SheetPin` through `container` = a sheet symbol
+fails with `ISC_INVALID_TYPE`; put sheet pins in `SheetSymbol.pins` on `CreateItems` or `UpdateItems`.
 
 ### Symbol in the library editor
 

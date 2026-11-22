@@ -17,16 +17,20 @@ to that pin's connection point (pin number, not name). `kicaddy pins Lib:Sym ...
 in grid units for planning a layout.
 
 Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move
-or show a field), `power`, `wire`, `label`, `global_label`, `no_connect`, `note`, and `junction` for a
-deliberate four-way dot. `commit` adds junctions where KiCad's rule finds 3+ wire directions or pins
-meeting (sch_geometry.junctions). `lint` reports overlapping bodies and text and wires crossing pins,
-bodies, and text (sch_geometry.lint).
+or show a field), `power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction`
+for a deliberate four-way dot, `sheet` (a child sheet drawn by its own build function, with sheet pins from
+its hierarchical labels), and `net_class`. `Project` holds what the sheets share and writes the project
+scaffold (.kicad_pro, empty board, library tables, datasheets/ and analysis/); `run()` builds into it.
+`commit` adds junctions where KiCad's rule finds 3+ wire directions or pins meeting
+(sch_geometry.junctions). `lint` reports overlapping bodies and text and wires crossing pins, bodies, and
+text (sch_geometry.lint).
 
 Requires the runtime set up by `kicaddy doctor`; run a design script with `kicaddy run build.py [--out DIR]`.
 """
 
 import argparse
 import math
+import re
 import sys
 import tempfile
 import time
@@ -108,8 +112,113 @@ class _Placement:
     dirty: bool = True
 
 
+SHEET_SIDES = {"left": "SHS_LEFT", "right": "SHS_RIGHT", "top": "SHS_TOP", "bottom": "SHS_BOTTOM"}
+SHEET_PIN_SPIN = {"left": "right", "right": "left", "top": "bottom", "bottom": "up"}  # text inside the box (probed)
+
+
+@dataclass
+class _SheetBox:
+    """One child sheet drawn on its parent."""
+    name: str
+    box: tuple  # (x0, y0, x1, y1) grid
+    pins: dict  # label -> (point, spin, shape)
+    fields: list  # Text protos: Sheetname, Sheetfile
+
+
 MANDATORY = {"Reference": "reference_field", "Value": "value_field", "Footprint": "footprint_field",
              "Datasheet": "datasheet_field", "Description": "description_field"}
+
+
+def _pack(message):
+    from google.protobuf import any_pb2
+
+    packed = any_pb2.Any()
+    packed.Pack(message)
+    return packed
+
+
+def _check(results, request_status, what):
+    """Raise unless an item request and each of its item results succeeded."""
+    t = _proto.types
+    if request_status != t.IRS_OK:
+        raise RuntimeError(f"{what}: {t.ItemRequestStatus.Name(request_status)}")
+    for r in results:
+        if r.status.code != _proto.editor.ISC_OK:
+            raise RuntimeError(f"{what}: {r.status}")
+
+
+class Project:
+    """One KiCad project in `directory`: the root sheet `root` (a Schematic), its child sheets, and what they
+    share: references, power-symbol numbering, net classes, the title block, and the board file."""
+
+    def __init__(self, api, directory, name, page="A4", title="", comments=()):
+        t = _proto.types
+        self.api = api
+        self.directory = Path(directory)
+        self.name = name
+        self.page = page
+        path = self.directory / f"{name}.kicad_sch"
+        for suffix in (".kicad_sch", ".kicad_pro", ".kicad_prl"):  # never the board
+            path.with_suffix(suffix).unlink(missing_ok=True)
+        for table in ("sym_lib_table", "fp_lib_table"):  # project-local tables; an existing one is kept
+            file = self.directory / table.replace("_", "-")
+            if not file.exists():
+                file.write_text(f"({table}\n  (version 7)\n)\n")
+        for sub in ("datasheets", "analysis"):  # where kicad-happy looks
+            (self.directory / sub).mkdir(exist_ok=True)
+        self.pin_ids = {}  # pin KIID -> "REF.PIN", every sheet
+        self.units = {}  # (ref, unit) -> name of the sheet it is placed on
+        self.auto = {"#PWR": 0, "#FLG": 0}
+        self.libraries_ready = set()
+        self.net_classes = []  # (NetClass proto, [net-name patterns])
+        self.sheets = []  # every Schematic, root first, in creation order
+        self.files = {name}  # sheet file stems in use
+        self.title_block = (time.strftime("%Y-%m-%d"), "1", tuple(comments[:4]))
+        doc = api(_proto.project.CreateDocument(type=t.DOCTYPE_SCHEMATIC, path=str(path))).document
+        root = api(_proto.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0].path
+        spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=root, project=doc.project)
+        self.root = Schematic(self, spec, name, path, "/", page, title)
+
+    def commit(self):
+        """Create every sheet's pending items, send the net classes, create the board once, and save."""
+        t = _proto.types
+        for s in self.sheets:
+            s.commit()
+        project = self.root.document.project
+        if self.net_classes:
+            self.api(_proto.project.SetNetClasses(net_classes=[c for c, _ in self.net_classes],
+                                                  merge_mode=t.MMM_MERGE, project=project))
+            patterns = [_proto.project_settings.NetClassPatternAssignment(pattern=p, netclass=c.name)
+                        for c, nets in self.net_classes for p in nets]
+            self.api(_proto.project.SetNetClassAssignments(pattern_assignments=patterns,
+                                                           merge_mode=t.MMM_MERGE, project=project))
+        board = self.directory / f"{self.name}.kicad_pcb"
+        if not board.exists():
+            doc = self.api(_proto.project.CreateDocument(type=t.DOCTYPE_PCB, path=str(board))).document
+            self.api(_proto.project.SaveDocument(document=doc))
+        self.api(_proto.project.SaveDocument(document=self.root.document))
+
+    def netlist(self):
+        """[(net name, {"REF.PIN", ...})] over the whole hierarchy; power-symbol and flag pins dropped."""
+        response = self.api(_proto.sch_cmd.GetSchematicNetlist(document=self.root.document,
+                                                                types=[_proto.enums.KOT_SCH_PIN]))
+        nets = []
+        for net in response.nets:
+            members = {self.pin_ids[i.value] for s in net.sheets for i in s.items if i.value in self.pin_ids}
+            members = {m for m in members if not m.startswith("#")}
+            if members:
+                nets.append((net.name, members))
+        return sorted(nets, key=lambda n: n[0])
+
+    def erc(self):
+        """ERC violations over every sheet."""
+        tasks = _proto.tasks
+        token = self.api(_proto.sch_tasks.StartErcTask(document=self.root.document)).token
+        while (status := self.api(tasks.GetTaskStatus(token=token))).state == tasks.TS_RUNNING:
+            time.sleep(0.05)
+        if status.state != tasks.TS_COMPLETED:
+            raise RuntimeError(f"ERC task: {tasks.TaskState.Name(status.state)} {status.error_message}")
+        return list(self.api(_proto.sch_tasks.GetErcTaskResult(token=token)).violations)
 
 
 class Schematic:
@@ -118,34 +227,33 @@ class Schematic:
     SHAPES = {"input": "SLSH_INPUT", "output": "SLSH_OUTPUT", "bidirectional": "SLSH_BIDI",
               "tri_state": "SLSH_TRISTATE", "passive": "SLSH_PASSIVE"}
 
-    def __init__(self, api, path, page="A4", title="", comments=()):
+    def __init__(self, project, spec, name, path, hier_path, page, title):
+        """One sheet of `project`, addressed by `spec`; `hier_path` is "/" for the root, "/amp/" for a child."""
         t = _proto.types
-        self.api = api
+        self.project = project
+        self.api = project.api
+        self.document = spec  # DocumentSpecifier of this sheet
+        self.header = t.ItemHeader(document=spec)
+        self.name = name
         self.path = Path(path)
-        self.name = self.path.stem
-        for suffix in (".kicad_sch", ".kicad_pro", ".kicad_prl"):
-            self.path.with_suffix(suffix).unlink(missing_ok=True)
-        doc = api(_proto.project.CreateDocument(type=t.DOCTYPE_SCHEMATIC, path=str(self.path))).document
-        root = api(_proto.sch_cmd.GetSchematicHierarchy(document=doc)).top_level_sheets[0].path
-        self.sheet = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=root, project=doc.project)
-        self.header = t.ItemHeader(document=self.sheet)
-        api(_proto.editor.SetPageSettings(document=self.sheet, page_settings=t.PageSettings(
+        self.hier_path = hier_path
+        self.api(_proto.editor.SetPageSettings(document=spec, page_settings=t.PageSettings(
             page_size=t.PageSize.Value(self.PAGES[page]), orientation=t.PO_LANDSCAPE)))
-        block = t.TitleBlockInfo(title=title, date=time.strftime("%Y-%m-%d"), revision="1")
-        for i, comment in enumerate(comments[:4], 1):
+        date, revision, comments = project.title_block
+        block = t.TitleBlockInfo(title=title, date=date, revision=revision)
+        for i, comment in enumerate(comments, 1):
             setattr(block, f"comment{i}", comment)
-        api(_proto.editor.SetTitleBlockInfo(document=self.sheet, title_block=block))
-        self.pins = {}  # "REF.PIN" -> (x, y) grid
-        self.pin_ids = {}  # pin KIID -> "REF.PIN"
+        self.api(_proto.editor.SetTitleBlockInfo(document=spec, title_block=block))
+        self.pins = {}  # "REF.PIN" and "<sheet>.<LABEL>" -> (x, y) grid
         self.placements = {}  # (ref, unit) -> _Placement
         self._items = []  # protos for the next CreateItems
         self._wires = []  # ((x1, y1), (x2, y2)) grid segments
         self._labels = []  # (kind, text, point, spin, shape)
         self._notes = []  # (at, Text proto)
+        self._sheets = []  # child sheet boxes (_SheetBox)
         self._junctions = set()  # explicit junction points
         self._junctions_created = set()
-        self._auto = {"#PWR": 0, "#FLG": 0}
-        self._libraries_ready = set()
+        project.sheets.append(self)
 
     # -- geometry ---------------------------------------------------------------------------------
     @staticmethod
@@ -168,10 +276,14 @@ class Schematic:
         for name in fields or {}:
             if name in MANDATORY:
                 raise ValueError(f"{name} is a mandatory field; use value=, footprint=, datasheet=")
+        key = (ref, unit or 1)
+        if key in self.project.units:
+            raise ValueError(f"{ref} unit {unit or 1} is already placed on sheet {self.project.units[key]}")
+        self.project.units[key] = self.name
         library, entry = lib_id.split(":", 1)
-        if library not in self._libraries_ready:
+        if library not in self.project.libraries_ready:
             runtime.wait_for_symbol_libraries(self.api, {library})
-            self._libraries_ready.add(library)
+            self.project.libraries_ready.add(library)
         request = _proto.sch_cmd.PlaceSymbolFromLibrary(
             header=self.header,
             lib_id=t.LibraryIdentifier(library_nickname=library, entry_name=entry),
@@ -193,7 +305,7 @@ class Schematic:
                 raise RuntimeError(f"{ref}.{pin.number} is off the connection grid")
             point = (at[0] + round(dx), at[1] + round(dy))
             self.pins[f"{ref}.{pin.number}"] = result[pin.number] = point
-            self.pin_ids[pin.id.value] = f"{ref}.{pin.number}"
+            self.project.pin_ids[pin.id.value] = f"{ref}.{pin.number}"
         name = ref + chr(64 + (unit or 1)) if definition.unit_count > 1 else ref
         p = _Placement(name, ref, unit or 1, tuple(at), rotation, mirror, placed, definition, result)
         self.placements[(ref, p.unit)] = p
@@ -253,8 +365,8 @@ class Schematic:
         """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference; its pin lands
         on `at`, a grid point or "REF.PIN"."""
         prefix = "#FLG" if name == "PWR_FLAG" else "#PWR"
-        self._auto[prefix] += 1
-        ref = f"{prefix}{self._auto[prefix]:02d}"
+        self.project.auto[prefix] += 1
+        ref = f"{prefix}{self.project.auto[prefix]:02d}"
         self.symbol(ref, f"power:{name}", self.at(at), rotation=rotation)
         return ref
 
@@ -295,6 +407,16 @@ class Schematic:
         item = _proto.sch.GlobalLabel(shape=_proto.sch.SchematicLabelShape.Value(self.SHAPES[shape]))
         self._label(item, "global", text, at, spin, shape)
 
+    def hier_label(self, text, at, spin="right", shape="input"):
+        """Hierarchical label on a child sheet: becomes the sheet pin `text` on the parent's sheet box;
+        `shape`: input, output, bidirectional, tri_state, passive."""
+        if self.project.root is self:
+            raise ValueError("hier_label belongs on a child sheet; the root sheet has no parent")
+        if shape not in self.SHAPES:
+            raise ValueError(f"shape must be one of {', '.join(self.SHAPES)}, not {shape!r}")
+        item = _proto.sch.HierarchicalLabel(shape=_proto.sch.SchematicLabelShape.Value(self.SHAPES[shape]))
+        self._label(item, "hier", text, at, spin, shape)
+
     def no_connect(self, at):
         self._items.append(_proto.sch.NoConnectMarker(position=self.mm(self.at(at))))
 
@@ -307,66 +429,156 @@ class Schematic:
         self._items.append(item)
         self._notes.append((tuple(at), item.text))
 
+    # -- hierarchy --------------------------------------------------------------------------------
+    def sheet(self, name, build, at, size, pins=None, page=None, title=None):
+        """Child sheet `name`, file <name>.kicad_sch, drawn as a box with its top-left corner at `at` and
+        `size` (w, h) in grid units; `build(child)` draws the child and returns None. Sheet pins come from
+        the child's hierarchical labels: automatic (outputs on the right, the rest on the left, 2 units apart
+        from the top in label order) or `pins={label: (side, offset)}`, offset from the top (left, right) or
+        left (top, bottom) edge. Returns {label: (x, y)}; each pin is also "<name>.<label>"."""
+        sch, t, e, enums = _proto.sch, _proto.types, _proto.editor, _proto.enums
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            raise ValueError(f"sheet name {name!r}: letters, digits, _ and - only")
+        if name in self.project.files:
+            raise ValueError(f"sheet name {name!r} is already used in this project")
+        for pair in (at, size):
+            if len(pair) != 2 or not all(isinstance(v, int) for v in pair):
+                raise ValueError(f"sheet {name}: at and size are (x, y) integer grid pairs, not {pair!r}")
+        (x, y), (w, h) = at, size
+        if w <= 0 or h <= 0:
+            raise ValueError(f"sheet {name}: size {size!r} must be positive")
+        if any(k.startswith(f"{name}.") for k in self.pins):
+            raise ValueError(f"sheet name {name!r} clashes with a reference on this sheet")
+
+        self.project.files.add(name)
+        file = f"{name}.kicad_sch"
+        (self.path.parent / file).unlink(missing_ok=True)  # a stale file is not loaded; keep the folder clean
+        sym = sch.SheetSymbol(position=self.mm(at), size=self.mm(size),
+                              page_number=str(len(self.project.sheets) + 1))
+        for field, text, point, valign in ((sym.name_field, name, (x, y - 1), enums.VA_BOTTOM),
+                                           (sym.filename_field, file, (x, y + h + 1), enums.VA_TOP)):
+            field.visible = field.text.attributes.visible = True  # hidden at (0, 0) by default
+            field.text.text = text
+            field.text.position.CopyFrom(self.mm(point))
+            field.text.attributes.size.CopyFrom(t.Vector2(x_nm=self.LABEL_SIZE, y_nm=self.LABEL_SIZE))
+            field.text.attributes.horizontal_alignment = enums.HA_LEFT
+            field.text.attributes.vertical_alignment = valign
+        commit = self.api(e.BeginCommit(header=self.header))  # the hierarchy shows the child only once created
+        result = self.api(e.CreateItems(header=self.header, items=[_pack(sym)]))
+        _check(result.created_items, result.status, f"sheet {name}")
+        self.api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message=f"sheet {name}", header=self.header))
+        result.created_items[0].item.Unpack(sym)
+
+        def find(node):
+            if node.filename == file:  # file names are unique project-wide
+                return node
+            return next((n for n in map(find, node.children) if n is not None), None)
+
+        top = self.api(_proto.sch_cmd.GetSchematicHierarchy(document=self.project.root.document)).top_level_sheets[0]
+        node = find(top)
+        if node is None:
+            raise RuntimeError(f"sheet {name}: not in the hierarchy after create")
+        spec = t.DocumentSpecifier(type=t.DOCTYPE_SCHEMATIC, sheet_path=node.path, project=self.document.project)
+        child = Schematic(self.project, spec, name, self.path.parent / file, node.path.path_human_readable,
+                          page or self.project.page, title or name)
+        if build(child) is not None:
+            raise ValueError(f"sheet {name}: a sheet build function returns None; return every net from the "
+                             "root build")
+
+        labels = {}  # text -> shape, first occurrence
+        for kind, text, _, _, shape in child._labels:
+            if kind == "hier":
+                labels.setdefault(text, shape)
+        if pins is None:
+            sides = {"left": [l for l, s in labels.items() if s != "output"],
+                     "right": [l for l, s in labels.items() if s == "output"]}
+            for side, names in sides.items():
+                if names and 2 * len(names) > h - 2:
+                    raise ValueError(f"sheet {name}: {len(names)} pins on the {side} need height >= "
+                                     f"{2 * len(names) + 2}")
+            layout = {label: (side, 2 * (i + 1)) for side, names in sides.items() for i, label in enumerate(names)}
+        else:
+            if set(pins) != set(labels):
+                raise ValueError(f"sheet {name}: pins without a hierarchical label: {sorted(set(pins) - set(labels))}; "
+                                 f"hierarchical labels without a pin: {sorted(set(labels) - set(pins))}")
+            layout = {}
+            for label in labels:
+                side, offset = pins[label]
+                if side not in SHEET_SIDES:
+                    raise ValueError(f"sheet {name}: pin {label} side must be one of {', '.join(SHEET_SIDES)}, "
+                                     f"not {side!r}")
+                span = h if side in ("left", "right") else w
+                if not isinstance(offset, int) or not 0 < offset < span:
+                    raise ValueError(f"sheet {name}: pin {label} offset {offset} is not inside the {side} edge")
+                layout[label] = (side, offset)
+        points = {}
+        for label, (side, off) in layout.items():
+            point = {"left": (x, y + off), "right": (x + w, y + off), "top": (x + off, y),
+                     "bottom": (x + off, y + h)}[side]
+            other = next((l for l, p in points.items() if p == point), None)
+            if other is not None:
+                raise ValueError(f"sheet {name}: pins {other} and {label} share {point}")
+            points[label] = point
+
+        for label, (side, _) in layout.items():
+            pin = sym.pins.add(
+                position=self.mm(points[label]), side=sch.SheetSide.Value(SHEET_SIDES[side]),
+                shape=sch.SchematicLabelShape.Value(self.SHAPES[labels[label]]),
+                spin_style=sch.SchematicLabelSpinStyle.Value(f"SLSS_{SHEET_PIN_SPIN[side].upper()}"))
+            pin.text.text = label
+            pin.text.attributes.size.CopyFrom(t.Vector2(x_nm=self.LABEL_SIZE, y_nm=self.LABEL_SIZE))
+        if layout:
+            result = self.api(e.UpdateItems(header=self.header, items=[_pack(sym)]))
+            _check(result.updated_items, result.status, f"sheet {name} pins")
+
+        self._sheets.append(_SheetBox(
+            name, (x, y, x + w, y + h),
+            {label: (points[label], SHEET_PIN_SPIN[side], labels[label]) for label, (side, _) in layout.items()},
+            [sym.name_field.text, sym.filename_field.text]))
+        for label, point in points.items():
+            self.pins[f"{name}.{label}"] = point
+        return dict(points)
+
+    def net_class(self, name, nets, track_width=None, clearance=None):
+        """Project net class `name` for the net-name patterns `nets` (full names: "+9V", "/amp/OUT_L", "*"
+        wildcards); `track_width`, `clearance` in mm, unset ones inherit from Default."""
+        classes = self.project.net_classes
+        if name == "Default" or any(c.name == name for c, _ in classes):
+            raise ValueError(f"net class {name!r} is already defined")
+        if isinstance(nets, str) or not nets:
+            raise ValueError(f"net class {name!r}: nets is a non-empty list of net-name patterns")
+        net_class = _proto.project_settings.NetClass(name=name, priority=len(classes))
+        if track_width is not None:
+            net_class.board.track_width.value_nm = round(track_width * 1e6)
+        if clearance is not None:
+            net_class.board.clearance.value_nm = round(clearance * 1e6)
+        classes.append((net_class, list(nets)))
+
     # -- finishing --------------------------------------------------------------------------------
     def commit(self):
-        from google.protobuf import any_pb2
-
-        def pack(message):
-            packed = any_pb2.Any()
-            packed.Pack(message)
-            return packed
-
-        e, t = _proto.editor, _proto.types
-
-        def check(results, request_status, what):
-            if request_status != t.IRS_OK:
-                raise RuntimeError(f"{what}: {t.ItemRequestStatus.Name(request_status)}")
-            for r in results:
-                if r.status.code != e.ISC_OK:
-                    raise RuntimeError(f"{what}: {r.status}")
-
+        """Send this sheet's pending field updates, items, and junctions; the project saves."""
+        e = _proto.editor
         dirty = [p for p in self.placements.values() if p.dirty]
         if dirty:
-            result = self.api(e.UpdateItems(header=self.header, items=[pack(p.instance) for p in dirty]))
-            check(result.updated_items, result.status, "UpdateItems")
+            result = self.api(e.UpdateItems(header=self.header, items=[_pack(p.instance) for p in dirty]))
+            _check(result.updated_items, result.status, "UpdateItems")
             for p, updated in zip(dirty, result.updated_items):  # the server's version, for lint
                 updated.item.Unpack(p.instance)
                 p.instance.ClearField("definition")
                 p.dirty = False
         points = self._junctions | sch_geometry.junctions(
-            self._wires, [set(p.pins.values()) for p in self.placements.values()],
+            self._wires, [set(p.pins.values()) for p in self.placements.values()]
+            + [{p for p, _, _ in b.pins.values()} for b in self._sheets],
             {point for _, _, point, _, _ in self._labels})
         for point in sorted(points - self._junctions_created):
             self._items.append(_proto.sch.Junction(position=self.mm(point)))
         self._junctions_created |= points
         if self._items:
             commit = self.api(e.BeginCommit(header=self.header))
-            result = self.api(e.CreateItems(header=self.header, items=[pack(i) for i in self._items]))
-            check(result.created_items, result.status, "CreateItems")
+            result = self.api(e.CreateItems(header=self.header, items=[_pack(i) for i in self._items]))
+            _check(result.created_items, result.status, "CreateItems")
             self.api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message="build", header=self.header))
         self._items = []
-        self.api(_proto.project.SaveDocument(document=self.sheet))
-
-    def netlist(self):
-        """[(net name, {"REF.PIN", ...})] from the server; power-symbol and flag pins dropped."""
-        response = self.api(_proto.sch_cmd.GetSchematicNetlist(document=self.sheet,
-                                                                types=[_proto.enums.KOT_SCH_PIN]))
-        nets = []
-        for net in response.nets:
-            members = {self.pin_ids[i.value] for s in net.sheets for i in s.items if i.value in self.pin_ids}
-            members = {m for m in members if not m.startswith("#")}
-            if members:
-                nets.append((net.name, members))
-        return sorted(nets, key=lambda n: n[0])
-
-    def erc(self):
-        tasks = _proto.tasks
-        token = self.api(_proto.sch_tasks.StartErcTask(document=self.sheet)).token
-        while (status := self.api(tasks.GetTaskStatus(token=token))).state == tasks.TS_RUNNING:
-            time.sleep(0.05)
-        if status.state != tasks.TS_COMPLETED:
-            raise RuntimeError(f"ERC task: {tasks.TaskState.Name(status.state)} {status.error_message}")
-        return list(self.api(_proto.sch_tasks.GetErcTaskResult(token=token)).violations)
 
     # -- lint -------------------------------------------------------------------------------------
     def _extents(self, text, ink=True):
@@ -410,7 +622,7 @@ class Schematic:
         item.attributes.vertical_alignment = enums.VA_BOTTOM
         h = self.LABEL_SIZE / 1e6 / GRID_MM
         vertical = spin in ("up", "bottom")
-        if kind == "global":
+        if kind in ("global", "hier"):  # a hierarchical label's flag fits inside the global-label outline
             item.attributes.horizontal_alignment = enums.HA_LEFT
             x0, _, x1, _ = (v / 1e6 / GRID_MM for v in self._extents(item, ink=False))  # as the outline
             margin = 0.375 * h  # label size ratio, eeschema/default_values.h
@@ -471,6 +683,15 @@ class Schematic:
                     texts.append(g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None))
         for kind, text, anchor, spin, shape in self._labels:
             texts.append(g.TextBox(f"{kind} {text!r}", self._label_box(kind, text, anchor, spin, shape), None, anchor))
+        for b in self._sheets:
+            bodies.append(g.Body(f"sheet {b.name}", b.box, frozenset(p for p, _, _ in b.pins.values())))
+            for i, text in enumerate(b.fields):
+                box = tuple(v / 1e6 / GRID_MM for v in self._extents(text))
+                texts.append(g.TextBox(f"sheet {b.name}.{'Sheetname' if i == 0 else 'Sheetfile'}", box,
+                                       f"sheet {b.name}", None))
+            for label, (point, spin, shape) in b.pins.items():
+                texts.append(g.TextBox(f"sheet pin {b.name}.{label}", self._label_box("hier", label, point, spin, shape),
+                                       f"sheet {b.name}", point))
         for at, note in self._notes:
             text = _proto.types.Text()
             text.CopyFrom(note)
@@ -481,13 +702,15 @@ class Schematic:
             texts.append(g.TextBox(f"note ({at[0]:g}, {at[1]:g})", box, None, None))
         return g.lint(bodies, texts, pin_lines, self._wires)
 
-    def plot(self, kind, output, drawing_sheet=True, dpi=None):
+    def plot(self, kind, output, drawing_sheet=True, dpi=None, all_sheets=False):
+        """Plot this sheet, or with `all_sheets` (from the root) every sheet: one page each in a PDF."""
         sj = _proto.sch_jobs
         job = {"png": sj.RunSchematicJobExportPng, "svg": sj.RunSchematicJobExportSvg,
                "pdf": sj.RunSchematicJobExportPdf}[kind]()
         job.plot_settings.CopyFrom(sj.SchematicPlotSettings(
-            plot_drawing_sheet=drawing_sheet, page_size=sj.SJPS_AUTO, sheet_mode=sj.SJSM_SINGLE_SHEET))
-        job.job_settings.CopyFrom(_proto.jobs.RunJobSettings(document=self.sheet, output_path=str(output)))
+            plot_drawing_sheet=drawing_sheet, page_size=sj.SJPS_AUTO,
+            sheet_mode=sj.SJSM_ALL_SHEETS if all_sheets else sj.SJSM_SINGLE_SHEET))
+        job.job_settings.CopyFrom(_proto.jobs.RunJobSettings(document=self.document, output_path=str(output)))
         if kind == "png":
             job.dpi = dpi or SHEET_DPI
             job.plot_background_color = True
@@ -545,11 +768,11 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
     out = Path(args.out or Path(sys.argv[0]).resolve().parent).resolve()
     out.mkdir(parents=True, exist_ok=True)
     with _server(out) as api:
-        sch = Schematic(api, out / f"{name}.kicad_sch", page=page, title=title, comments=comments)
-        expected = build(sch)
-        sch.commit()
+        project = Project(api, out, name, page=page, title=title, comments=comments)
+        expected = build(project.root)
+        project.commit()
 
-        actual = sch.netlist()
+        actual = project.netlist()
         for net, members in actual:
             print(f"net {net:28s} {' '.join(sorted(members))}")
         got, want = {frozenset(m) for _, m in actual}, {frozenset(n) for n in expected}
@@ -558,21 +781,25 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
             print(f"NETLIST MISMATCH\n  missing:    {[sorted(n) for n in want - got]}\n"
                   f"  unexpected: {[sorted(n) for n in got - want]}")
 
-        violations = sch.erc()
+        violations = project.erc()
         print(f"ERC: {len(violations)} violation(s)")
         for v in violations:
             print(f"  {_proto.types.RuleSeverity.Name(v.severity)} {v.description} @ "
-                  f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g})")
+                  f"({v.position.x_nm / 1e6 / GRID_MM:g}, {v.position.y_nm / 1e6 / GRID_MM:g}) "
+                  f"on {v.sheet_specific_path.path_human_readable or '/'}")
 
-        issues = sch.lint()
+        issues = [f"{s.hier_path} {i}" for s in project.sheets for i in s.lint()]
         print(f"LINT: {len(issues)} issue(s)")
         for issue in issues:
             print(f"  {issue}")
 
-        for kind in ("png", "svg", "pdf"):
-            print(f"{kind}: {sch.plot(kind, out / f'{name}.{kind}')}")
-        for path in sch.plot_cropped(out / f"{name}_crop.png"):
-            print(f"crop: {path}")
+        for s in project.sheets:
+            stem = s.path.stem
+            for kind in ("png", "svg"):
+                print(f"{kind}: {s.plot(kind, out / f'{stem}.{kind}')}")
+            for path in s.plot_cropped(out / f"{stem}_crop.png"):
+                print(f"crop: {path}")
+        print(f"pdf: {project.root.plot('pdf', out / f'{name}.pdf', all_sheets=True)}")
     return 0 if ok and not violations and not issues else 1
 
 

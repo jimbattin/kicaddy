@@ -175,7 +175,10 @@ Observed in headless mode:
   schematic handler with one (`/work/demo/`). Project-level commands compare the path as an exact string and accepted
   only the trailing-slash form. Use the schematic's `project`, or append the slash.
 - **Sheets.** `GetSchematicHierarchy` returns the sheet tree with a `SheetPath` per sheet. A schematic specifier with
-  a `sheet_path` targets that sheet; without one, `GetItems` returned items of all sheets.
+  a `sheet_path` targets that sheet; without one, `GetItems` returned items of all sheets. A child sheet's specifier
+  is `DocumentSpecifier(type=DOCTYPE_SCHEMATIC, sheet_path=<child path>, project=<root's project>)`;
+  `PlaceSymbolFromLibrary`, `CreateItems`, `UpdateItems`, `SetPageSettings`, `SetTitleBlockInfo`, and the plot jobs
+  work on it. `SaveDocument` on the root writes every child `.kicad_sch`.
 - **Created documents.** `CreateDocument` makes an in-memory schematic or board at the given path, plus a project of
   the same base name. Nothing is on disk until `SaveDocument`, which wrote the `.kicad_sch`, `.kicad_pro`, and
   `.kicad_prl`.
@@ -203,7 +206,8 @@ Items are protobuf messages packed in `Any`: `kiapi.schematic.types.*` for schem
 - **Connections.** A wire connects where its endpoint lands on a pin. Pins on the same point connect without a wire:
   a resistor pin placed on a `GND` symbol's pin joined the GND net, and a `PWR_FLAG` placed on a `GND` pin flagged
   that net with no ERC error.
-- **Containers.** `CreateItems.container` names an existing symbol or footprint to add child items to.
+- **Containers.** `CreateItems.container` names an existing symbol or footprint to add child items to. Not sheet
+  symbols: a `SheetPin` with `container` = a sheet fails with `ISC_INVALID_TYPE` (use `SheetSymbol.pins`).
 
 ## Commits
 

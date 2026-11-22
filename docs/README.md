@@ -33,8 +33,8 @@ and no selection, view, or `RunAction` commands in headless mode. See [04-workfl
 | [05-cropping-schematic-plots.md](05-cropping-schematic-plots.md) | Heuristic for cropping schematic plots to readable images (fit or tile), with results on four example designs |
 | [06-method-comparison-headphone-amp.md](06-method-comparison-headphone-amp.md) | Time and token cost of the KiCad IPC method against a free-choice method, on the same headphone-amp task |
 | [examples/minimal_client.py](examples/minimal_client.py) | Self-contained client: starts the headless server, reads a document, shuts down |
-| [../plugin/](../plugin/) | The `kicaddy` plugin: `bin/kicaddy` (`doctor` resolves the chosen KiCad and sets up cached bindings, pinned venv, isolated config; `run`, `pins`, `config`), the engine (`engine/kicaddy/`: runtime, schematic builder `schematic.py` with automatic junctions and a layout lint, geometry `sch_geometry.py`, crop tool `crop.py`), and the `kicaddy` skill |
-| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM, headphone amp |
+| [../plugin/](../plugin/) | The `kicaddy` plugin: `bin/kicaddy` (`doctor` resolves the chosen KiCad and sets up cached bindings, pinned venv, isolated config; `run`, `pins`, `config`), the engine (`engine/kicaddy/`: runtime, project and schematic builder `schematic.py` with hierarchical sheets, net classes, automatic junctions, and a layout lint, geometry `sch_geometry.py`, crop tool `crop.py`), and the `kicaddy` skill |
+| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM, headphone amp, and the headphone amp as a three-sheet project (`headphone_amp_hier`) |
 
 ## Evidence labels
 
@@ -49,7 +49,7 @@ Unlabelled statements in the protocol and workflow documents are **[live]**.
 |---|---|
 | Commands with a registered handler | 134 |
 | of which usable in headless mode | 116 fully, 2 partly |
-| of which exercised successfully here | 60 |
+| of which exercised successfully here | 62 |
 | Commands declared in the protos with no handler | 8 |
 | Server start to socket ready | about 0.5 s extracted, about 1.2 s via the AppImage mount |
 | Typical request round trip | about 10 ms |

@@ -487,7 +487,7 @@
       {
         "filename": "am_radio.kicad_sch",
         "name": "",
-        "uuid": "fba74323-13bf-4fdc-95b1-800f690e26ed"
+        "uuid": "6e35fc47-f28b-4d8c-806a-a0e90273b70d"
       }
     ],
     "used_designators": "",
@@ -495,7 +495,7 @@
   },
   "sheets": [
     [
-      "fba74323-13bf-4fdc-95b1-800f690e26ed",
+      "6e35fc47-f28b-4d8c-806a-a0e90273b70d",
       ""
     ]
   ],

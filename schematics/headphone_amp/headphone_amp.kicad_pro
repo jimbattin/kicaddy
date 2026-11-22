@@ -487,7 +487,7 @@
       {
         "filename": "headphone_amp.kicad_sch",
         "name": "",
-        "uuid": "fd0a2c14-e7b7-43b7-b90e-46f068961d21"
+        "uuid": "852235ad-451c-4306-b17e-4b65c2ba5b1e"
       }
     ],
     "used_designators": "",
@@ -495,7 +495,7 @@
   },
   "sheets": [
     [
-      "fd0a2c14-e7b7-43b7-b90e-46f068961d21",
+      "852235ad-451c-4306-b17e-4b65c2ba5b1e",
       ""
     ]
   ],
