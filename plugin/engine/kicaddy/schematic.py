@@ -1379,7 +1379,8 @@ def _arguments(extra=None):
 
 def run(build, name, page="A4", title="", comments=(), out_dir=None):
     """Entry point for a design script. Exit status 1 on netlist mismatch, any ERC violation, or any lint
-    issue; the plots are written either way."""
+    issue. The plots are written only on exit status 0; a failing build removes the ones an earlier build
+    left, so no drawing on disk shows another state than the saved files."""
     args = _arguments(lambda p: p.add_argument("--out", default=out_dir, help="output directory"))
     out = Path(args.out or Path(sys.argv[0]).resolve().parent).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -1404,14 +1405,23 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
         issues = lint_issues(project)
         print_lint(issues)
 
-        for s in project.sheets:
-            stem = s.path.stem
-            for kind in ("png", "svg"):
-                print(f"{kind}: {plot(api, s.document, kind, out / f'{stem}.{kind}')}")
-            for path in plot_cropped(api, s.document, out / f"{stem}_crop.png"):
-                print(f"crop: {path}")
-        print(f"pdf: {plot(api, project.root.document, 'pdf', out / f'{name}.pdf', all_sheets=True)}")
-    return 0 if ok and not violations and not issues else 1
+        passed = ok and not violations and not issues
+        if passed:
+            for s in project.sheets:
+                stem = s.path.stem
+                for kind in ("png", "svg"):
+                    print(f"{kind}: {plot(api, s.document, kind, out / f'{stem}.{kind}')}")
+                for path in plot_cropped(api, s.document, out / f"{stem}_crop.png"):
+                    print(f"crop: {path}")
+            print(f"pdf: {plot(api, project.root.document, 'pdf', out / f'{name}.pdf', all_sheets=True)}")
+        else:
+            for stem in (s.path.stem for s in project.sheets):
+                for old in (out / f"{stem}.png", out / f"{stem}.svg", out / f"{stem}_crop.png",
+                            *out.glob(f"{stem}_crop_r*c*.png")):
+                    old.unlink(missing_ok=True)
+            (out / f"{name}.pdf").unlink(missing_ok=True)
+            print("plots: none (the build failed)")
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

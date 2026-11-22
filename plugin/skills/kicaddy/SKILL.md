@@ -131,7 +131,8 @@ Without the tools, the CLI workflow below is unchanged.
    prints every net (`net <name> <pins>`; pins connected to nothing share one `unconnected:` line), the ERC
    violations with positions, `LINT: n issue(s)` with one line per layout issue, and the output paths. Exit 0
    only when the netlist matches the declared nets, ERC reports 0 violations, and LINT reports 0 issues; on
-   `NETLIST MISMATCH` it lists missing and unexpected nets. An ERC line ends in
+   `NETLIST MISMATCH` it lists missing and unexpected nets. A failing build writes no plots, removes the
+   earlier ones, and prints `plots: none (the build failed)`. An ERC line ends in
    `on <sheet path>` (`/` for the root, `/amp/` for child sheet `amp`). A LINT line reads
    `<sheet path> kind: a / b @ (x, y)` (grid units on that sheet, the centre of the clash); kinds:
    - `body-body`: two symbol bodies (or sheet boxes) overlap.
@@ -181,7 +182,8 @@ Coordinates are in units of the 1.27 mm connection grid, Y down. A point given a
 pin's connection point (pin number, not name).
 
 - `run(build, name, page="A4", title="", comments=(), out_dir=None)`: entry point for a design script. Exit
-  status 1 on netlist mismatch, any ERC violation, or any LINT issue; the plots are written either way.
+  status 1 on netlist mismatch, any ERC violation, or any LINT issue; the schematic files are saved either
+  way, the plots only on exit status 0.
   `page` is one of `A5 A4 A3 A2 A B` (`A`, `B`: ANSI); the sheet is landscape. `comments` fill up to 4
   title-block comment lines. The command-line option `--out DIR` overrides `out_dir`; the default is the
   script's directory.
@@ -199,6 +201,7 @@ pin's connection point (pin number, not name).
   - Per sheet (`<stem>` = `<name>` for the root, the sheet name for a child): `<stem>.png`, `<stem>.svg`, and
     the crop `<stem>_crop.png` (or tiles).
   - `<name>.pdf`: every sheet, one page each.
+  - The plots (PNG, SVG, crop, PDF) exist only after a build that exits 0.
 - Every sheet gets the same title block (date, revision 1, `comments`); a child's title is its `title`.
 
 Methods on `s`:
