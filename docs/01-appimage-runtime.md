@@ -31,10 +31,15 @@ Two ways to run:
 | Mode | Command | Notes |
 |---|---|---|
 | FUSE mount | `kicad-nightly kicad-cli …` | Mounts at `/tmp/.mount_kicad…`, unmounts on exit. First launch this session: 7 s; later about 1 s. After the tool exits, a cleanup process with the same command line lingers about 6 s. |
-| Extracted | `kicad-nightly --appimage-extract`, then `AppDir/bin/kicad-cli …` | 3.8 GB on disk, no FUSE, about 0.5 s to start. Extracts into `./AppDir`. |
+| Extracted | `kicad-nightly --appimage-extract`, then `AppDir/bin/kicad-cli …` | 3.8 GB on disk, no FUSE, about 0.5 s to start. Extracts into `./AppDir`, plus a `squashfs-root` symlink to it. Works in a container without FUSE (Debian 12, `node:22-bookworm-slim`, no font packages added). |
 
 `bin/*` are hard links to the `sharun` launcher, which loads the environment from `AppDir/.env` and runs the real
 binary in `shared/bin/`.
+
+Newer nightlies: `https://kicad-downloads.s3.cern.ch/appimage/latest.json` lists each variant's `filename`,
+`version`, and `git_sha`; `variants.nightly` is the 10.99 build. The download is `…/appimage/nightly/<filename>.tar`
+(one member, the AppImage); `<filename>` without `.tar` is a 404. A `.minisig` signature sits next to it.
+`tools/corpus.py --latest` uses this feed.
 
 ## Contents relevant to the IPC API
 

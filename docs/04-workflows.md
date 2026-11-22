@@ -235,7 +235,9 @@ call(sch_jobs.RunSchematicJobExportNetlist(job_settings=settings, format=sch_job
 Also run: `RunSchematicJobExportPdf`, `RunSchematicJobExportSvg`, `RunSchematicJobExportPng`. Output path is a
 directory, or a file name when `plot_settings.sheet_mode = SJSM_SINGLE_SHEET`. For an image showing the drawing at a
 readable size, see [05-cropping-schematic-plots.md](05-cropping-schematic-plots.md). `RunSchematicJobExportBOM`
-rejected a request with no fields: `A list of fields fields or a fields preset are required`.
+rejected a request with no fields: `A list of fields fields or a fields preset are required`. `kicad-cli sch export
+bom` with `--fields`, `--labels`, and `--group-by Value,Footprint,MPN` (what `kicaddy bom` runs) reads the saved
+files, includes child sheets, leaves out power symbols, and works while an `api-server` holds the same project.
 
 ## Board
 

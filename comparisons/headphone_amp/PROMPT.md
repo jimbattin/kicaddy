@@ -6,7 +6,8 @@ shared context plus their own task; neither saw the other's task.
 
 Paths are as they were then: the `/tmp/hpamp-*` output directories, and the old `~/.cache/kicad-ipc` bindings and
 venv, which the builder no longer uses (it now runs on `plugin/bin/kicaddy doctor`). For the M2 benchmark, keep the
-shared context and replace agent A's `# Method (required)` section with use of the `kicaddy` plugin.
+shared context and replace agent A's `# Method (required)` section with use of the `kicaddy` plugin: that prompt is
+[PROMPT_PLUGIN.md](PROMPT_PLUGIN.md) (used from M8 on; run with `omp -p` in an empty directory).
 
 ## Shared context
 
