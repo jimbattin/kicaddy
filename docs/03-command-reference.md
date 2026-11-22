@@ -26,7 +26,7 @@ Package `kiapi.common.commands` · `api/proto/common/commands/base_commands.prot
 | `GetKiCadBinaryPath` | `PathResponse` | — | yes | ✔ | Absolute path of a bundled binary, e.g. `kicad-cli`. |
 | `GetPaths` | `GetPathsResponse` | — | yes | ✔ | User plugin/template/settings dirs and stock library dirs. |
 | `Ping` | `Empty` | — | yes | ✔ | Liveness check. |
-| `GetTextExtents` | `Box2` | — | yes | ✔ | Bounding box of a text item without placing it. |
+| `GetTextExtents` | `Box2` | — | yes | ✔ | Bounding box of a text item without placing it. One round trip (about 10 ms) per text: 254 texts on `pic_programmer` took 2.5 s per lint. The box moves with `position` and nothing else (882 fields, labels, and notes of the design corpus and `pic_programmer`, in every rotation and alignment they use: 0 differences), so the lint asks once per distinct text and attribute set, at the origin, and keeps the answer for the server's life. |
 | `GetTextAsShapes` | `GetTextAsShapesResponse` | — | yes |  | Text rendered to polygons/segments. |
 | `GetPluginSettingsPath` | `StringResponse` | — | yes |  | Writable per-plugin data dir (not created). |
 

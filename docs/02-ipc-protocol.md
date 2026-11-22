@@ -250,6 +250,12 @@ format-specific options and return `RunJobResponse { status, output_path[], mess
 - Missing output directories were created.
 - Response `output_path` listed the written files for most jobs. Render and 3D jobs returned `JS_SUCCESS` with an
   empty list although the files were written.
+- **The plot jobs draw the files, loaded once.** The first `RunSchematicJobExport*` after a document is created or
+  opened draws the saved files; every later one draws that same load, whatever was committed and saved since.
+  After a build and its plots, an edit batch that changed a value and added a symbol was saved (`"5.1k"` in the
+  `.kicad_sch`) and returned by `GetItems`, the netlist, and ERC, yet the SVG still held `4.7k` and 81 texts.
+  `CloseAllDocuments` and `OpenDocument` end it (`5.1k`, the new symbol, 83 texts). `RefreshEditor` has no
+  handler. An unsaved change is never drawn: save, and reopen before plotting again.
 
 ## Libraries
 
@@ -257,7 +263,9 @@ format-specific options and return `RunJobResponse { status, output_path[], mess
   (`LTS_GLOBAL`, `LTS_PROJECT`, or `LTS_BOTH`); without it: `AS_BAD_REQUEST: unknown library table scope`.
 - **Rows report `LLS_INVALID` until their load starts**, not only when broken. Right after start all 223 symbol rows
   were `LLS_INVALID`. `LoadAllLibraries` starts a background load. Poll `GetLibraryStatuses` until needed rows are
-  `LLS_LOADED` (took 1–2 s); only `LLS_ERROR` means failure.
+  `LLS_LOADED` (took 1–2 s); only `LLS_ERROR` means failure. Every global row is listed from server start (223
+  before any document was open), so a nickname with no row will never load: the client fails at once and names
+  the closest nicknames instead of polling to its timeout (61 s for `Devices:R` before that check).
 - `PlaceSymbolFromLibrary` does not wait for that load. Before it finished, placement failed with
   `symbol 'Timer:NE555P' not found`.
 - `GetLibraryItems` (by `type` and `nickname`) lists the `LibraryIdentifier`s in named libraries: 537 symbols in
