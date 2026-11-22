@@ -158,9 +158,9 @@ pi exposes them as tools.
 |---|---|
 | `kicaddy_build` | run a design `build.py` (`script`, optional `out` directory) on the warm server: same output and files as `kicaddy run` |
 | `kicaddy_open` | open an existing project (directory, `.kicad_pro`, root `.kicad_sch`) for query, render, and edit |
-| `kicaddy_query` | placed symbols (with `refs`: those symbols and their pin points), nets, or ERC of the open project; library pin offsets (`lib_ids`), with or without an open project |
+| `kicaddy_query` | placed symbols (with `refs`: those symbols and their pin points), nets, or ERC of the open project; library pin offsets (`lib_ids`), with or without an open project; `dir` (or, with nothing open, the session directory) supplies the project's `sym-lib-table` for `lib_ids` |
 | `kicaddy_render` | cropped PNGs of every sheet (or one), returned as images |
-| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
+| `kicaddy_edit` | builder calls on the open project (built or opened) as one batch, plus moving, removing, and changing items already in it (`s.move`, `s.remove`, `s.remove_wire`, `s.remove_label`, `s.remove_no_connect`, `s.field(..., text=)`, `project.rename_net`); reports the netlist change and the ERC and LINT issues it added. `expect` declares the netlist change (required for opened projects); a batch whose change differs is dropped and the saved files reopened. Any exception, or `exit()`, drops the batch and leaves the document unchanged; a committed batch is saved (for a built project not into `build.py`; a rebuild discards it) |
 
 While a project is open, the agent's `edit`/`write` calls on its `.kicad_sch`/`.kicad_pro` files are blocked.
 

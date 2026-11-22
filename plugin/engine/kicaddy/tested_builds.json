@@ -1,16 +1,16 @@
 {
   "builds": [
     {
-      "key": "bdd2930d2be6000ed615d81deff253bbafd414bb",
-      "version": "10.99.0-6860-gbdd2930d2b",
-      "date": "2026-11-22",
-      "kicaddy": "0.5.4"
-    },
-    {
       "key": "df8ee8981210e57e6bb01f836043e5111213aeb0",
       "version": "10.99.0-6868-gdf8ee89812",
       "date": "2026-11-22",
       "kicaddy": "0.5.4"
+    },
+    {
+      "key": "bdd2930d2be6000ed615d81deff253bbafd414bb",
+      "version": "10.99.0-6860-gbdd2930d2b",
+      "date": "2026-11-22",
+      "kicaddy": "0.5.5"
     }
   ]
 }

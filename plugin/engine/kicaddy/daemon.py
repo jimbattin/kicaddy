@@ -20,6 +20,7 @@ import io
 import json
 import linecache
 import os
+import re
 import runpy
 import signal
 import sys
@@ -149,6 +150,20 @@ class Session:
         if self.project is None:
             raise OpError(NO_DOCUMENT)
 
+    def _format_note(self, root):
+        """A line for a root sheet last saved by another KiCad release than the running one. KiCad saves only
+        its own file format, so the first committed batch rewrites every sheet in it."""
+        head = root.read_text(errors="replace")[:2000]
+        saved = re.search(r'\(generator_version "([^"]*)"\)', head)
+        ours = ".".join(self.current["full_version"].split(".")[:2])
+        if saved and saved[1] == ours:
+            return []
+        version = re.search(r"\(version (\d+)\)", head)
+        return [f"file format: {version[1] if version else 'unknown'}, saved by KiCad "
+                f"{saved[1] if saved else 'unknown'}; this is KiCad {ours}. KiCad saves only its own format: the "
+                f"first committed kicaddy_edit batch rewrites every sheet in the {ours} format, which earlier "
+                "releases cannot open. Tell the user."]
+
     def root(self):
         """(root .kicad_sch path, root DocumentSpecifier) of the open document."""
         return self.project.root.path.resolve(), self.project.root.document
@@ -224,8 +239,9 @@ class Session:
         self.project = schematic.Project.open(self.api, root)
         sheets = self.project.sheets
         symbols = sum(1 for s in sheets for p in s.placements.values() if not p.ref.startswith("#"))
-        return {"output": f"opened {root} ({len(sheets)} sheet(s): {' '.join(s.hier_path for s in sheets)})\n"
-                          f"symbols: {symbols}\nedit with kicaddy_edit; pass expect"}
+        return {"output": "\n".join([f"opened {root} ({len(sheets)} sheet(s): {' '.join(s.hier_path for s in sheets)})",
+                                     f"symbols: {symbols}", *self._format_note(root),
+                                     "edit with kicaddy_edit; pass expect"])}
 
     def op_build(self, request):
         script = Path(request["script"]).expanduser().resolve()
@@ -271,9 +287,17 @@ class Session:
             if not lib_ids:
                 raise OpError('pins needs lib_ids, e.g. ["Device:R"]')
             self._check_server()
-            if self.project is None:  # nothing open yet: a short-lived server, as `kicaddy pins` uses
-                return {"output": _capture(schematic.probe_pins, lib_ids)[1].rstrip()}
-            return {"output": _capture(schematic.print_library_pins, self.api, self.root()[1], lib_ids)[1].rstrip()}
+            directory = request.get("dir")
+            if directory is None and self.project is None:  # nothing open: the session directory's tables
+                directory = request.get("cwd") or os.getcwd()
+            if directory is None:
+                return {"output": _capture(schematic.print_library_pins, self.api, self.root()[1], lib_ids)[1].rstrip()}
+            if not Path(directory).is_dir():
+                raise OpError(f"no such directory: {directory}")
+            try:  # a short-lived server, as `kicaddy pins --dir`: the open project's server keeps its own tables
+                return {"output": _capture(schematic.probe_pins, lib_ids, directory)[1].rstrip()}
+            except RuntimeError as e:  # a library that does not load, as the CLI reports it
+                raise OpError(f"error: {e}") from None
         self.require_document()
         if what == "symbols":
             refs = set(request.get("refs") or [])
@@ -365,7 +389,8 @@ class Session:
                 s.commit(staged=True)
             api(e.EndCommit(id=commit.id, action=e.CMA_COMMIT, message=f"kicaddy batch {number}", header=header))
             commit = None
-        except Exception:
+        except (Exception, SystemExit):
+            # exit() in a batch drops the batch like any error; _Stop (SIGTERM) still propagates
             error = _trace("<batch>")
             project.in_batch = False
             if commit is not None:

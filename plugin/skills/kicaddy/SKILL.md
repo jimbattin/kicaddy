@@ -40,14 +40,18 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
 - **Review** with `kicaddy_render` (optional `sheet`: a file stem) instead of reading `<stem>_crop.png`: it
   plots the crops again and returns them as images.
 - **Query** with `kicaddy_query`, `what` =
-  - `pins` with `lib_ids`: library pin offsets, as `kicaddy pins`; works before any project is open.
+  - `pins` with `lib_ids`: library pin offsets, as `kicaddy pins`; works before any project is open: it then
+    reads the `sym-lib-table` of the session directory, or of `dir` (a project directory, as
+    `kicaddy pins --dir`), so the project's own `library:name` symbols are found.
   - `symbols`: one line per placed symbol (sheet, reference, library id, value, origin, `rot`/`mirror` when
     set). With `refs` (a list of references), only those, each followed by its pin points on the sheet: look
     there before wiring to a part of an opened project.
   - `nets` (`REF.PIN` sets) and `erc`.
 
   `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root `.kicad_sch`) for query, render,
-  and edit.
+  and edit. When the files were saved by another KiCad release, its output has a `file format:` line: the first
+  committed batch rewrites every sheet in the running KiCad's format, which earlier releases cannot open (query
+  and render change nothing). Pass that on to the user.
 - **Edit** with `kicaddy_edit`: `code` is Python run as one batch against the open project, `s` the sheet
   (`sheet`: file stem, default the root), `sheets` maps stems to sheets, `project` the project. Before the batch
   the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. The builder
@@ -76,10 +80,10 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   - `rename` `{"/VPP_ON": "/VPP_EN"}` (full net names).
   Pins of added parts left unconnected need not be declared.
 - A committed batch saves the files and reports `netlist: …` (component and net changes, or `unchanged`),
-  `expect: matched`, and the ERC and LINT totals with the issues the batch added. Any exception drops the whole
-  batch and leaves the document unchanged. For a project from `kicaddy_build`, a rebuild discards batches, so
-  copy every change you keep into `build.py` (the source of truth), then rebuild once at the end. For a project
-  from `kicaddy_open`, the saved files are the only copy of the batches.
+  `expect: matched`, and the ERC and LINT totals with the issues the batch added. Any exception, or `exit()`,
+  drops the whole batch and leaves the document unchanged. For a project from `kicaddy_build`, a rebuild discards
+  batches, so copy every change you keep into `build.py` (the source of truth), then rebuild once at the end. For
+  a project from `kicaddy_open`, the saved files are the only copy of the batches.
 - While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
   same directory fails as busy: use the tools.
 
@@ -320,8 +324,11 @@ Methods on `s`:
 
 - Wires are orthogonal.
 - Junction dots are automatic wherever 3 or more wire directions or pins meet, including a wire end or a pin
-  on the middle of another wire. A pin or wire end that touches the middle of a wire connects to it, so route
-  wires around pins they must not join. Two wires crossing middle to middle do not connect.
+  on the middle of another wire. A pin or a single wire end that touches the middle of a wire connects to it,
+  so route wires around pins they must not join. Two wires crossing middle to middle do not connect, and
+  neither do two wire ends that meet from opposite sides on the middle of a third wire: KiCad reads the two as
+  one wire crossing it, draws no dot, and the build reports `NETLIST MISMATCH`. To join all four directions
+  there, add `s.junction(point)`.
 - Two pins on the same point connect without a wire. `s.wire` fails with `zero-length wire at (x, y)` when two
   consecutive points coincide: a wire between pins that already touch (e.g. a resistor placed with its pin on a
   capacitor's pin), or a corner point equal to the pin the wire starts or ends at. Work out each pin's absolute

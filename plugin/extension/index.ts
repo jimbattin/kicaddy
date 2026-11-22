@@ -269,21 +269,33 @@ export default function kicaddy(pi: HostAPI): void {
 		execute: (_id, params, signal, _onUpdate, ctx) => call(ctx, signal, "open", { path: resolve(ctx.cwd, params.path) }),
 	});
 
-	pi.registerTool<{ what: string; lib_ids?: string[]; refs?: string[] }>({
+	pi.registerTool<{ what: string; lib_ids?: string[]; refs?: string[]; dir?: string }>({
 		name: "kicaddy_query",
 		label: "kicaddy query",
 		description:
-			"Query the open project (placed symbols, pin points of `refs`, nets as REF.PIN sets, ERC) or library pin offsets in grid units (`lib_ids`, like `kicaddy pins`; no open project needed).",
+			"Query the open project (placed symbols, pin points of `refs`, nets as REF.PIN sets, ERC) or library pin offsets in grid units (`lib_ids`, like `kicaddy pins`; no open project needed: the session directory's sym-lib-table is used, or `dir`'s).",
 		parameters: Type.Object({
 			what: Type.Union([Type.Literal("symbols"), Type.Literal("nets"), Type.Literal("erc"), Type.Literal("pins")]),
 			lib_ids: Type.Optional(Type.Array(Type.String(), { description: "Library:Symbol ids, for what=pins" })),
 			refs: Type.Optional(
 				Type.Array(Type.String(), { description: "for what=symbols: only these references, each with its pin points" }),
 			),
+			dir: Type.Optional(
+				Type.String({
+					description:
+						"for what=pins: project directory whose sym-lib-table to use, as `kicaddy pins --dir`; default the open project, else the session directory",
+				}),
+			),
 		}),
 		approval: "read",
 		execute: (_id, params, signal, _onUpdate, ctx) =>
-			call(ctx, signal, "query", { what: params.what, lib_ids: params.lib_ids ?? [], refs: params.refs ?? [] }),
+			call(ctx, signal, "query", {
+				what: params.what,
+				lib_ids: params.lib_ids ?? [],
+				refs: params.refs ?? [],
+				cwd: ctx.cwd,
+				...(params.dir ? { dir: resolve(ctx.cwd, params.dir) } : {}),
+			}),
 	});
 
 	pi.registerTool<{ sheet?: string }>({
