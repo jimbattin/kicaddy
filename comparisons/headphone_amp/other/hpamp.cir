@@ -1,0 +1,85 @@
+* Headphone amp, one channel: NE5532 + BD139/BD140 class-AB buffer, 9 V single supply
+.param RL=32 POT=1.0 VPK=1.414
+
+* ---- models -------------------------------------------------------------
+* Behavioural op-amp approximating NE5532: Aol 100 dB, GBW 10 MHz,
+* output swings to within 1.5 V of each rail, Rout 25 ohm.
+.subckt OPAMP inp inn vcc vee out
+Rin inp inn 300k
+Emid mid 0 vcc vee 0.5
+Rvee vee 0 1G
+G1 mid n1 inp inn 1m
+R1 n1 mid 100Meg
+C1 n1 mid 15.9p
+Bo o2 0 V = max(min(V(n1), V(vcc)-1.5), V(vee)+1.5)
+Ro o2 out 25
+.ends
+
+.model D1N4148 D(IS=2.52n RS=0.568 N=1.752 CJO=4p M=0.4 TT=20n BV=100)
+.model BD139 NPN(IS=1e-13 BF=150 VAF=100 IKF=0.6 ISE=1e-13 NE=1.5 RB=5 RE=0.1 RC=0.2 CJE=120p CJC=30p TF=1n TR=100n)
+.model BD140 PNP(IS=1e-13 BF=150 VAF=100 IKF=0.6 ISE=1e-13 NE=1.5 RB=5 RE=0.1 RC=0.2 CJE=120p CJC=40p TF=1.5n TR=100n)
+
+* ---- supply -------------------------------------------------------------
+VBAT vcc 0 9
+C9 vcc 0 100u
+C10 vcc 0 100n
+
+* ---- source + volume ----------------------------------------------------
+VIN src 0 DC 0 AC 1 SIN(0 {VPK} 1k)
+RS src in 100
+RV1a in wip {10k*(1-POT)+0.01}
+RV1b wip 0 {10k*POT+0.01}
+
+* ---- input coupling + bias ---------------------------------------------
+C1 wip inp 1u
+R1 inp vref 100k
+R2 vcc vref 100k
+R3 vref 0 100k
+C2 vref 0 47u
+
+* ---- gain stage -------------------------------------------------------
+XU1 inp inn vcc 0 oa OPAMP
+R8 out inn 10k
+C5 out inn 100p
+R9 inn g1 4.7k
+C3 g1 0 22u
+
+* ---- class-AB output buffer --------------------------------------------
+R4 vcc b1 1k
+D1 b1 oa D1N4148
+D2 oa b2 D1N4148
+R5 b2 0 1k
+Q1 vcc b1 e1 BD139
+Q2 0 b2 e2 BD140
+R6 e1 out 2.2
+R7 e2 out 2.2
+
+* ---- output coupling --------------------------------------------------
+C4 out hp 1000u
+R10 hp 0 1k
+RLOAD hp 0 {RL}
+
+.control
+set noaskquit
+op
+echo "=== DC operating point ==="
+print v(vref) v(inp) v(inn) v(oa) v(out) v(b1) v(b2)
+print i(VBAT)
+let iq1 = (v(e1)-v(out))/2.2
+let iq2 = (v(out)-v(e2))/2.2
+print iq1 iq2
+echo "=== AC ==="
+ac dec 50 1 1Meg
+let g = db(v(hp)/v(in))
+meas ac g1k find g at=1k
+meas ac f_lo when g=g1k-3 cross=1
+meas ac f_hi when g=g1k-3 cross=last
+* loop-gain margin proxy: peaking of closed loop
+meas ac gpk max g
+echo "=== Transient 32 ohm, 1 Vpk in ==="
+tran 2u 60m 40m
+fourier 1k v(hp)
+meas tran vpk_hp max v(hp) from=50m to=60m
+meas tran vmin_hp min v(hp) from=50m to=60m
+.endc
+.end

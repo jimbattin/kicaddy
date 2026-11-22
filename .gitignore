@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# KiCad per-user and transient project files
+*.kicad_prl
+*.lck
+_autosave-*
+*-backups/
+fp-info-cache
+
+# Leftover crop scratch dirs from an interrupted build (kicad_sch_ipc.Schematic.plot_cropped)
+.crop-*/

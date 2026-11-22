@@ -1,0 +1,33 @@
+* one channel of headphone amp, behavioral op-amp (A=1e5, GBW 8 MHz) with +/-70 mA-ish clamp
+V9 vcc 0 DC 9
+Vin in 0 DC 0 AC 1 SIN(0 0.5 1k)
+C1 in p 1u
+R1 p ref 100k
+R7 vcc ref 22k
+R8 ref 0 22k
+C3 ref 0 47u
+* op-amp: single pole, output clamp 0.7..8.3 V
+G1 0 x p n 1
+Rx x 0 1e5
+Cx x 0 199n
+Eo o1 0 x 0 1
+Bo o 0 V=max(0.7,min(8.3,v(o1)))
+Ro o out 0.5
+R3 out n 22k
+R4 n g 10k
+C6 g 0 22u
+C7 out j 1000u
+R9 j 0 10k
+RL j 0 16
+.control
+op
+print v(ref) v(out) v(n)
+ac dec 20 1 10meg
+let g=db(v(j)/v(in))
+meas ac g1k find g at=1000
+meas ac f3lo when g=7.1 cross=1
+meas ac f3hi when g=7.1 cross=2
+tran 10u 40m 0 10u
+meas tran vpp pp v(j) from=30m to=40m
+.endc
+.end
