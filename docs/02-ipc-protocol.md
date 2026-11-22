@@ -256,6 +256,9 @@ format-specific options and return `RunJobResponse { status, output_path[], mess
 - Library tables cannot be read or edited via the API: `GetLibraryTable`, `AddLibraryTableEntry`,
   `UpdateLibraryTableEntry`, `DeleteLibraryTableEntry`, and `SearchLibraries` are declared in the protos but have no
   handler. Tables are the `sym-lib-table` and `fp-lib-table` files in the settings and project directories.
+- `ReloadLibrary` (`type`, `scope`, `nickname`) reloads rows that are already in a table. A project row added after
+  the document opened returns `LCS_NOT_FOUND` (`Library '<name>' not found`); the project table is read only when
+  the document opens. A rewritten library file of a loaded row is picked up by `GetItemsFromLibrary` without a reload.
 
 ## Logging
 

@@ -6,14 +6,15 @@ a Python `build.py` that places library symbols and wires them by pin, optionall
 KiCad project (`.kicad_pro`, every `.kicad_sch`, net classes, an empty `.kicad_pcb` created once, project-local
 library tables, `datasheets/` and `analysis/` for kicad-happy), checks the netlist against the nets the script
 declares, runs ERC and a layout lint (overlapping symbols and text, wires over pins), and plots PNG/SVG plus a
-cropped PNG per sheet the agent can read, and one multi-page PDF.
+cropped PNG per sheet the agent can read, and one multi-page PDF. Parts missing from the stock libraries get a
+symbol generated from a pin table (JSON) into a project library.
 
 The plugin ships:
 
 - `bin/kicaddy`: the command line (stdlib Python; the runtime it sets up lives in its own venv).
 - `engine/kicaddy/`: the engine (runtime bootstrap, IPC client, schematic builder, schematic geometry and lint,
-  crop tool).
-- `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`) and a worked example.
+  pin-table symbol generator, crop tool).
+- `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`), a worked example design, and an example pin table.
 
 ## Prerequisites
 
@@ -94,8 +95,8 @@ the choice and writes it there. `--kicad` and `KICADDY_KICAD` override it for on
 | `server` | starts the headless server, checks version, settings directory, and libraries, and builds, saves, and reads back the netlist of a two-resistor schematic |
 
 `--refresh` rebuilds the venv and bindings even if cached. On success doctor records the runtime and prints the
-`cli:` line to use. Afterwards, `run`, `pins`, and `env` refuse to start if the KiCad file (or Flatpak commit)
-changed, or if the config file's `kicad` changed, until doctor runs again.
+`cli:` line to use. Afterwards, `run`, `pins`, `symbol`, and `env` refuse to start if the KiCad file (or Flatpak
+commit) changed, or if the config file's `kicad` changed, until doctor runs again.
 
 Locations:
 
@@ -121,6 +122,7 @@ Locations:
 ## Using the skill
 
 Ask the agent to draw or build a schematic; the `kicaddy` skill tells it to run `doctor`, look up pin offsets, write
-`build.py` in your project directory, build it with `kicaddy run build.py` until the netlist matches and ERC is
-clean, and review each sheet's cropped PNG. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad
-nightly to use and saves your answer with `kicaddy config kicad`.
+a pin table and run `kicaddy symbol` for any part the stock libraries lack, write `build.py` in your project
+directory, build it with `kicaddy run build.py` until the netlist matches and ERC is clean, and review each sheet's
+cropped PNG. If `doctor` fails at `kicad` or `api-server`, the agent asks which KiCad nightly to use and saves your
+answer with `kicaddy config kicad`.

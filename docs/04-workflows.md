@@ -89,7 +89,10 @@ The returned instance carries the full library definition. Pins are `SchematicPi
 | `Connector_Generic:Conn_01x02` | 1 | (−4, 0) |
 | `Connector_Generic:Conn_01x02` | 2 | (−4, +2) |
 
-For pin offsets of any symbol, run `python3 plugin/bin/kicaddy pins Lib:Symbol …`.
+For pin offsets of any symbol, run `python3 plugin/bin/kicaddy pins Lib:Symbol …`. For a part missing from the stock
+libraries, `python3 plugin/bin/kicaddy symbol TABLE.json --dir PROJECT` writes a symbol from a pin table into a
+project library (`PROJECT/<library>.kicad_sym`, registered in `PROJECT/sym-lib-table`) and prints its offsets;
+`kicaddy pins --dir PROJECT library:name` reprints them.
 
 Connection point = `symbol.position + T(pin.position)`. `orientation` rotates counter-clockwise on screen. In grid
 units, Y down:

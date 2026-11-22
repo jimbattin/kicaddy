@@ -15,9 +15,10 @@ The build is a workable base for headless, agent-driven schematic and PCB work u
   STEP, position, and raytraced render output. API DRC results matched `kicad-cli pcb drc` on the saved file.
 - The legacy SWIG `pcbnew` Python module is not in this build: no legacy fallback.
 - API-drawn schematics come out readable with little layout work. A small builder
-  (`plugin/engine/kicaddy/schematic.py`) and a crop heuristic ([05](05-cropping-schematic-plots.md)) produced five
-  ERC-clean designs whose netlists matched their scripts' intent. In a head-to-head test it cost 1.7× fewer
-  tokens and 1.8× less time than an agent free to draw any other way ([06](06-method-comparison-headphone-amp.md)).
+  (`plugin/engine/kicaddy/schematic.py`) and a crop heuristic ([05](05-cropping-schematic-plots.md)) produced seven
+  ERC-clean designs whose netlists matched their scripts' intent, one of them on a symbol generated from a pin table.
+  In a head-to-head test it cost 1.7× fewer tokens and 1.8× less time than an agent free to draw any other way
+  ([06](06-method-comparison-headphone-amp.md)).
 
 Main limits: no routing commands (tracks are placed as raw geometry), no stackup write, no library-table editing,
 and no selection, view, or `RunAction` commands in headless mode. See [04-workflows.md](04-workflows.md#gaps).
@@ -33,8 +34,8 @@ and no selection, view, or `RunAction` commands in headless mode. See [04-workfl
 | [05-cropping-schematic-plots.md](05-cropping-schematic-plots.md) | Heuristic for cropping schematic plots to readable images (fit or tile), with results on four example designs |
 | [06-method-comparison-headphone-amp.md](06-method-comparison-headphone-amp.md) | Time and token cost of the KiCad IPC method against a free-choice method, on the same headphone-amp task |
 | [examples/minimal_client.py](examples/minimal_client.py) | Self-contained client: starts the headless server, reads a document, shuts down |
-| [../plugin/](../plugin/) | The `kicaddy` plugin: `bin/kicaddy` (`doctor` resolves the chosen KiCad and sets up cached bindings, pinned venv, isolated config; `run`, `pins`, `config`), the engine (`engine/kicaddy/`: runtime, project and schematic builder `schematic.py` with hierarchical sheets, net classes, automatic junctions, and a layout lint, geometry `sch_geometry.py`, crop tool `crop.py`), and the `kicaddy` skill |
-| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM, headphone amp, and the headphone amp as a three-sheet project (`headphone_amp_hier`). The KiCad files are tracked; the plots (PNG, SVG, PDF, crops) are git-ignored and written by `kicaddy run` |
+| [../plugin/](../plugin/) | The `kicaddy` plugin: `bin/kicaddy` (`doctor` resolves the chosen KiCad and sets up cached bindings, pinned venv, isolated config; `run`, `pins`, `symbol`, `config`), the engine (`engine/kicaddy/`: runtime, project and schematic builder `schematic.py` with hierarchical sheets, net classes, automatic junctions, and a layout lint, geometry `sch_geometry.py`, pin-table symbol generator `symbols.py`, crop tool `crop.py`), and the `kicaddy` skill |
+| [../schematics/](../schematics/) | Example designs on the builder: NE555 blinker, buzzer, AM radio, 16-bit SRAM, headphone amp, the headphone amp as a three-sheet project (`headphone_amp_hier`), and a Daisy Seed3 demo on a generated project symbol library (`daisy_seed3`). The KiCad files are tracked; the plots (PNG, SVG, PDF, crops) are git-ignored and written by `kicaddy run` |
 
 ## Evidence labels
 
@@ -49,7 +50,7 @@ Unlabelled statements in the protocol and workflow documents are **[live]**.
 |---|---|
 | Commands with a registered handler | 134 |
 | of which usable in headless mode | 116 fully, 2 partly |
-| of which exercised successfully here | 62 |
+| of which exercised successfully here | 63 |
 | Commands declared in the protos with no handler | 8 |
 | Server start to socket ready | about 0.5 s extracted, about 1.2 s via the AppImage mount |
 | Typical request round trip | about 10 ms |

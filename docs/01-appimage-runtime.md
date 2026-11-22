@@ -122,3 +122,5 @@ start: 5.7 s; later ones about 10 ms. On the `doctor` directory, `GetLibraryStat
 footprint rows.
 
 Project-local tables (`sym-lib-table`, `fp-lib-table` next to the `.kicad_pro`) are picked up when the project opens.
+A row added after that is not: `ReloadLibrary` answers `LCS_NOT_FOUND` for it, so write the table before
+`CreateDocument` (as `kicaddy symbol` and `kicaddy run` do).

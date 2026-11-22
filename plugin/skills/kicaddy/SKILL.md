@@ -62,6 +62,10 @@ On a `FAIL` line:
      each pin object exactly once; `left`/`right` run top to bottom, `top`/`bottom` left to right. Without it
      the layout is DIP: the first half down the left, the rest up the right (pin 1 top left, the last pin top
      right). Group by function: power on top, grounds on the bottom, inputs left, outputs right.
+
+   A bad table prints one `error: <file>: <key>: …` line (e.g. `pins[3].numbers`, `sides.left[0]`,
+   `fields.MPN`) with the expected shape and the value found, exits 1, and writes nothing: fix that key and
+   rerun. `KiCad could not load the library: …` means KiCad rejected the written file.
 3. **Net intent.** Write down the expected nets (sets of `"REF.PIN"`) before any layout. This list is what
    `build()` returns and what the build checks against.
 4. **Layout on the grid.** Pick a page, place symbols so that the pins you connect line up on X or Y, and route
