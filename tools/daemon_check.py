@@ -84,7 +84,8 @@ if __name__ == "__main__":
     sys.exit(run(build, "hint", page="A4", title="hint"))
 '''
 
-# The series insert of the skill's `expect` section, on the NE555 example.
+# The series insert of the skill's `expect` section on the NE555 example: INSERT without its field move (one new
+# LINT line), MOVED as the skill has it.
 INSERT = '''s.remove_wire("U1.3", "R3.1")
 s.symbol("R10", "Device:R", (105, 38), rotation=90, value="100")
 s.wire("U1.3", "R10.1")

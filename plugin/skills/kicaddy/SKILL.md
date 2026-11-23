@@ -114,6 +114,7 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   ```python
   s.remove_wire("U1.3", "R3.1")          # U1.3 and R3.1 were one net
   s.symbol("R10", "Device:R", (105, 38), rotation=90, value="100")
+  s.field("R10", "Reference", at=(105, 40))  # clear of the GND symbol's value above it
   s.wire("U1.3", "R10.1")
   s.wire("R10.2", "R3.1")
   ```
