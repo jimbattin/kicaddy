@@ -1,0 +1,99 @@
+# Packages the plugin on every push to main, and releases it when its version is new.
+#
+# A version is new when `plugin/package.json` holds one with no `v<version>` tag. The job then tags the pushed
+# commit and creates the GitHub release, with `kicaddy-<version>.tgz` (`plugin/` packed by `npm pack`) attached.
+# To release: raise the version in `plugin/package.json` and `.omp-plugin/marketplace.json`, and push.
+#
+# The package is checked without KiCad: the two versions agree, the tarball holds the plugin and no caches, its
+# Python compiles on 3.9 (the oldest version the plugin supports), and `kicaddy --help` runs from it.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.9"
+
+      - name: Version
+        id: version
+        run: |
+          version=$(jq -r .version plugin/package.json)
+          catalog=$(jq -r '.plugins[0].version' .omp-plugin/marketplace.json)
+          if [[ $version != "$catalog" ]]; then
+            echo "::error::plugin/package.json has $version, .omp-plugin/marketplace.json has $catalog"
+            exit 1
+          fi
+          status=0
+          git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null || status=$?
+          case $status in
+            0) new=false ;;
+            2) new=true ;;
+            *) exit "$status" ;;
+          esac
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "new=$new" >>"$GITHUB_OUTPUT"
+          echo "kicaddy $version, new: $new"
+
+      - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir dist
+          (cd plugin && npm pack --pack-destination ../dist)
+          if tar -tzf "dist/kicaddy-$VERSION.tgz" | grep -E '__pycache__|\.pyc$'; then
+            echo "::error::caches in the package"
+            exit 1
+          fi
+          tar -xzf "dist/kicaddy-$VERSION.tgz" -C dist
+          for f in LICENSE README.md package.json bin/kicaddy extension/index.ts skills/kicaddy/SKILL.md \
+            engine/kicaddy/schematic.py; do
+            if [[ ! -f dist/package/$f ]]; then
+              echo "::error::$f is not in the package"
+              exit 1
+            fi
+          done
+
+      - name: Check the package on Python 3.9
+        run: |
+          python --version
+          python -m compileall -q dist/package/engine dist/package/skills
+          python dist/package/bin/kicaddy --help >/dev/null
+
+      - name: Release
+        if: steps.version.outputs.new == 'true' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          previous=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          {
+            if [[ -n $previous ]]; then
+              echo "Changes since $previous:"
+              echo
+              git log --reverse --format='- %s' "$previous..HEAD"
+            else
+              echo "First public release."
+            fi
+            echo
+            echo "\`kicaddy-$VERSION.tgz\` is \`plugin/\` packed by \`npm pack\`. Install:" \
+              "[README](https://github.com/$GITHUB_REPOSITORY/blob/v$VERSION/README.md#install)."
+          } >dist/notes.md
+          gh release create "v$VERSION" "dist/kicaddy-$VERSION.tgz" --target "$GITHUB_SHA" \
+            --title "kicaddy $VERSION" --notes-file dist/notes.md

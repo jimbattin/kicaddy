@@ -67,6 +67,10 @@ git clone https://github.com/jimbattin/kicaddy.git
 pi install "$PWD/kicaddy/plugin"
 ```
 
+Each version is also a [release](https://github.com/jimbattin/kicaddy/releases) with `kicaddy-<version>.tgz`, the
+`plugin/` directory as an npm package: extract it, and link or install the `package` directory it holds instead of
+`kicaddy/plugin`.
+
 ## Set up KiCad
 
 Tell kicaddy which KiCad to use, then let `doctor` set up and check the runtime (virtual environment, API
@@ -188,6 +192,7 @@ if __name__ == "__main__":
 | [`schematics/`](schematics/) | example designs, each a `build.py` with the KiCad files it produces |
 | [`comparisons/`](comparisons/) | a benchmark of this method against free-choice drawing ([docs/06](docs/06-method-comparison-headphone-amp.md)) |
 | [`tools/`](tools/) | repository tools: rebuild the examples on a KiCad build, test the session daemon, clean-container install test |
+| [`.github/`](.github/workflows/release.yml) | the workflow that packages the plugin on every push and releases a new version |
 
 ## License
 
