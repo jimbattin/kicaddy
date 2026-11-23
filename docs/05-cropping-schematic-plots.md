@@ -91,7 +91,7 @@ otherwise assumes 300.
 ## Results
 
 Four designs, all built through the IPC API with `schematics/*/build.py`. Each netlist matched its build script's
-expectation; ERC reported 0 violations. Crop times are `crop()` alone, on this machine.
+expectation; ERC reported 0 violations. Crop times are `crop()` alone.
 
 | Design | Page | Content (mm) | Output | Effective dpi | Crop time (ms) | Framed fallback bbox error (mm) |
 |---|---|---|---|---|---|---|

@@ -35,7 +35,7 @@ The plugin ships:
 
 | Platform | Status |
 |---|---|
-| Linux | tested (this machine, and a clean Debian container with only an extracted AppImage) |
+| Linux | tested (Arch Linux with the nightly AppImage, and a clean Debian 12 container with only an extracted AppImage) |
 | macOS | expected to work, untested |
 | Flatpak KiCad | supported, untested |
 | Windows | not supported |

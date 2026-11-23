@@ -1,8 +1,8 @@
 # Benchmark prompt: headphone amplifier
 
-The exact prompt behind [docs/06](../../docs/06-method-comparison-headphone-amp.md), copied verbatim from the `task`
-tool call in omp session `01a2002e-2b88-731f-97c8-631c0892c897` (2026-11-21T22:50:47Z). Both subagents got the
-shared context plus their own task; neither saw the other's task.
+The exact prompt behind [docs/06](../../docs/06-method-comparison-headphone-amp.md), copied from the `task` tool call of
+the benchmark session (2026-11-21T22:50:47Z), verbatim except that `<repo>` stands for the absolute path of this
+repository's checkout. Both subagents got the shared context plus their own task; neither saw the other's task.
 
 Paths are as they were then: the `/tmp/hpamp-*` output directories, and the old `~/.cache/kicad-ipc` bindings and
 venv, which the builder no longer uses (it now runs on `plugin/bin/kicaddy doctor`). For the M2 benchmark, keep the

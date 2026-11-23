@@ -4,7 +4,7 @@
 
 | Item | Value |
 |---|---|
-| File | `~/.local/bin/kicad-nightly` → `kicad-nightly-10.99.0.6860.gbdd2930d2b-x86_64.AppImage` (502 MB) |
+| File | `kicad-nightly-10.99.0.6860.gbdd2930d2b-x86_64.AppImage` (502 MB); `kicad-nightly` below is a symlink to it on `PATH` |
 | Version | `10.99.0-6860-gbdd2930d2b`, release build |
 | Source commit | `bdd2930d2be6000ed615d81deff253bbafd414bb` |
 | AppImage runtime | uruntime 0.5.6 (SquashFS/DwarFS, FUSE mount) |

@@ -61,7 +61,9 @@ listed separately).
 | Circuit simulation | ngspice, one channel, generic op-amp model: 10.1 dB gain, 3.2 Vpp into 32 Ω | ngspice, one channel, hand-made transistor models: DC, AC, clipping sweep, square wave, bias vs temperature |
 
 Artifacts: [`comparisons/headphone_amp/`](../comparisons/headphone_amp/). No B virtualenv there; `draw.py` needs
-`schemdraw` and `matplotlib`.
+`schemdraw` and `matplotlib`. `kicaddy_m2/`, `kicaddy_m3/` and `kicaddy_m8/` hold the build script and crop of the
+reruns with the `kicaddy` plugin at milestones M2, M3 and M8 ([labels](README.md#milestone-labels)): `kicaddy_m3/` on
+the fixed circuit of `PROMPT_FIXED.md`, `kicaddy_m8/` on `PROMPT_PLUGIN.md`.
 
 ## Reading the numbers
 

@@ -45,6 +45,13 @@ and no selection, view, or `RunAction` commands in headless mode. See [04-workfl
 
 Unlabelled statements in the protocol and workflow documents are **[live]**.
 
+## Milestone labels
+
+`M1`–`M8` in these documents name the stages in which the plugin was built: M1 runtime bootstrap (`doctor`),
+M2 installable plugin with the skill, M3 builder completeness and layout lint, M4 projects and hierarchy,
+M5 custom symbols, M6 extension with a session server, M7 editing schematics the plugin did not author,
+M8 hardening and release.
+
 ## Numbers
 
 | Measure | Value |
@@ -56,11 +63,8 @@ Unlabelled statements in the protocol and workflow documents are **[live]**.
 | Server start to socket ready | about 0.5 s extracted, about 1.2 s via the AppImage mount |
 | Typical request round trip | about 10 ms |
 
-## Scratch data
+## Running the examples
 
-Working data left in `~/.cache/kicad-ipc/` (3.8 GB, mostly the extracted `AppDir/`): extracted AppImage,
-sparse source checkout, probe scripts, test projects, the generated Python bindings (`gen/`), and a venv with
-`pynng`, `protobuf`, and `Pillow` (`venv/`). The docs do not depend on it. The `schematics/` scripts do not use it
-either: they run on the runtime set up by `python3 plugin/bin/kicaddy doctor` (chosen KiCad resolved, bindings
-generated and cached per KiCad build, pinned venv, isolated `KICAD_CONFIG_HOME`, all under `~/.cache/kicaddy/`);
-run them with `python3 plugin/bin/kicaddy run schematics/<design>/build.py`.
+The `schematics/` scripts run on the runtime set up by `python3 plugin/bin/kicaddy doctor` (chosen KiCad resolved,
+bindings generated and cached per KiCad build, pinned venv, isolated `KICAD_CONFIG_HOME`, all under
+`~/.cache/kicaddy/`); run them with `python3 plugin/bin/kicaddy run schematics/<design>/build.py`.
