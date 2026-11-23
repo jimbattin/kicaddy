@@ -86,6 +86,30 @@ if __name__ == "__main__":
     sys.exit(run(build, "hint", page="A4", title="hint"))
 '''
 
+# Six sheets of one crop each: more images than one render returns.
+MANY = '''import sys
+
+from kicaddy.schematic import run
+
+
+def child(n):
+    def draw(c):
+        c.symbol(f"R{n}", "Device:R", (40, 40))
+        c.no_connect(f"R{n}.1")
+        c.no_connect(f"R{n}.2")
+    return draw
+
+
+def build(s):
+    for n in range(1, 6):
+        s.sheet(f"part{n}", child(n), (20 + 30 * (n - 1), 20), (20, 10))
+    return [{f"R{n}.{pin}"} for n in range(1, 6) for pin in (1, 2)]
+
+
+if __name__ == "__main__":
+    sys.exit(run(build, "many", page="A4", title="many"))
+'''
+
 # The series insert of the skill's `expect` section on the NE555 example: INSERT without its field move (one new
 # LINT line), MOVED as the skill has it.
 INSERT = '''s.remove_wire("U1.3", "R3.1")
@@ -400,6 +424,28 @@ def power_refs(d, tmp):
     check("power: another sheet keeps its own numbers", b["ok"] and m and int(m[1]) < 401, b["output"])
 
 
+def many(d, tmp):
+    """A render of more than MAX_RENDER_IMAGES crops returns their count per sheet and no image; one sheet of
+    it returns its crop."""
+    script = tmp / "many/build.py"
+    script.parent.mkdir()
+    script.write_text(MANY)
+    b = d.request("build", script=str(script), cwd=str(tmp))
+    r = d.request("render")
+    lines = r["output"].splitlines()
+    stems = ["many", *(f"part{n}" for n in range(1, 6))]
+    check("render: more than 4 crops are counted, not returned", b["ok"] and r["ok"] and r["images"] == []
+          and len(lines) == 3 and lines[0].startswith("crops: 6 images in ")
+          and lines[0].endswith(", not returned (more than 4 at once)")
+          and lines[1] == "  " + "  ".join(f"{stem} 1" for stem in stems)
+          and lines[2] == "note: pass sheet for one sheet's crop, or box or around for one region"
+          and all((tmp / "many" / f"{stem}_crop.png").exists() for stem in stems),
+          f'{b["output"][-400:]}\n{r["output"]}')
+    r = d.request("render", sheet="part1")
+    check("render: one sheet of them is returned", r["ok"] and len(r["images"]) == 1
+          and r["output"] == f'crop: {r["images"][0]}', r["output"])
+
+
 def stable(d, tmp):
     directory = tmp / "stable"
     directory.mkdir()
@@ -491,7 +537,7 @@ def main():
     started = time.time()
     d = Daemon(tmp)
     try:
-        for part in (pins, library_hint, built, queries, edits, crossing, power_refs, stable, annotations):
+        for part in (pins, library_hint, built, queries, edits, crossing, power_refs, many, stable, annotations):
             part(d, tmp)
     except Failure as e:
         check("the daemon stayed up", False, e)

@@ -12,9 +12,10 @@ it and deletes the placed symbols. The model is loaded from the document before 
 difference is reported, and when the batch declares `expect` (required for opened projects) a difference from it
 drops the batch and reopens the saved files; so does a new ERC or LINT line when the batch is `strict`. A batch
 starting on the document a batch last measured (same fingerprint) reuses that netlist, ERC and LINT. `render`
-writes the images of an opened project to kicaddy's cache, never into the project. A project whose root sheet
-was saved by another KiCad release opens for query and render; `edit` is refused until `open` is sent with
-`upgrade`, because a save rewrites every sheet in the running release's file format.
+writes the images of an opened project to kicaddy's cache, never into the project, and returns at most 4 crops
+as images. A project whose root sheet was saved by another KiCad release opens for query and render; `edit` is
+refused until `open` is sent with `upgrade`, because a save rewrites every sheet in the running release's file
+format.
 """
 
 import builtins
@@ -38,6 +39,7 @@ NO_EXPECT = ("kicaddy_edit on a project opened with kicaddy_open needs expect: t
              "({} for none)")
 NEEDS_UPGRADE = ("this project is in the file format of {saved}; a save rewrites every sheet in that of KiCad "
                  "{ours}, which {saved} cannot open. Reopen with upgrade: true when the user has agreed")
+MAX_RENDER_IMAGES = 4  # crops one render returns as images; a 1600 x 1200 tile is about 2.6k tokens
 GRID_NM = schematic.GRID_MM * 1e6
 
 
@@ -392,11 +394,16 @@ class Session:
                 if not sheets:
                     raise OpError(f"no sheet {wanted!r}; sheets: {', '.join(s[0] for s in self.sheets())}")
             out = self.root()[0].parent if self.built else self._render_dir()
-            images = []
-            for stem, _, spec, _ in sheets:
-                images += [str(path) for path in schematic.plot_cropped(self.api, spec, out / f"{stem}_crop.png",
-                                                                        scratch=self.api.scratch)]
-            return {"output": "\n".join(f"crop: {path}" for path in images), "images": images}
+            crops = [(stem, schematic.plot_cropped(self.api, spec, out / f"{stem}_crop.png",
+                                                   scratch=self.api.scratch)) for stem, _, spec, _ in sheets]
+            images = [str(path) for _, paths in crops for path in paths]
+            if len(images) <= MAX_RENDER_IMAGES:
+                return {"output": "\n".join(f"crop: {path}" for path in images), "images": images}
+            counts = "  ".join(f"{stem} {len(paths)}" for stem, paths in crops)
+            how = ("pass sheet for one sheet's crop, or box or around for one region" if len(crops) > 1 else
+                   "pass box or around for one region of the sheet")
+            return {"output": f"crops: {len(images)} images in {out}, not returned (more than "
+                              f"{MAX_RENDER_IMAGES} at once)\n  {counts}\nnote: {how}"}
         if around:
             if not isinstance(around, list) or not all(isinstance(ref, str) for ref in around):
                 raise OpError("around: a list of references")

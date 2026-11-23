@@ -336,7 +336,7 @@ export default function kicaddy(pi: HostAPI): void {
 		name: "kicaddy_render",
 		label: "kicaddy render",
 		description:
-			"Plot cropped PNGs of every sheet of the open project (or the sheet with this file stem) and return them as images; with `around` or `box`, one image of that region.",
+			"Plot cropped PNGs of the open project's sheets (or of the sheet with this file stem) and return up to 4 of them as images; with `around` or `box`, one image of that region.\nMore than 4 crops: the result is the number per sheet instead of images; pass `sheet`, `around` or `box`.",
 		parameters: Type.Object({
 			sheet: Type.Optional(Type.String({ description: "sheet file stem; default every sheet" })),
 			around: Type.Optional(
@@ -368,7 +368,7 @@ export default function kicaddy(pi: HostAPI): void {
 		name: "kicaddy_edit",
 		label: "kicaddy edit",
 		description:
-			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), s.flags, project.rename_net, s.note_text, s.remove_note): the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
+			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), s.flags, project.rename_net, s.note_text, s.remove_note): edit.md of the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
 		parameters: Type.Object({
 			code: Type.String({ description: "Python, e.g. s.symbol(\"R5\", \"Device:R\", (60, 30), value=\"1k\")" }),
 			sheet: Type.Optional(Type.String({ description: "sheet file stem; default the root sheet" })),
