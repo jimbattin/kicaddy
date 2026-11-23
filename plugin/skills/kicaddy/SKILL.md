@@ -84,7 +84,8 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
     markers on its pins move with it; a power symbol alone on a pin moves too; any other contact gets a stub
     wire from the old pin point. Move before wiring new items to its pins in the same batch.
   - `s.remove(ref, unit=None)`: delete every unit of `ref` on the sheet (or one unit) and the no-connect
-    markers on its pins; its wires and labels stay.
+    markers on its pins; its wires and labels stay. `s.move` and `s.remove` also take power symbols and flags
+    (`#PWR0407`, `#FLG0401`). A junction an edit leaves with fewer than three connections is removed at commit.
   - `s.remove_wire(a, b)`: delete the wires lying on the straight run from `a` to `b` (points or `"REF.PIN"`);
     a wire reaching past either end is refused, so pass its full extent.
   - `s.remove_label(text, at=None)`, `s.remove_no_connect(at)`: local or global labels; no-connect markers.
@@ -103,7 +104,9 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   - `connect` `{"C8.1": target}`: the pin joins `target`, a `"REF.PIN"`, an existing net name, or a new net
     name; `disconnect` `["R5.1"]`;
   - `rename` `{"/VPP_ON": "/VPP_EN"}` (full net names).
-  Pins of added parts left unconnected need not be declared.
+  Pins of added parts left unconnected need not be declared. A new net is named by connecting one of its pins
+  to the full name (a local label `PRE_OUT` on sheet `power_analog` is `/power_analog/PRE_OUT`, a global label
+  or power symbol its bare name) and the others to that pin.
 
   Inserting a part in series splits a net. `connect` alone declares the pin's whole net joined to the target,
   so list the pin that leaves under `disconnect` and connect to pins, not net names:
@@ -127,9 +130,11 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   the saved files are the only copy of the batches.
 - While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
   same directory fails as busy: use the tools.
-- In omp the kicaddy tools are also commands of `bash`: a list value is repeated
-  (`--lib-ids Device:R --lib-ids Device:C`) or passed as JSON with `-j`. Images come back only from a tool call
-  (in eval: `tool.kicaddy_render`); `bash` prints the paths.
+- In omp the kicaddy tools are also commands of `bash`; these forms are all a session needs, no `--help`:
+  `kicaddy_build build.py`, `kicaddy_render`, `kicaddy_query -j '{"what": "pins", "lib_ids": ["Device:R",
+  "Device:C"]}'`, `kicaddy_query -j '{"what": "items", "sheet": "usb"}'`, and for a batch a JSON file with
+  `code`, `sheet`, `expect` passed as `kicaddy_edit @batch.json`. Images come back only from a tool call (in
+  eval: `await tool.kicaddy_render({"sheet": "usb"})`); `bash` prints the paths.
 
 Without the tools, the CLI workflow below is unchanged.
 
@@ -140,7 +145,8 @@ Without the tools, the CLI workflow below is unchanged.
    the pins come `unit N  body (x0, y0)-(x1, y1)`, the box that unit's drawing fills (`none` for a unit of pins
    only), and `Reference at (x, y) center vertical` / `Value at …`: each visible field's anchor, alignment and
    direction at rotation 0 (Geometry). Pins printed at the same offset are stacked: they share one connection
-   point and one net.
+   point and one net. A project's own symbols may keep a field inside the body (`Value at (0, 3)` with
+   `body (-4, -4)-(4, 4)`): move it with `s.field` on every placement.
    Look up every symbol you will place, in one call, before laying anything out. An id that does not exist
    gets a line `not found: Timer:NE555 (Timer has NE555P, NE555D, …)` with the closest names in that library
    (or the closest library names), and the exit status is 1: pick from that line instead of guessing again.
@@ -329,8 +335,9 @@ Methods on `s`:
 - `s.power(name, at, rotation=0, symbol=None)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with
   an automatic `#PWR`/`#FLG` reference; its pin is at `at`, a grid point or `"REF.PIN"`. Returns the reference.
   With `symbol="VCC"` (any `power:` symbol) it places that symbol and sets its Value to `name`, which names the
-  net: `s.power("CM5_3V3", p, symbol="VCC")`; ERC and `PWR_FLAG` rules are those of `+5V`. A power symbol and a
-  global label of the same name are one net across sheets.
+  net: `s.power("CM5_3V3", p, symbol="VCC")`; ERC and `PWR_FLAG` rules are those of `+5V`: on a net no power
+  output drives, the power symbol needs a `PWR_FLAG` (a global label does not). A power symbol and a global label
+  of the same name are one net across sheets.
 - `s.wire(*points)`: polyline through grid points and/or `"REF.PIN"` names; one wire segment per leg. Legs must
   be horizontal or vertical and non-zero.
 - `s.label(text, at, spin="right")`: local net label; `at` is a grid point or `"REF.PIN"`, as for `s.power`;
@@ -344,8 +351,9 @@ Methods on `s`:
   labels have the same size. A note does not wrap: break lines yourself, or use `s.text_box`.
 - `s.text_box(text, at, size, text_size=1.27, border=True)`: framed text that KiCad wraps; `at` is the top-left
   corner, `size` (w, h) in grid units. A line holds about (w − 1.5) / 0.85 characters and lines are 1.6 units
-  apart: n lines need h ≥ 1.6 n + 1.5. Text longer than the box runs out below the frame and LINT does not see
-  that: size the box. LINT takes the frame as the text's box. `border=False` saves a frameless box; this
+  apart: n lines need h ≥ 1.6 n + 1. Text longer than the box runs out below the frame and LINT does not see
+  that: size the box. LINT takes the frame as the text's box. A full-sheet crop is too coarse to judge text
+  against the frame: render the box with `kicaddy_render` and `box`. `border=False` saves a frameless box; this
   KiCad's plots still draw the frame.
 - `s.rectangle(a, b, style="dash")`: a frame from corner `a` to corner `b` around a block; `style` is `solid`,
   `dash`, `dot`, `dashdot`, or `dashdotdot`. LINT ignores frames, also a wire or text crossing the frame line.
@@ -407,11 +415,11 @@ Methods on `s`:
 
 - Wires are orthogonal.
 - Junction dots are automatic wherever 3 or more wire directions or pins meet, including a wire end or a pin
-  on the middle of another wire. A pin or a single wire end that touches the middle of a wire connects to it,
-  so route wires around pins they must not join. Two wires crossing middle to middle do not connect, and
-  neither do two wire ends that meet from opposite sides on the middle of a third wire: KiCad reads the two as
-  one wire crossing it, draws no dot, and the build reports `NETLIST MISMATCH` with a `hint:` line naming the
-  point. To join all four directions there, add `s.junction(point)`.
+  on the middle of another wire. A pin, a label anchor, or a single wire end that touches the middle of a wire
+  connects to it, so route wires around pins they must not join. Two wires crossing middle to middle do not
+  connect, and neither do two wire ends that meet from opposite sides on the middle of a third wire: KiCad
+  reads the two as one wire crossing it, draws no dot, and the build reports `NETLIST MISMATCH` with a `hint:`
+  line naming the point. To join all four directions there, add `s.junction(point)`.
 - Two pins on the same point connect without a wire. `s.wire` fails with `zero-length wire at (x, y)` when two
   consecutive points coincide: a wire between pins that already touch (e.g. a resistor placed with its pin on a
   capacitor's pin), or a corner point equal to the pin the wire starts or ends at. Work out each pin's absolute
@@ -427,7 +435,9 @@ Methods on `s`:
   power input pins as not driven. The example flags both battery nets.
 - `PWR_FLAG` and the upward power symbols (`+5V`, `+9V`, `+12V`, `VCC`) all print their value above the pin. On
   one rail, keep a flag at least 6 units left or right of such a symbol: 5 or fewer gives
-  `text-text: #PWR…Value / #FLG…Value`. Next to `GND` (value below the pin) 4 units is enough.
+  `text-text: #PWR…Value / #FLG…Value`. That holds for values up to about 4 characters; a longer value (a rail
+  from `symbol=`) needs half the two value widths: `CM5_3V3` beside a flag 7 units. Next to `GND` (value below
+  the pin) 4 units is enough.
 
 ## After a clean build: BOM and handoff
 

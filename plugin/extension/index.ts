@@ -217,7 +217,7 @@ export default function kicaddy(pi: HostAPI): void {
 		for (const path of response.images ?? []) {
 			content.push({ type: "image", mimeType: "image/png", data: readFileSync(path).toString("base64") });
 		}
-		return { content, details: { state: response.state } };
+		return { content };
 	}
 
 	pi.on("session_start", (_event, ctx) => {
