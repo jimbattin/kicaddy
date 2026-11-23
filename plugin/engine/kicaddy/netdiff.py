@@ -240,3 +240,22 @@ def check(want, after, added):
         elif want.components[ref] != after.components[ref]:
             lines.append(f"component {ref}: expected value {want.components[ref]}, found {after.components[ref]}")
     return lines
+
+
+SPLIT_HINT = ("hint: connect joins a pin's whole net to the target; to move a pin off its net, list it under "
+              "disconnect too")
+
+
+def split_hint(before, after, expect):
+    """SPLIT_HINT when a net that `connect` names (by one of its pins, as key or target, or by its name) is no
+    longer one net after the batch although `expect` took none of its remaining pins off it; else None."""
+    connect = expect.get("connect", {})
+    left, gone = set(expect.get("disconnect", [])), set(expect.get("remove", []))
+    where = {pin: i for i, (_, pins) in enumerate(after.nets) for pin in pins}
+    named = set(connect) | set(connect.values())
+    for name, pins in before.nets:
+        if named & (set(pins) | {name}):
+            stay = {p for p in pins if p not in left and _ref(p) not in gone}
+            if len({where.get(p) for p in stay}) > 1:
+                return SPLIT_HINT
+    return None

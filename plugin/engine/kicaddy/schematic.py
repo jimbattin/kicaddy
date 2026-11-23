@@ -19,15 +19,17 @@ writes a custom symbol from a pin table into the project's library (symbols.py) 
 
 Methods: `symbol` (rotation, mirror, value, footprint, datasheet, user fields such as MPN), `field` (move,
 show, turn, align, or change the text of a field), `flags` (do not populate, exclude from the BOM or the board),
-`power`, `wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`, `junction` for a deliberate four-way dot,
+`power` (any rail name with `symbol=`), `wire`, `label`, `global_label`, `hier_label`, `no_connect`, `note`,
+`text_box` (text KiCad wraps in a frame), `rectangle` (a section frame), `junction` for a deliberate four-way dot,
 `sheet` (a child sheet drawn by its own build function, with sheet pins from its hierarchical labels), and
 `net_class`. `Project` holds what the sheets share and writes the project scaffold (.kicad_pro, empty board,
 library tables, datasheets/ and analysis/); `run()` builds into it.
-`Project.open` loads an existing project into the same model (`Schematic.load`), where an edit batch may also
-`move`, `remove`, `remove_wire`, `remove_label`, `remove_no_connect` items already in the document and
-`Project.rename_net`. `commit` adds junctions where KiCad's rule finds 3+ wire directions or pins meeting
-(sch_geometry.junctions) and deletes the dots an edit leaves without one. `lint` reports overlapping bodies and
-text, fields over their own symbol's drawing, and wires crossing pins, bodies, and text (sch_geometry.lint).
+`Project.open` loads an existing project into the same model (`Schematic.load`, text boxes, frames and tables
+included), where an edit batch may also `move`, `remove`, `remove_wire`, `remove_label`, `remove_no_connect`,
+`note_text`, `remove_note` items already in the document and `Project.rename_net`. `commit` adds junctions
+where KiCad's rule finds 3+ wire directions or pins meeting (sch_geometry.junctions) and deletes the dots an edit
+leaves without one. `lint` reports overlapping bodies and text, fields over their own symbol's drawing, and wires
+crossing pins, bodies, and text (sch_geometry.lint); a text box counts as text with its frame as the box.
 
 Requires the runtime set up by `kicaddy doctor`; run a design script with `kicaddy run build.py [--out DIR]`.
 """
@@ -47,14 +49,19 @@ from . import bootstrap, crop, runtime, sch_geometry, symbols
 
 GRID_MM = 1.27
 PLOT_DPI = 300  # source resolution for the cropped PNG; crop downsamples to fit
+REGION_PAD = 12  # grid units kept around the parts of a region render
 SHEET_DPI = 200  # full-sheet PNG
 
 _proto = None  # namespace of generated modules, filled by bind()
 _live = None  # the omp extension's session daemon (daemon.Session): run() builds on its warm server
 
 PROJECT_STATE = ("pin_ids", "units", "auto", "libraries_ready", "net_classes", "files")  # edit-batch rollback
-SHEET_STATE = ("pins", "placements", "_items", "_wires", "_labels", "_notes", "_sheets", "_junctions",
+SHEET_STATE = ("pins", "placements", "_items", "_wires", "_labels", "_notes", "_graphics", "_sheets", "_junctions",
                "_junctions_created", "_existing", "_no_connects", "_updates", "_deletes", "_touched")
+# KiCadObjectType names of the sheet items the model loads and the daemon fingerprints
+ITEM_KINDS = ("KOT_SCH_SYMBOL", "KOT_SCH_LINE", "KOT_SCH_JUNCTION", "KOT_SCH_NO_CONNECT", "KOT_SCH_LABEL",
+              "KOT_SCH_GLOBAL_LABEL", "KOT_SCH_HIER_LABEL", "KOT_SCH_TEXT", "KOT_SCH_SHEET", "KOT_SCH_TEXTBOX",
+              "KOT_SCH_SHAPE", "KOT_SCH_TABLE")
 BATCH_ERROR = "{} is not available in an edit batch; add it to build.py and rebuild"
 
 
@@ -187,6 +194,30 @@ def _xy(point):
     return f"({round(point[0], 2) + 0.0:g}, {round(point[1], 2) + 0.0:g})"
 
 
+def _graphic_line(shape):
+    """The `kicaddy_query items` line of a sheet-level GraphicShape: kind, bounding box, a rectangle's line
+    style, a polygon's point count."""
+    kind = shape.WhichOneof("geometry") or "shape"
+    points = [(x / 1e6 / GRID_MM, y / 1e6 / GRID_MM) for x, y in _shape_points(shape)]
+    if not points:
+        return kind
+    xs, ys = [x for x, _ in points], [y for _, y in points]
+    line = f"{kind} {_xy((min(xs), min(ys)))}-{_xy((max(xs), max(ys)))}"
+    if kind == "rectangle":
+        line += " " + _proto.enums.StrokeLineStyle.Name(shape.attributes.stroke.style)[4:].lower()
+    elif kind == "polygon":
+        line += f" {len(points)} points"
+    return line
+
+
+def _table_line(table):
+    """The `kicaddy_query items` line of a table: the box around its cells, columns, cells."""
+    corners = [_point(v) for c in table.cells for v in (c.text_box.textbox.top_left, c.text_box.textbox.bottom_right)]
+    box = (f" {_xy((min(x for x, _ in corners), min(y for _, y in corners)))}-"
+           f"{_xy((max(x for x, _ in corners), max(y for _, y in corners)))}") if corners else ""
+    return f"table{box} {table.column_count} columns, {len(table.cells)} cells"
+
+
 @dataclass
 class _Placement:
     """One placed symbol item (each unit of a multi-unit symbol is its own item)."""
@@ -204,6 +235,14 @@ class _Placement:
     # deletes every junction dot that depends on them (observed headless, KiCad 10.99.0-6860).
     dirty: bool = True
     existing: bool = False  # loaded from the document (Schematic.load), not placed by this batch
+
+
+@dataclass
+class _Note:
+    """A text (SchematicText) or a text box (SchematicTextBox) on a sheet."""
+    at: tuple  # the text's anchor, or the box's top-left corner: the point note_text() and remove_note() take
+    item: object  # the proto; a new one is also in Schematic._items until commit
+    existing: bool = False  # loaded from the document
 
 
 SHEET_SIDES = {"left": "SHS_LEFT", "right": "SHS_RIGHT", "top": "SHS_TOP", "bottom": "SHS_BOTTOM"}
@@ -318,6 +357,7 @@ class Project:
         self.sheets = []  # every Schematic, root first, in creation order
         self.files = {name}  # sheet file stems in use
         self.in_batch = False  # set by the daemon while an edit batch runs
+        self.script = None  # the design script (run()), for the library hint
 
     @classmethod
     def open(cls, api, root):
@@ -460,6 +500,7 @@ class Schematic:
     LABEL_SIZE = 1_270_000  # nm
     SHAPES = {"input": "SLSH_INPUT", "output": "SLSH_OUTPUT", "bidirectional": "SLSH_BIDI",
               "tri_state": "SLSH_TRISTATE", "passive": "SLSH_PASSIVE"}
+    RECTANGLE_STYLES = ("solid", "dash", "dot", "dashdot", "dashdotdot")
 
     def __init__(self, project, spec, name, path, hier_path):
         """One sheet of `project`, addressed by `spec`; `hier_path` is "/" for the root, "/amp/" for a child."""
@@ -479,7 +520,8 @@ class Schematic:
         self._items = []  # protos for the next CreateItems
         self._wires = []  # ((x1, y1), (x2, y2)) grid segments
         self._labels = []  # (kind, text, point, spin, shape)
-        self._notes = []  # (at, Text proto)
+        self._notes = []  # _Note: texts and text boxes
+        self._graphics = []  # kicaddy_query items lines of frames, graphic lines, shapes and tables
         self._sheets = []  # child sheet boxes (_SheetBox)
         self._junctions = set()  # explicit junction points
         self._junctions_created = set()
@@ -502,12 +544,12 @@ class Schematic:
 
     def load(self):
         """Replace the model with this sheet as the document holds it: placements with absolute pin points,
-        wires, junctions, no-connect markers, labels, notes, and child sheet boxes. Everything loaded is
-        existing: an edit batch may move, change, or remove it."""
+        wires, junctions, no-connect markers, labels, notes and text boxes, child sheet boxes, and the lines of
+        the graphics (frames, graphic lines, shapes, tables). Everything loaded is existing: an edit batch may
+        move, change, or remove it."""
         sch, en = _proto.sch, _proto.enums
         self._reset()
-        kinds = [en.KOT_SCH_SYMBOL, en.KOT_SCH_LINE, en.KOT_SCH_JUNCTION, en.KOT_SCH_NO_CONNECT, en.KOT_SCH_LABEL,
-                 en.KOT_SCH_GLOBAL_LABEL, en.KOT_SCH_HIER_LABEL, en.KOT_SCH_TEXT, en.KOT_SCH_SHEET]
+        kinds = [getattr(en, k) for k in ITEM_KINDS]
         rotations = {sch.SSO_0: 0, sch.SSO_90: 90, sch.SSO_180: 180, sch.SSO_270: 270}
         existing = (sch.SchematicLine, sch.Junction, sch.NoConnectMarker, sch.LocalLabel, sch.GlobalLabel,
                     sch.HierarchicalLabel)
@@ -544,14 +586,23 @@ class Schematic:
                     self.pins[f"{name}.{pin.text.text}"] = point
                 self._sheets.append(box)
             elif item.Is(sch.SchematicText.DESCRIPTOR):
-                text = _unpack(item, sch.SchematicText).text
-                self._notes.append((_point(text.position), text))
+                m = _unpack(item, sch.SchematicText)
+                self._notes.append(_Note(_point(m.text.position), m, True))
+            elif item.Is(sch.SchematicTextBox.DESCRIPTOR):
+                m = _unpack(item, sch.SchematicTextBox)
+                self._notes.append(_Note(_point(m.textbox.top_left), m, True))
+            elif item.Is(sch.SchematicGraphicShape.DESCRIPTOR):
+                self._graphics.append(_graphic_line(_unpack(item, sch.SchematicGraphicShape).shape))
+            elif item.Is(sch.SchematicTable.DESCRIPTOR):
+                self._graphics.append(_table_line(_unpack(item, sch.SchematicTable)))
             else:
                 kind = next((k for k in existing if item.Is(k.DESCRIPTOR)), None)
                 if kind is None:  # directive labels
                     continue
                 proto = _unpack(item, kind)
                 if kind is sch.SchematicLine and proto.type != sch.SLT_WIRE:  # buses, graphic lines
+                    if proto.type == sch.SLT_GRAPHIC:
+                        self._graphics.append(f"line {_xy(_point(proto.start))}-{_xy(_point(proto.end))}")
                     continue
                 self._existing[proto.id.value] = proto
                 self._swap(*self._entry(proto), None)
@@ -656,7 +707,16 @@ class Schematic:
         self.project.units[key] = self.name
         library, entry = lib_id.split(":", 1)
         if library not in self.project.libraries_ready:
-            runtime.wait_for_symbol_libraries(self.api, {library})
+            try:
+                runtime.wait_for_symbol_libraries(self.api, {library})
+            except RuntimeError as e:
+                script, out = self.project.script, self.project.directory
+                if (str(e).startswith(f"no symbol library {library!r}") and script is not None
+                        and script.parent != out and symbols.has_library(script.parent, library)):
+                    raise RuntimeError(f"no symbol library {library!r} in {out / 'sym-lib-table'}; {script.name}'s "
+                                       f"directory has it: build without --out, or run kicaddy symbol … --dir {out}"
+                                       ) from None
+                raise
             self.project.libraries_ready.add(library)
         request = _proto.sch_cmd.PlaceSymbolFromLibrary(
             header=self.header,
@@ -955,13 +1015,47 @@ class Schematic:
         for k in found:
             self._delete(k)
 
-    def power(self, name, at, rotation=0):
-        """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference; its pin lands
-        on `at`, a grid point or "REF.PIN"."""
+    def _notes_at(self, at):
+        """The notes and text boxes already in the document whose anchor `kicaddy_query items` prints as `at`."""
+        found = [n for n in self._notes if abs(n.at[0] - at[0]) <= 0.0051 and abs(n.at[1] - at[1]) <= 0.0051]
+        if not found:
+            raise ValueError(f"no note or text box at {_xy(at)} on this sheet; kicaddy_query items prints their "
+                             "anchors")
+        if not all(n.existing for n in found):
+            raise self._new_in_batch(f"the note at {_xy(at)}", "write its final text where it is placed instead")
+        return found
+
+    def note_text(self, at, text):
+        """Change the text of the note or text box already in the document anchored at `at` (a note's point, a text
+        box's top-left corner)."""
+        found = self._notes_at(at)
+        if len(found) > 1:
+            raise ValueError(f"{len(found)} notes at {_xy(at)}; remove them with remove_note and place one")
+        item = found[0].item
+        (item.textbox if isinstance(item, _proto.sch.SchematicTextBox) else item.text).text = text
+        self._updates[item.id.value] = item
+
+    def remove_note(self, at):
+        """Delete the notes and text boxes already in the document anchored at `at`."""
+        for note in self._notes_at(at):
+            self._notes.remove(note)
+            self._updates.pop(note.item.id.value, None)
+            self._deletes.add(note.item.id.value)
+
+    def power(self, name, at, rotation=0, symbol=None):
+        """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference; its pin lands on
+        `at`, a grid point or "REF.PIN". With `symbol` ("VCC", "+5V", ...) place power:<symbol> with its Value set
+        to `name`: a power symbol's Value names its net, so a rail of any name can be drawn as a power symbol."""
         prefix = "#FLG" if name == "PWR_FLAG" else "#PWR"
         self.project.auto[prefix] += 1
         ref = f"{prefix}{self.project.auto[prefix]:02d}"
-        self.symbol(ref, f"power:{name}", self.at(at), rotation=rotation)
+        try:
+            self.symbol(ref, f"power:{symbol or name}", self.at(at), value=name if symbol else None, rotation=rotation)
+        except RuntimeError as e:
+            if symbol is None and f"'power:{name}' not found" in str(e):
+                raise RuntimeError(f"{e}; to draw a rail named {name!r} with another power symbol, pass symbol=: "
+                                   f's.power({name!r}, at, symbol="VCC")') from None
+            raise
         return ref
 
     # -- connections and annotations ------------------------------------------------------------
@@ -1023,7 +1117,43 @@ class Schematic:
         item.text.attributes.horizontal_alignment = _proto.enums.HA_LEFT
         item.text.attributes.size.CopyFrom(_proto.types.Vector2(x_nm=round(size * 1e6), y_nm=round(size * 1e6)))
         self._items.append(item)
-        self._notes.append((tuple(at), item.text))
+        self._notes.append(_Note(tuple(at), item))
+
+    def text_box(self, text, at, size, text_size=1.27, border=True):
+        """Framed text that KiCad wraps: top-left corner `at`, `size` (w, h) in grid units, `text_size` in mm.
+        LINT takes the frame as the text's box. `border=False` saves a frameless box (KiCad 10.99.0-6860 still
+        plots the frame)."""
+        en, t = _proto.enums, _proto.types
+        if len(size) != 2 or not all(isinstance(v, (int, float)) and v > 0 for v in size) or text_size <= 0:
+            raise ValueError(f"text_box size {size!r}: (w, h) in grid units, both positive; text_size in mm")
+        item = _proto.sch.SchematicTextBox()
+        box = item.textbox
+        box.top_left.CopyFrom(self.mm(at))
+        box.bottom_right.CopyFrom(self.mm((at[0] + size[0], at[1] + size[1])))
+        box.text = text
+        box.border_enabled = border
+        box.attributes.size.CopyFrom(t.Vector2(x_nm=round(text_size * 1e6), y_nm=round(text_size * 1e6)))
+        box.attributes.horizontal_alignment = en.HA_LEFT
+        box.attributes.vertical_alignment = en.VA_TOP
+        box.attributes.multiline = True
+        item.graphic_attributes.stroke.style = en.SLS_SOLID
+        item.graphic_attributes.fill.fill_type = t.GFT_UNFILLED
+        self._items.append(item)
+        self._notes.append(_Note(tuple(at), item))
+
+    def rectangle(self, a, b, style="dash"):
+        """Frame from corner `a` to corner `b` (grid points) around a block; LINT ignores it."""
+        if style not in self.RECTANGLE_STYLES:
+            raise ValueError(f"style must be one of {', '.join(self.RECTANGLE_STYLES)}, not {style!r}")
+        if a[0] == b[0] or a[1] == b[1]:
+            raise ValueError(f"rectangle {tuple(a)}-{tuple(b)}: the corners must differ in x and in y")
+        item = _proto.sch.SchematicGraphicShape()
+        item.shape.rectangle.top_left.CopyFrom(self.mm((min(a[0], b[0]), min(a[1], b[1]))))
+        item.shape.rectangle.bottom_right.CopyFrom(self.mm((max(a[0], b[0]), max(a[1], b[1]))))
+        item.shape.attributes.stroke.style = _proto.enums.StrokeLineStyle.Value(f"SLS_{style.upper()}")
+        item.shape.attributes.fill.fill_type = _proto.types.GFT_UNFILLED
+        self._items.append(item)
+        self._graphics.append(_graphic_line(item.shape))
 
     # -- hierarchy --------------------------------------------------------------------------------
     def sheet(self, name, build, at, size, pins=None, page=None, title=None):
@@ -1285,6 +1415,14 @@ class Schematic:
         xs, ys = [p.origin[0] + x for x, _ in corners], [p.origin[1] + y for _, y in corners]
         return (min(xs), min(ys), max(xs), max(ys))
 
+    def extent(self, p):
+        """Box (x0, y0, x1, y1) around everything placement `p` draws: body, pins, and visible fields."""
+        boxes = [(x, y, x, y) for x, y in p.pins.values()] or [(*p.origin, *p.origin)]
+        body = self.body_box(p)
+        boxes += [body] if body else []
+        boxes += [self._field_box(p, f) for f in self._fields(p.instance) if f.visible and f.text.text]
+        return (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
+
     def _seen(self, p, field):
         """(vertical, justify) of a symbol field as drawn: its stored angle and alignment through the symbol's
         rotation and mirror (sch_geometry.text_flipped). justify: "left" (the text starts on its anchor),
@@ -1342,14 +1480,20 @@ class Schematic:
             for label, (point, spin, shape) in b.pins.items():
                 texts.append(g.TextBox(f"sheet pin {b.name}.{label}", self._label_box("hier", label, point, spin, shape),
                                        f"sheet {b.name}", point, spin in ("up", "bottom")))
-        for at, note in self._notes:
+        for note in self._notes:
+            if isinstance(note.item, sch.SchematicTextBox):  # the frame is the text's box: KiCad wraps inside it
+                box = note.item.textbox
+                (x0, y0), (x1, y1) = _point(box.top_left), _point(box.bottom_right)
+                frame = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+                texts.append(g.TextBox(f"text box {_xy(note.at)}", frame, None, None, self._upright(box)))
+                continue
             text = _proto.types.Text()
-            text.CopyFrom(note)
+            text.CopyFrom(note.item.text)
             text.attributes.multiline = True
             if text.attributes.vertical_alignment == enums.VA_UNKNOWN:
                 text.attributes.vertical_alignment = enums.VA_CENTER  # multi-line notes centre vertically
             box = tuple(v / 1e6 / GRID_MM for v in self._extents(text))
-            texts.append(g.TextBox(f"note ({at[0]:g}, {at[1]:g})", box, None, None, self._upright(text)))
+            texts.append(g.TextBox(f"note ({note.at[0]:g}, {note.at[1]:g})", box, None, None, self._upright(text)))
         return g.lint(bodies, texts, pin_lines, self._wires)
 
 
@@ -1371,15 +1515,52 @@ def plot(api, document, kind, output, drawing_sheet=True, dpi=None, all_sheets=F
     return Path(output)
 
 
-def plot_cropped(api, document, output):
+def plot_cropped(api, document, output, scratch=None):
     """Crop heuristic, docs/05-cropping-schematic-plots.md: plot without the drawing sheet at
-    PLOT_DPI, trim to ink, pad, downsample to fit, or tile when that would make text illegible."""
+    PLOT_DPI, trim to ink, pad, downsample to fit, or tile when that would make text illegible. The raw plot
+    goes to a temporary directory in `scratch` (default: beside `output`)."""
     from PIL import Image
 
-    with tempfile.TemporaryDirectory(dir=Path(output).parent, prefix=".crop-") as tmp:
+    with tempfile.TemporaryDirectory(dir=scratch or Path(output).parent, prefix=".crop-") as tmp:
         raw = plot(api, document, "png", Path(tmp) / "raw.png", drawing_sheet=False, dpi=PLOT_DPI)
         with Image.open(raw) as image:
             return crop.save(crop.crop(image, PLOT_DPI), output)
+
+
+def around_box(s, refs):
+    """Grid box (x0, y0, x1, y1) for a render around the symbols `refs` of sheet `s`: their extent with
+    REGION_PAD units around it, grown to hold whole each other symbol and label the padded box cuts, smallest
+    first, while the box still fits one legible image; then 1 unit more."""
+    def union(a, b):
+        return (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
+
+    mine = [s.extent(p) for p in s.placements.values() if p.ref in refs]
+    box = mine[0]
+    for b in mine[1:]:
+        box = union(box, b)
+    box = (box[0] - REGION_PAD, box[1] - REGION_PAD, box[2] + REGION_PAD, box[3] + REGION_PAD)
+    limit = [n / crop.MIN_DPI * 25.4 / GRID_MM for n in crop.MAX_SIZE]  # 213 x 160 units
+    others = [s.extent(p) for p in s.placements.values() if p.ref not in refs]
+    others += [s._label_box(*label) for label in s._labels]
+    cut = [b for b in others if sch_geometry._overlap(b, box) and union(b, box) != box]
+    for b in sorted(cut, key=lambda b: ((b[2] - b[0]) * (b[3] - b[1]), b)):
+        grown = union(box, b)
+        if grown[2] - grown[0] <= limit[0] and grown[3] - grown[1] <= limit[1]:
+            box = grown
+    return (box[0] - 1, box[1] - 1, box[2] + 1, box[3] + 1)
+
+
+def plot_region(api, document, box, output, scratch):
+    """One PNG of the grid box (x0, y0, x1, y1) of sheet `document`, scaled down to fit one image: (path,
+    (w, h) in px, True when its text is still legible)."""
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(dir=scratch, prefix=".crop-") as tmp:
+        raw = plot(api, document, "png", Path(tmp) / "raw.png", drawing_sheet=False, dpi=PLOT_DPI)
+        with Image.open(raw) as image:
+            part, scale = crop.region(image, PLOT_DPI, tuple(v * GRID_MM for v in box))
+            part.save(output)
+    return Path(output), part.size, PLOT_DPI * scale >= crop.MIN_DPI
 
 
 def print_nets(nets, here=None):
@@ -1442,8 +1623,8 @@ def symbol_detail(s, p):
 def sheet_items(project, s, net=None):
     """The lines of `kicaddy_query items`: what `symbols` leaves out of sheet `s`, from a model loaded from the
     document: power symbols and flags (reference, value, pin point), wires, junctions, no-connect markers,
-    labels, notes, and child sheet boxes. With `net` (a full net name) only that net's power symbols, pins,
-    wires, junctions, and labels on the sheet."""
+    labels, notes, text boxes, frames, graphic lines, shapes, tables, and child sheet boxes. With `net` (a full
+    net name) only that net's power symbols, pins, wires, junctions, and labels on the sheet."""
     en = _proto.enums
     entries = {k: s._entry(proto) for k, proto in s._existing.items()}
     power = {p.ref: p for p in s.placements.values() if p.ref.startswith("#")}
@@ -1480,8 +1661,14 @@ def sheet_items(project, s, net=None):
     lines += [f"{kind} {text!r} {_xy(point)} {spin}{' ' + shape if shape else ''}"
               for kind, text, point, spin, shape in labels]
     if net is None:
-        lines += [f"note {_xy(point)} {json.dumps(text.text, ensure_ascii=False)}"
-                  for point, text in sorted(s._notes, key=lambda n: n[0])]
+        lines += [f"note {_xy(n.at)} {json.dumps(n.item.text.text, ensure_ascii=False)}"
+                  for n in sorted(s._notes, key=lambda n: n.at) if isinstance(n.item, _proto.sch.SchematicText)]
+        for n in sorted(s._notes, key=lambda n: n.at):
+            if isinstance(n.item, _proto.sch.SchematicTextBox):
+                box = n.item.textbox
+                lines.append(f"text box {_xy(_point(box.top_left))}-{_xy(_point(box.bottom_right))} "
+                             f"{json.dumps(box.text, ensure_ascii=False)}")
+        lines += sorted(s._graphics)
         for b in s._sheets:
             pin_text = "  ".join(f"{label} {_xy(point)}" for label, (point, _, _) in b.pins.items())
             lines.append(f"sheet {b.name} {sch_geometry.span(b.box)}" + (f" pins: {pin_text}" if pin_text else ""))
@@ -1621,6 +1808,7 @@ def run(build, name, page="A4", title="", comments=(), out_dir=None):
     server = _live.attach(out) if _live is not None else _server(out)
     with server as api:
         project = Project(api, out, name, page=page, title=title, comments=comments)
+        project.script = Path(sys.argv[0]).resolve()
         expected = build(project.root)
         project.commit()
         if _live is not None:

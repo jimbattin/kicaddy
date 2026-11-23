@@ -92,9 +92,14 @@ class Api:
         return response
 
 
+def project_key(project_dir):
+    """A short stable key of a project directory: its lock file and its render cache are named by it."""
+    return hashlib.sha256(str(Path(project_dir).resolve()).encode()).hexdigest()[:16]
+
+
 def _lock(root, project_dir):
     """Exclusive advisory lock on a project; flock (not lockf) so a second open in-process also conflicts."""
-    key = hashlib.sha256(str(project_dir.resolve()).encode()).hexdigest()[:16]
+    key = project_key(project_dir)
     path = root / "locks" / f"{key}.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = open(path, "a+")
@@ -133,6 +138,7 @@ def server(launcher, config_home, project_dir=None, paths=()):
             paths = [sock_dir] + ([Path(project_dir)] if project_dir is not None else []) + [Path(p) for p in paths]
             argv, env = bootstrap.kicad_command(launcher, ["api-server", "--socket", str(socket_path)],
                                                 config_home, paths)
+            locks = set(Path(project_dir).glob("~*.lck")) if project_dir is not None else set()
             process = subprocess.Popen(argv, env=env, stdout=log, stderr=subprocess.STDOUT)
             try:
                 deadline = time.monotonic() + 90
@@ -146,6 +152,7 @@ def server(launcher, config_home, project_dir=None, paths=()):
                     time.sleep(0.05)
                 api = Api(socket_path, deadline)
                 api.process = process
+                api.scratch = sock_dir  # the server writes here (Flatpak mounts it), the client reads: raw plots
                 yield api
             finally:
                 process.send_signal(signal.SIGINT)
@@ -154,6 +161,9 @@ def server(launcher, config_home, project_dir=None, paths=()):
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
+                if project_dir is not None:  # KiCad removes its project lock on SIGINT; a killed server leaves it
+                    for stale in set(Path(project_dir).glob("~*.lck")) - locks:
+                        stale.unlink(missing_ok=True)
     finally:
         shutil.rmtree(sock_dir, ignore_errors=True)
         if lock is not None:

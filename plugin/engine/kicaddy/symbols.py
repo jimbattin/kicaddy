@@ -296,6 +296,15 @@ def _string_after(block, head):
     return re.sub(r"\\(.)", r"\1", m.group(1)) if m else None
 
 
+def has_library(directory, library):
+    """True when `directory`/sym-lib-table has a row named `library`; False without a readable table."""
+    try:
+        text = (Path(directory) / "sym-lib-table").read_text()
+        return any(_string_after(text[a:b], r"lib\s+\(name") == library for a, b in _children(text, ""))
+    except (OSError, ValueError):
+        return False
+
+
 def _library_text(path, specs):
     """New text of `path` with `specs` replacing same-named symbols, plus the symbol names in order."""
     blocks = []

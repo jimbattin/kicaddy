@@ -157,6 +157,20 @@ def layout(width, height, dpi):
     raise ValueError(f"{width}x{height} px at {dpi} dpi needs more than 256 tiles")
 
 
+def region(image, dpi, box):
+    """The part of a sheetless plot inside `box` (x0, y0, x1, y1 in mm from the page's top-left corner), clipped
+    to the page and scaled down to fit MAX_SIZE: (image, scale <= 1). ValueError when the box misses the page."""
+    px = [round(v / 25.4 * dpi) for v in box]
+    x0, y0, x1, y1 = max(0, px[0]), max(0, px[1]), min(image.width, px[2]), min(image.height, px[3])
+    if x1 <= x0 or y1 <= y0:
+        raise ValueError("the box is outside the page")
+    part = image.crop((x0, y0, x1, y1))
+    scale = min(1.0, MAX_SIZE[0] / part.width, MAX_SIZE[1] / part.height)
+    if scale < 1.0:
+        part = part.resize((max(1, round(part.width * scale)), max(1, round(part.height * scale))), Image.LANCZOS)
+    return part, scale
+
+
 def save(grid, out_path):
     """Write a single image to out_path, or tiles as <stem>_r<row>c<col>; return the paths."""
     out_path = Path(out_path)

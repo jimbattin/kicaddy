@@ -285,7 +285,7 @@ export default function kicaddy(pi: HostAPI): void {
 		name: "kicaddy_query",
 		label: "kicaddy query",
 		description:
-			"Query the open project (placed symbols; with `refs` their pin points, body box and fields with anchor and box; nets as REF.PIN sets; ERC; LINT; `items`: the power symbols, wires, junctions, labels and notes of a sheet, or of one net on it) or library pin offsets, body boxes and field positions in grid units (`lib_ids`, like `kicaddy pins`; no open project needed: the session directory's sym-lib-table is used, or `dir`'s).",
+			"Query the open project (placed symbols; with `refs` their pin points, body box and fields with anchor and box; nets as REF.PIN sets; ERC; LINT; `items`: the power symbols, wires, junctions, labels, notes, text boxes, frames and tables of a sheet, or of one net on it) or library pin offsets, body boxes and field positions in grid units (`lib_ids`, like `kicaddy pins`; no open project needed: the session directory's sym-lib-table is used, or `dir`'s).",
 		parameters: Type.Object({
 			what: Type.Union([
 				Type.Literal("symbols"),
@@ -332,22 +332,43 @@ export default function kicaddy(pi: HostAPI): void {
 			}),
 	});
 
-	pi.registerTool<{ sheet?: string }>({
+	pi.registerTool<{ sheet?: string; around?: string[]; box?: number[] }>({
 		name: "kicaddy_render",
 		label: "kicaddy render",
-		description: "Plot cropped PNGs of every sheet of the open project (or the sheet with this file stem) and return them as images.",
-		parameters: Type.Object({ sheet: Type.Optional(Type.String({ description: "sheet file stem; default every sheet" })) }),
+		description:
+			"Plot cropped PNGs of every sheet of the open project (or the sheet with this file stem) and return them as images; with `around` or `box`, one image of that region.",
+		parameters: Type.Object({
+			sheet: Type.Optional(Type.String({ description: "sheet file stem; default every sheet" })),
+			around: Type.Optional(
+				Type.Array(Type.String(), {
+					description:
+						"references on one sheet: one image of the region around them (12 grid units of margin) instead of the sheet crops",
+				}),
+			),
+			box: Type.Optional(
+				Type.Array(Type.Number(), {
+					minItems: 4,
+					maxItems: 4,
+					description: "[x0, y0, x1, y1] in grid units on `sheet` (default the root sheet): one image of that region",
+				}),
+			),
+		}),
 		approval: "write",
-		execute: (_id, params, signal, _onUpdate, ctx) => call(ctx, signal, "render", params.sheet ? { sheet: params.sheet } : {}),
+		execute: (_id, params, signal, _onUpdate, ctx) =>
+			call(ctx, signal, "render", {
+				...(params.sheet ? { sheet: params.sheet } : {}),
+				...(params.around?.length ? { around: params.around } : {}),
+				...(params.box !== undefined ? { box: params.box } : {}),
+			}),
 	});
 
 	const pins = (description: string) => Type.Record(Type.String(), Type.String(), { description });
 	const refs = (description: string) => Type.Array(Type.String(), { description });
-	pi.registerTool<{ code: string; sheet?: string; expect?: Record<string, unknown> }>({
+	pi.registerTool<{ code: string; sheet?: string; expect?: Record<string, unknown>; strict?: boolean }>({
 		name: "kicaddy_edit",
 		label: "kicaddy edit",
 		description:
-			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), s.flags, project.rename_net): the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
+			"Run Python builder calls as one batch on the open project; the netlist change is checked against `expect`, and a failed batch leaves the document unchanged.\nThe project comes from kicaddy_build or kicaddy_open. In `code`, `s` is the sheet, `sheets` maps file stems to sheets, and `project` is the project. Besides the build.py methods, items already in the document can be moved, removed, and changed (s.move, s.remove, s.remove_wire, s.remove_label, s.remove_no_connect, s.field(..., text=), s.flags, project.rename_net, s.note_text, s.remove_note): the kicaddy skill lists them. `expect` is required for a project from kicaddy_open ({} for no netlist change). Reports the netlist change and the ERC and LINT issues the batch added; a committed batch is saved.",
 		parameters: Type.Object({
 			code: Type.String({ description: "Python, e.g. s.symbol(\"R5\", \"Device:R\", (60, 30), value=\"1k\")" }),
 			sheet: Type.Optional(Type.String({ description: "sheet file stem; default the root sheet" })),
@@ -366,12 +387,18 @@ export default function kicaddy(pi: HostAPI): void {
 					{ additionalProperties: false, description: "the netlist change the batch makes; {} for none" },
 				),
 			),
+			strict: Type.Optional(
+				Type.Boolean({
+					description: "drop the batch when it adds an ERC violation or a LINT line; they are reported as for an expect mismatch",
+				}),
+			),
 		}),
 		execute: (_id, params, signal, _onUpdate, ctx) =>
 			call(ctx, signal, "edit", {
 				code: params.code,
 				...(params.sheet ? { sheet: params.sheet } : {}),
 				...(params.expect !== undefined ? { expect: params.expect } : {}),
+				...(params.strict === true ? { strict: true } : {}),
 			}),
 	});
 

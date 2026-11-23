@@ -10,9 +10,10 @@ updates, the changed and deleted items, and the new items (a symbol placed insid
 for UpdateItems until that commit ends). An exception in the code drops the first; a failure in the second drops
 it and deletes the placed symbols. The model is loaded from the document before and after each batch; the netlist
 difference is reported, and when the batch declares `expect` (required for opened projects) a difference from it
-drops the batch and reopens the saved files. A project whose root sheet was saved by another KiCad release opens
-for query and render; `edit` is refused until `open` is sent with `upgrade`, because a save rewrites every sheet
-in the running release's file format.
+drops the batch and reopens the saved files; so does a new ERC or LINT line when the batch is `strict`. `render`
+writes the images of an opened project to kicaddy's cache, never into the project. A project whose root sheet
+was saved by another KiCad release opens for query and render; `edit` is refused until `open` is sent with
+`upgrade`, because a save rewrites every sheet in the running release's file format.
 """
 
 import builtins
@@ -29,7 +30,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from . import bootstrap, netdiff, runtime, schematic
+from . import bootstrap, netdiff, runtime, sch_geometry, schematic
 
 NO_DOCUMENT = "no document: call kicaddy_build or kicaddy_open first"
 NO_EXPECT = ("kicaddy_edit on a project opened with kicaddy_open needs expect: the netlist change the batch makes "
@@ -201,9 +202,7 @@ class Session:
     def fingerprint(self):
         """sha256 over every sheet's items (symbol instances without their library definition)."""
         p = schematic._proto
-        en = p.enums
-        kinds = [en.KOT_SCH_SYMBOL, en.KOT_SCH_LINE, en.KOT_SCH_JUNCTION, en.KOT_SCH_NO_CONNECT, en.KOT_SCH_LABEL,
-                 en.KOT_SCH_GLOBAL_LABEL, en.KOT_SCH_HIER_LABEL, en.KOT_SCH_TEXT, en.KOT_SCH_SHEET]
+        kinds = [getattr(p.enums, k) for k in schematic.ITEM_KINDS]
         total = hashlib.sha256()
         for _, _, spec, _ in self.sheets():
             blobs = []
@@ -367,21 +366,69 @@ class Session:
             return {"output": "\n".join(lines)}
         raise OpError(f"what must be symbols, nets, erc, lint, items, or pins, not {what!r}")
 
+    def _render_dir(self):
+        """kicaddy's cache directory for the open project's images: a render writes nothing into a project."""
+        path = bootstrap.cache_root() / "renders" / runtime.project_key(self.project.root.path.resolve().parent)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     def op_render(self, request):
         self.require_document()
         if self.plots_stale:
             self.reopen()
-        sheets = self.sheets()
-        wanted = request.get("sheet")
-        if wanted:
-            sheets = [s for s in sheets if s[0] == wanted]
-            if not sheets:
-                raise OpError(f"no sheet {wanted!r}; sheets: {', '.join(s[0] for s in self.sheets())}")
-        root, _ = self.root()
-        images = []
-        for stem, _, spec, _ in sheets:
-            images += [str(path) for path in schematic.plot_cropped(self.api, spec, root.parent / f"{stem}_crop.png")]
-        return {"output": "\n".join(f"crop: {path}" for path in images), "images": images}
+        around, box = request.get("around") or [], request.get("box")
+        if around and box is not None:
+            raise OpError("pass around or box, not both")
+        if not around and box is None:
+            sheets = self.sheets()
+            wanted = request.get("sheet")
+            if wanted:
+                sheets = [s for s in sheets if s[0] == wanted]
+                if not sheets:
+                    raise OpError(f"no sheet {wanted!r}; sheets: {', '.join(s[0] for s in self.sheets())}")
+            out = self.root()[0].parent if self.built else self._render_dir()
+            images = []
+            for stem, _, spec, _ in sheets:
+                images += [str(path) for path in schematic.plot_cropped(self.api, spec, out / f"{stem}_crop.png",
+                                                                        scratch=self.api.scratch)]
+            return {"output": "\n".join(f"crop: {path}" for path in images), "images": images}
+        if around:
+            if not isinstance(around, list) or not all(isinstance(ref, str) for ref in around):
+                raise OpError("around: a list of references")
+            holding = {ref: [s for s in self.project.sheets if any(p.ref == ref for p in s.placements.values())]
+                       for ref in around}
+            missing = [ref for ref, found in holding.items() if not found]
+            if missing:
+                raise OpError(f"around: not placed: {' '.join(sorted(missing))}")
+            sheet = self._sheet(request)
+            if sheet is not None:
+                off = [ref for ref, found in holding.items() if sheet not in found]
+                if off:
+                    raise OpError(f"around: not on sheet {sheet.path.stem}: {' '.join(sorted(off))}")
+            else:
+                common = [s for s in self.project.sheets if all(s in found for found in holding.values())]
+                if len(common) != 1:
+                    raise OpError(f"around: {' '.join(around)} are not on one sheet; pass sheet")
+                sheet = common[0]
+            region = schematic.around_box(sheet, set(around))
+        else:
+            if not (isinstance(box, list) and len(box) == 4
+                    and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in box)
+                    and box[0] < box[2] and box[1] < box[3]):
+                raise OpError("box: [x0, y0, x1, y1] in grid units, x0 < x1 and y0 < y1")
+            sheet = self._sheet(request) or self.project.root
+            region = tuple(box)
+        output = self._render_dir() / f"{sheet.path.stem}_region.png"  # a view, not a build output
+        try:
+            path, (w, h), legible = schematic.plot_region(self.api, sheet.document, region, output, self.api.scratch)
+        except ValueError as e:
+            raise OpError(str(e)) from None
+        lines = [f"region: {path} {sch_geometry.span(region)} on {sheet.hier_path}, {w} x {h} px"]
+        if not legible:
+            w_units, h_units = round(region[2] - region[0], 1), round(region[3] - region[1], 1)
+            lines.append(f"note: the region is {w_units:g} x {h_units:g} units; one image shows about 213 x 160 "
+                         "legibly: text may be unreadable, render a smaller box")
+        return {"output": "\n".join(lines), "images": [str(path)]}
 
     @staticmethod
     def _erc_key(v):
@@ -473,21 +520,33 @@ class Session:
             if mismatch:
                 self.reopen()
                 state = "unchanged" if self._hashes() == hashes else "CHANGED"
+                split = netdiff.split_hint(before, after, expect)
                 lines += [*report, "expect mismatch:", *(f"  {m}" for m in mismatch), *hints,
-                          f"batch dropped: the netlist change does not match expect; reopened the saved files ({state})"]
+                          *([split] if split else []), "batch dropped: the netlist change does not match expect; "
+                          f"reopened the saved files ({state})"]
                 raise OpError("\n".join(line for line in lines if line))
+
+        violations = project.erc()
+        new = [v for v in violations if self._erc_key(v) not in erc_before]
+        issues = schematic.lint_issues(project)
+        fresh = [i for i in issues if i not in lint_before]
+        if request.get("strict") is True and (new or fresh):
+            self.reopen()
+            state = "unchanged" if self._hashes() == hashes else "CHANGED"
+            counts = [f"{len(n)} new {what}{'' if len(n) == 1 else 's'}"
+                      for n, what in ((new, "ERC violation"), (fresh, "LINT line")) if n]
+            lines += [*report, f"batch dropped: {' and '.join(counts)}",
+                      *(f"  {schematic.format_violation(v)}" for v in new), *(f"  {i}" for i in fresh),
+                      f"reopened the saved files ({state})"]
+            raise OpError("\n".join(line for line in lines if line))
 
         api(schematic._proto.project.SaveDocument(document=project.root.document))
         self.batches = number
         self.plots_stale = True
         lines += [f"batch {number} committed (sheet {target.hier_path})", *report,
                   "expect: matched" if expect is not None else "expect: not given"]
-        violations = project.erc()
-        new = [v for v in violations if self._erc_key(v) not in erc_before]
         lines += [f"ERC: {len(violations)} violation(s), {len(new)} new", *(f"  {schematic.format_violation(v)}"
                                                                          for v in new)]
-        issues = schematic.lint_issues(project)
-        fresh = [i for i in issues if i not in lint_before]
         lines += [f"LINT: {len(issues)} issue(s), {len(fresh)} new", *(f"  {i}" for i in fresh)]
         lines.append(f"saved: {project.root.path.resolve()}")
         return {"output": "\n".join(line for line in lines if line)}

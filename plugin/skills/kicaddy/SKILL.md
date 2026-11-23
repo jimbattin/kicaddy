@@ -38,7 +38,13 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
 - **Build** with `kicaddy_build` (`script`, optional `out`: the output directory) instead of
   `kicaddy run`: same output, files, and exit line (`exit: 0`), without a server start per build.
 - **Review** with `kicaddy_render` (optional `sheet`: a file stem) instead of reading `<stem>_crop.png`: it
-  plots the crops again and returns them as images.
+  plots the crops again and returns them as images. With `around` (references on one sheet) or `box`
+  (`[x0, y0, x1, y1]` in grid units, on `sheet`, default the root) it returns one image of that region instead:
+  the parts with 12 units around them, grown to keep the parts and labels at its edge whole. Up to about
+  106 × 80 units is drawn at full size, up to 213 × 160 legibly. For a project from `kicaddy_open` the images
+  are written to kicaddy's cache, not into the project: use the printed paths. It also works after a build that
+  exited 1 (the files are saved either way): render the region of a LINT line you cannot resolve from its
+  coordinates.
 - **Query** with `kicaddy_query`, `what` =
   - `pins` with `lib_ids`: library pin offsets, body boxes and field positions, as `kicaddy pins`; works before
     any project is open: it then reads the `sym-lib-table` of the session directory, or of `dir` (a project
@@ -52,9 +58,12 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   - `nets` (`REF.PIN` sets), `erc`, and `lint` (the `LINT:` block of a build, for the open project as it is).
   - `items`: what `symbols` leaves out of one sheet (`sheet`, default the root): `power <ref> <value> (x, y)`
     for power symbols and flags (the pin point), `wire (x1, y1)-(x2, y2)`, `junction`, `no-connect`,
-    `label 'X' (x, y) right` (also `global`, `hier`), `note (x, y) "text"`, and child `sheet` boxes. With `net`
-    (a full name as `nets` prints it), only that net's power symbols, pins, wires, junctions and labels on the
-    sheet. Use it instead of reading the `.kicad_sch` files or probing with a batch that raises.
+    `label 'X' (x, y) right` (also `global`, `hier`), `note (x, y) "text"`, `text box (x0, y0)-(x1, y1) "text"`,
+    `rectangle (x0, y0)-(x1, y1) dash` (a frame), `line (x1, y1)-(x2, y2)` (a graphic line), other shapes
+    (`polygon`, `circle`, …) with their bounding box, `table (x0, y0)-(x1, y1) N columns, M cells`, and child
+    `sheet` boxes. With `net` (a full name as `nets` prints it), only that net's power symbols, pins, wires,
+    junctions and labels on the sheet. Use it instead of reading the `.kicad_sch` files or probing with a batch
+    that raises.
 
   `sheet` (a file stem) limits `symbols`, `nets`, `erc` and `lint` to one sheet; a net line then lists that
   sheet's pins and ends with `+N on other sheets`.
@@ -79,6 +88,8 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   - `s.remove_wire(a, b)`: delete the wires lying on the straight run from `a` to `b` (points or `"REF.PIN"`);
     a wire reaching past either end is refused, so pass its full extent.
   - `s.remove_label(text, at=None)`, `s.remove_no_connect(at)`: local or global labels; no-connect markers.
+  - `s.note_text(at, text)`, `s.remove_note(at)`: change the text of, or delete, the note or text box whose
+    anchor `items` prints at `at` (a note's point, a text box's top-left corner); `expect` `{}`.
   - `s.field(ref, name, text="330")`: change a field's text (not `Reference`; remove and place instead).
   - `project.rename_net("/VPP_ON", "VPP_EN")`: give the local or global labels naming that net (full name, as
     `kicaddy_query nets` prints it) the new text. A net named by a power symbol is refused.
@@ -93,6 +104,21 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
     name; `disconnect` `["R5.1"]`;
   - `rename` `{"/VPP_ON": "/VPP_EN"}` (full net names).
   Pins of added parts left unconnected need not be declared.
+
+  Inserting a part in series splits a net. `connect` alone declares the pin's whole net joined to the target,
+  so list the pin that leaves under `disconnect` and connect to pins, not net names:
+
+  ```python
+  s.remove_wire("U1.3", "R3.1")          # U1.3 and R3.1 were one net
+  s.symbol("R10", "Device:R", (105, 38), rotation=90, value="100")
+  s.wire("U1.3", "R10.1")
+  s.wire("R10.2", "R3.1")
+  ```
+
+  `expect`: `{"add": {"R10": "100"}, "disconnect": ["R3.1"], "connect": {"R10.1": "U1.3", "R10.2": "R3.1"}}`.
+  Without `disconnect` the batch is dropped and a `hint:` line says so.
+- **`strict: true`** drops a batch that adds an ERC violation or a LINT line (`batch dropped: 1 new LINT line`,
+  then the lines) and reopens the saved files, as for an `expect` mismatch.
 - A committed batch saves the files and reports `netlist: …` (component and net changes, or `unchanged`), a
   `flags: <ref> <flags set, or none>` line per part whose flags changed, `expect: matched`, and the ERC and
   LINT totals with the issues the batch added. Any exception, or `exit()`, drops the whole batch and leaves the
@@ -101,6 +127,9 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   the saved files are the only copy of the batches.
 - While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
   same directory fails as busy: use the tools.
+- In omp the kicaddy tools are also commands of `bash`: a list value is repeated
+  (`--lib-ids Device:R --lib-ids Device:C`) or passed as JSON with `-j`. Images come back only from a tool call
+  (in eval: `tool.kicaddy_render`); `bash` prints the paths.
 
 Without the tools, the CLI workflow below is unchanged.
 
@@ -110,7 +139,8 @@ Without the tools, the CLI workflow below is unchanged.
    unit, number, name, offset from the symbol origin in grid units at rotation 0, and electrical type. After
    the pins come `unit N  body (x0, y0)-(x1, y1)`, the box that unit's drawing fills (`none` for a unit of pins
    only), and `Reference at (x, y) center vertical` / `Value at …`: each visible field's anchor, alignment and
-   direction at rotation 0 (Geometry).
+   direction at rotation 0 (Geometry). Pins printed at the same offset are stacked: they share one connection
+   point and one net.
    Look up every symbol you will place, in one call, before laying anything out. An id that does not exist
    gets a line `not found: Timer:NE555 (Timer has NE555P, NE555D, …)` with the closest names in that library
    (or the closest library names), and the exit status is 1: pick from that line instead of guessing again.
@@ -180,17 +210,20 @@ Without the tools, the CLI workflow below is unchanged.
    - `wire-pin`: a wire runs along a pin or crosses it away from its connection point.
 
    Names in LINT lines: `R1.Value` (a field), `label 'X'`, `global 'X'`, `hier 'X'` (labels), `note (x, y)`,
-   `sheet <name>` (a child sheet's box), `sheet <name>.Sheetname` / `.Sheetfile` (its fields), and
-   `sheet pin <name>.<label>`.
+   `text box (x, y)` (its frame is the box; nothing else may be inside it), `sheet <name>` (a child sheet's
+   box), `sheet <name>.Sheetname` / `.Sheetfile` (its fields), and `sheet pin <name>.<label>`.
 6. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
    wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read each sheet's
    `<stem>_crop.png` (or the tiles `<stem>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
    no overlaps, including a field over its own symbol's lines. The review looks only for what a reader would
-   misread and LINT cannot see: text that sits closer to another part than to its own, a crop split into tiles,
-   or a wrong fact in the note. This first clean build and its one review end the drawing work. Rebuild only to
-   fix such a misreading, then read the crop once more; otherwise do not rebuild and do not read the crop again:
-   no moving fields, parts, or wires that LINT passed, no rewording the note, no added decorations, no tighter
-   spacing. These limits apply to your own review only: layout changes the user asks for are always made.
+   misread and LINT cannot see: text that sits closer to another part than to its own, or a wrong fact in the
+   note. A drawing that fits one image (Geometry) and still comes out as tiles is laid out too wide: fix it. A
+   larger sheet is drawn in blocks that each fit one image; its tiles are expected, and the review reads each
+   block once (`kicaddy_render` with `box` set to the block, or the tiles without the tools). This first clean
+   build and its one review end the drawing work. Rebuild only to fix such a misreading, then read the crop
+   once more; otherwise do not rebuild and do not read the crop again: no moving fields, parts, or wires that
+   LINT passed, no rewording the note, no added decorations, no tighter spacing. These limits apply to your own
+   review only: layout changes the user asks for are always made.
 7. **Circuit check.** A build that exits 0 proves the drawing has the declared nets and passes ERC; it says
    nothing about how the circuit behaves. When the task asks for that too, check it in this order, from the
    output directory:
@@ -293,19 +326,29 @@ Methods on `s`:
   from `fields`. Pass `unit=` for a multi-unit symbol. Call it after `s.symbol`.
 - `s.flags(ref, dnp=None, exclude_from_bom=None, exclude_from_board=None)`: set (`True`) or clear (`False`) the
   flags of a placed symbol, on every unit of it; `None` leaves one as it is.
-- `s.power(name, at, rotation=0)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with an automatic
-  `#PWR`/`#FLG` reference; its pin is at `at`, a grid point or `"REF.PIN"`. Returns the reference.
+- `s.power(name, at, rotation=0, symbol=None)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with
+  an automatic `#PWR`/`#FLG` reference; its pin is at `at`, a grid point or `"REF.PIN"`. Returns the reference.
+  With `symbol="VCC"` (any `power:` symbol) it places that symbol and sets its Value to `name`, which names the
+  net: `s.power("CM5_3V3", p, symbol="VCC")`; ERC and `PWR_FLAG` rules are those of `+5V`. A power symbol and a
+  global label of the same name are one net across sheets.
 - `s.wire(*points)`: polyline through grid points and/or `"REF.PIN"` names; one wire segment per leg. Legs must
   be horizontal or vertical and non-zero.
-- `s.label(text, at, spin="right")`: local net label; `spin` is the side the text extends to: `left`, `right`,
-  `up`, `bottom`.
-- `s.global_label(text, at, spin="right", shape="passive")`: global net label, same `spin`; `shape` is `input`,
-  `output`, `bidirectional`, `tri_state`, or `passive`.
+- `s.label(text, at, spin="right")`: local net label; `at` is a grid point or `"REF.PIN"`, as for `s.power`;
+  `spin` is the side the text extends to: `left`, `right`, `up`, `bottom`.
+- `s.global_label(text, at, spin="right", shape="passive")`: global net label, same `at` and `spin`; `shape` is
+  `input`, `output`, `bidirectional`, `tri_state`, or `passive`.
 - `s.no_connect(at)`: no-connect marker on an unused pin (`"REF.PIN"`).
 - `s.note(text, at, size=1.27)`: left-aligned text; `size` in mm; `\n` for new lines. Multi-line notes are
   centred vertically on `at`. At the default size text is about 0.85 units per character (0.8 lower case, 0.95
   digits and capitals) and lines are 1.6 units apart: 100 characters are about 85 units wide. Field values and
-  labels have the same size. Nothing wraps: break long notes yourself.
+  labels have the same size. A note does not wrap: break lines yourself, or use `s.text_box`.
+- `s.text_box(text, at, size, text_size=1.27, border=True)`: framed text that KiCad wraps; `at` is the top-left
+  corner, `size` (w, h) in grid units. A line holds about (w − 1.5) / 0.85 characters and lines are 1.6 units
+  apart: n lines need h ≥ 1.6 n + 1.5. Text longer than the box runs out below the frame and LINT does not see
+  that: size the box. LINT takes the frame as the text's box. `border=False` saves a frameless box; this
+  KiCad's plots still draw the frame.
+- `s.rectangle(a, b, style="dash")`: a frame from corner `a` to corner `b` around a block; `style` is `solid`,
+  `dash`, `dot`, `dashdot`, or `dashdotdot`. LINT ignores frames, also a wire or text crossing the frame line.
 - `s.junction(*points)`: explicit dot for a deliberate four-way connection; T junctions are automatic.
 - `s.sheet(name, build, at, size, pins=None, page=None, title=None)`: child sheet, drawn as a box with its
   top-left corner at `at` and `size` (w, h) in grid units; returns `{label: (x, y)}` of its sheet pins.
@@ -356,6 +399,7 @@ Methods on `s`:
   means the pin is in every unit. Address a pin as `"U1.<pin number>"` after placing the unit that has it.
 - The crop is one image when the drawn content, including text, the note, and power symbols, fits in about
   205 × 150 grid units; anything larger comes out as tiles. Lay out for one image unless the circuit cannot fit.
+  When the circuit cannot fit, lay the sheet out in blocks that each fit 205 × 150, at least 10 units apart.
 - Page sizes in grid units (landscape): A5 165×116, A4 233×165, A3 330×233, A 220×170, B 340×220. Keep 8 units
   clear at each edge (frame) and the bottom-right 87×28 (title block).
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Check the session daemon (`kicaddy daemon`, behind the omp extension) on the configured KiCad: library pins
-through `cwd` and `dir`, build, query, render, edit batches with `expect`, `exit()` in a batch, part flags and the
-BOM, lookups with body and field geometry, queries by sheet, lint and items, field angle and alignment, the
-crossing hint, LINT text boxes, and the file-format gate of `open`. Everything is written to a temporary
-directory; one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
+through `cwd` and `dir`, the library hint of a build with `--out`, build, query, render (sheet crops, regions
+`around` references and by `box`, nothing written into an opened project), edit batches with `expect` (the
+split hint of a series insert) and `strict`, `exit()` in a batch, part flags and the BOM, lookups with body and
+field geometry, queries by sheet, lint and items, field angle and alignment, `s.power(symbol=)`, notes and text
+boxes changed and removed, frames and tables in `items`, the crossing hint, LINT text boxes, the file-format gate
+of `open`, and no lock file left after shutdown. Everything is written to a temporary directory (region images
+to kicaddy's render cache, removed at the end); one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
 
     python3 tools/daemon_check.py
 
@@ -17,6 +20,7 @@ import hashlib
 import json
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -70,7 +74,47 @@ HINT = "hint: wire ends meet on a crossing at ({0}, {1}) on /: s.junction(({0}, 
 TEXT_BOX = (r"text-pin: R1\.Value / pin R1\.1 @ \([^)]*\); "
             r"R1\.Value box \([\d.]+, [\d.]+\)-\([\d.]+, [\d.]+\) horizontal")
 
+# A design placing a symbol of the project library `daisy`, built from beside the library and from elsewhere.
+HINT_SCRIPT = '''import sys
+from kicaddy.schematic import run
+def build(s):
+    s.symbol("U1", "daisy:Daisy_Seed3", (60, 60))
+    return []
+if __name__ == "__main__":
+    sys.exit(run(build, "hint", page="A4", title="hint"))
+'''
+
+# The series insert of the skill's `expect` section, on the NE555 example.
+INSERT = '''s.remove_wire("U1.3", "R3.1")
+s.symbol("R10", "Device:R", (105, 38), rotation=90, value="100")
+s.wire("U1.3", "R10.1")
+s.wire("R10.2", "R3.1")
+'''
+MOVED = INSERT.replace('value="100")\n', 'value="100")\ns.field("R10", "Reference", at=(105, 40))\n')
+RIGHT = {"add": {"R10": "100"}, "disconnect": ["R3.1"], "connect": {"R10.1": "U1.3", "R10.2": "R3.1"}}
+WRONG = {k: v for k, v in RIGHT.items() if k != "disconnect"}
+SPLIT_HINT = ("hint: connect joins a pin's whole net to the target; to move a pin off its net, list it under "
+              "disconnect too")
+
+TEXT = ("The quick brown fox jumps over the lazy dog. " * 9)[:400]
+TABLE = '''import kicaddy.schematic as S
+P = S._proto; sch, t, en, e = P.sch, P.types, P.enums, P.editor
+tab = sch.SchematicTable(column_count=2)
+for w in (20, 20): tab.column_widths.add(value_nm=round(w * 1.27e6))
+for h in (4, 4): tab.row_heights.add(value_nm=round(h * 1.27e6))
+for r in range(2):
+    for c in range(2):
+        b = tab.cells.add(column_span=1, row_span=1).text_box.textbox
+        b.top_left.CopyFrom(s.mm((120 + 20 * c, 70 + 4 * r))); b.bottom_right.CopyFrom(s.mm((140 + 20 * c, 74 + 4 * r)))
+        b.text = f"cell {r}{c}"
+        b.attributes.size.CopyFrom(t.Vector2(x_nm=1270000, y_nm=1270000)); b.attributes.multiline = True
+        b.attributes.horizontal_alignment = en.HA_LEFT; b.attributes.vertical_alignment = en.VA_TOP
+made = s.api(e.CreateItems(header=s.header, items=[S._pack(tab)]))
+S._check(made.created_items, made.status, "table")
+'''
+
 RESULTS = []
+RENDER_DIRS = set()  # kicaddy's render-cache directories the checks wrote to, removed at the end
 
 
 class Failure(Exception):
@@ -120,6 +164,19 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def png_size(path):
+    """(width, height) of a PNG file."""
+    with open(path, "rb") as f:
+        return struct.unpack(">II", f.read(24)[16:24])
+
+
+def rendered(r, tmp):
+    """The images of a render response; those outside `tmp` are in the render cache: remember their directory."""
+    images = [Path(p) for p in r.get("images", [])]
+    RENDER_DIRS.update(p.parent for p in images if not p.resolve().is_relative_to(tmp.resolve()))
+    return images
+
+
 def symbol_lines(output):
     """{ref: its line} of `query symbols` output (the last unit's for a multi-unit symbol)."""
     return {line.split()[1]: line for line in output.splitlines() if line.startswith("/ ")}
@@ -139,6 +196,18 @@ def pins(d, tmp):
     check("pins: not found elsewhere", f"not found: {DAISY}" in r["output"], r["output"])
     r = d.request("query", what="pins", lib_ids=[DAISY], dir=str(tmp / "missing"))
     check("pins: a missing dir is an error", not r["ok"] and "no such directory" in r["output"], r["output"])
+
+
+def library_hint(d, tmp):
+    """A build with `--out` that misses a library the script's directory has names it; elsewhere it does not."""
+    for where in ("lib", "other"):
+        (tmp / where / "build.py").write_text(HINT_SCRIPT)
+    r = d.request("build", script=str(tmp / "lib/build.py"), out=str(tmp / "hint_out"), cwd=str(tmp))
+    want = f"no symbol library 'daisy' in {tmp.resolve()}/hint_out/sym-lib-table; build.py's directory has it"
+    check("hint: library beside the script", not r["ok"] and want in r["output"], r["output"][-800:])
+    r = d.request("build", script=str(tmp / "other/build.py"), out=str(tmp / "hint_out2"), cwd=str(tmp))
+    check("hint: plain message otherwise", not r["ok"] and "no symbol library 'daisy'" in r["output"]
+          and "directory has it" not in r["output"], r["output"][-800:])
 
 
 def built(d, tmp):
@@ -248,6 +317,53 @@ def queries(d, tmp):
           r["output"])
 
 
+def edits(d, tmp):
+    """On the NE555 project queries() left open: the split hint, strict batches, s.power(symbol=), note_text,
+    remove_note, and region renders."""
+    root = tmp / "ne555/ne555_blinker.kicad_sch"
+    r = d.request("edit", code=INSERT, expect=WRONG)
+    check("expect: split hint", not r["ok"] and "expect mismatch:" in r["output"] and SPLIT_HINT in r["output"],
+          r["output"])
+    before = sha(root)
+    r = d.request("edit", code=INSERT, expect=RIGHT, strict=True)
+    check("strict: a new LINT line drops the batch", not r["ok"] and "batch dropped: 1 new LINT line" in r["output"]
+          and re.search(r"text-text: (R10\.Reference / #PWR07\.Value|#PWR07\.Value / R10\.Reference) @", r["output"])
+          and r["output"].endswith("reopened the saved files (unchanged)") and sha(root) == before, r["output"])
+    r = d.request("edit", code=MOVED, expect=RIGHT, strict=True)
+    check("strict: a clean batch commits", r["ok"] and "expect: matched" in r["output"]
+          and re.search(r"^LINT: \d+ issue\(s\), 0 new$", r["output"], re.M), r["output"])
+
+    r = d.request("edit", code='s.power("VBAT", "C4.1", symbol="VCC")', expect={"connect": {"C4.1": "VBAT"}})
+    q = d.request("query", what="items", net="VBAT")
+    check("power: symbol= names the net", r["ok"] and "expect: matched" in r["output"]
+          and re.search(r"^power #PWR\d+ VBAT \(130, 27\)$", q["output"], re.M), f'{r["output"]}\n{q["output"]}')
+    r = d.request("edit", code='s.power("VBAT", (140, 20))', expect={})
+    check("power: a missing symbol names symbol=", not r["ok"] and "symbol=" in r["output"], r["output"])
+
+    r = d.request("edit", code='s.note_text((48, 63), "edited note")', expect={})
+    q = d.request("query", what="items")
+    check("note_text", r["ok"] and "netlist: unchanged" in r["output"]
+          and 'note (48, 63) "edited note"' in q["output"], f'{r["output"]}\n{q["output"]}')
+    r = d.request("edit", code="s.remove_note((48, 63))", expect={})
+    q = d.request("query", what="items")
+    check("remove_note", r["ok"] and not re.search(r"^note \(", q["output"], re.M), f'{r["output"]}\n{q["output"]}')
+
+    r = d.request("render", around=["R10"])
+    images = rendered(r, tmp)
+    check("render: around", r["ok"] and len(images) == 1 and images[0].exists()
+          and not images[0].resolve().is_relative_to((tmp / "ne555").resolve())
+          and all(a <= b for a, b in zip(png_size(images[0]), (1600, 1200))) and r["output"].startswith("region: "),
+          r["output"])
+    r = d.request("render", box=[80, 25, 120, 55])
+    images = rendered(r, tmp)
+    check("render: box is 15 px per unit", r["ok"] and len(images) == 1 and png_size(images[0]) == (600, 450),
+          f'{r["output"]} {[png_size(p) for p in images]}')
+    r = d.request("render", around=["NOPE"])
+    q = d.request("render", around=["R10"], box=[0, 0, 9, 9])
+    check("render: bad region arguments", not r["ok"] and r["output"] == "around: not placed: NOPE"
+          and not q["ok"] and q["output"] == "pass around or box, not both", f'{r["output"]}\n{q["output"]}')
+
+
 def crossing(d, tmp):
     script = tmp / "cross/build.py"
     script.parent.mkdir()
@@ -298,18 +414,65 @@ def stable(d, tmp):
           and r["output"].splitlines()[-1] == "edit with kicaddy_edit; pass expect", r["output"])
 
 
+def annotations(d, tmp):
+    """On the project stable() left open: text boxes and frames, LINT inside a text box, note_text and
+    remove_note on a text box, tables in items, and renders that write nothing into an opened project."""
+    directory = tmp / "stable"
+    root = directory / "stable.kicad_sch"
+    r = d.request("edit", code=f"s.text_box({TEXT!r}, (20, 80), (80, 12))\ns.rectangle((10, 76), (110, 96))",
+                  expect={})
+    text = root.read_text()
+    check("text_box and rectangle commit clean", r["ok"] and "netlist: unchanged" in r["output"]
+          and re.search(r"^LINT: \d+ issue\(s\), 0 new$", r["output"], re.M) and text.count("(text_box") == 1
+          and "(type dash)" in text, r["output"])
+    q = d.request("query", what="items")
+    check("items: text box and frame", q["ok"] and 'text box (20, 80)-(100, 92) "The quick' in q["output"]
+          and re.search(r"^rectangle \(10, 76\)-\(110, 96\) dash$", q["output"], re.M), q["output"])
+    r = d.request("edit", code='s.symbol("R5", "Device:R", (60, 86), value="1k")\n'
+                  's.no_connect("R5.1")\ns.no_connect("R5.2")', expect={"add": {"R5": "1k"}})
+    check("LINT: a part inside a text box", r["ok"] and "text-body: text box (20, 80) / R5 @" in r["output"],
+          r["output"])
+    r = d.request("edit", code='s.note_text((20, 80), "short")', expect={})
+    q = d.request("query", what="items")
+    check("note_text on a text box", r["ok"] and 'text box (20, 80)-(100, 92) "short"' in q["output"]
+          and root.read_text().count("(text_box") == 1, f'{r["output"]}\n{q["output"]}')
+    r = d.request("edit", code="s.remove_note((20, 80))", expect={})
+    q = d.request("query", what="items")
+    again = d.request("edit", code="s.remove_note((20, 80))", expect={})
+    check("remove_note on a text box; a second call fails", r["ok"] and "\ntext box" not in q["output"]
+          and not again["ok"] and "no note or text box at (20, 80)" in again["output"],
+          f'{r["output"]}\n{q["output"]}\n{again["output"]}')
+    r = d.request("edit", code=TABLE, expect={})
+    q = d.request("query", what="items")
+    check("items: table", r["ok"] and "table (120, 70)-(160, 78) 2 columns, 4 cells" in q["output"],
+          f'{r["output"]}\n{q["output"]}')
+
+    r = d.request("render")
+    images = rendered(r, tmp)
+    check("render: an opened project gets no file", r["ok"] and images and all(p.exists() for p in images)
+          and not any(p.resolve().is_relative_to(directory.resolve()) for p in images)
+          and not list(directory.glob("*_crop*.png")) and not list(directory.glob(".crop-*")), r["output"])
+    r = d.request("render", box=[10, 70, 50, 100], sheet="stable")
+    images = rendered(r, tmp)
+    check("render: box on an opened project", r["ok"] and len(images) == 1 and png_size(images[0]) == (600, 450),
+          f'{r["output"]} {[png_size(p) for p in images]}')
+
+
 def main():
     tmp = Path(tempfile.mkdtemp(prefix="kicaddy-daemon-check-"))
     started = time.time()
     d = Daemon(tmp)
     try:
-        for part in (pins, built, queries, crossing, stable):
+        for part in (pins, library_hint, built, queries, edits, crossing, stable, annotations):
             part(d, tmp)
     except Failure as e:
         check("the daemon stayed up", False, e)
     finally:
         d.close()
+        check("shutdown: no lock file left in the opened project", not list((tmp / "stable").glob("~*.lck")))
         shutil.rmtree(tmp, ignore_errors=True)
+        for directory in RENDER_DIRS:
+            shutil.rmtree(directory, ignore_errors=True)
     print(f"daemon check: {sum(RESULTS)}/{len(RESULTS)} in {time.time() - started:.0f} s")
     return 0 if all(RESULTS) else 1
 
