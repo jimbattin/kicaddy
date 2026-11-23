@@ -5,6 +5,18 @@ description: Draw, build, or edit KiCad schematics headless from Python (not for
 
 # kicaddy: headless KiCad schematics from a build script
 
+## Read when the task needs it
+
+This file covers a single-sheet design built from stock symbols. Read a file below only when the task matches
+it, in the same turn as the example or the pin lookup:
+
+- `skill://kicaddy/edit.md`: change or inspect an existing schematic: `kicaddy_open`, `kicaddy_edit` batches
+  with `expect`, and the output of `kicaddy_query` `symbols`, `nets`, `erc`, `lint`, `items`.
+- `skill://kicaddy/custom-symbols.md`: a part `kicaddy pins` does not find: a pin table and `kicaddy symbol`.
+- `skill://kicaddy/hierarchy.md`: a design of more than one sheet: `s.sheet`, `s.hier_label`.
+- `skill://kicaddy/circuit-check.md`: the task asks how the circuit behaves: simulation after a clean build.
+- `skill://kicaddy/bom-handoff.md`: a BOM, a design review, or sourcing after a clean build.
+
 ## Setup
 
 `kicaddy` below is this command line (outside omp, replace `$(realpath skill://kicaddy)` with the directory
@@ -45,97 +57,23 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
   from `kicaddy_open` the images are written to kicaddy's cache, not into the project: use the printed paths. It
   also works after a build that exited 1 (the files are saved either way): render the region of a LINT line you
   cannot resolve from its coordinates.
+  At most 4 crops come back as images from one call. For more it prints the number per sheet instead: pass
+  `sheet`, or `box` or `around` for one region.
 - **Query** with `kicaddy_query`, `what` =
   - `pins` with `lib_ids`: library pin offsets, body boxes and field positions, as `kicaddy pins`; works before
     any project is open: it then reads the `sym-lib-table` of the session directory, or of `dir` (a project
     directory, as `kicaddy pins --dir`), so the project's own `library:name` symbols are found.
-  - `symbols`: one line per placed symbol (sheet, reference, library id, value, origin, `rot`/`mirror` when
-    set, then the part flags that are set: `dnp`, `no-bom`, `no-board`). With `refs` (a list of references),
-    only those, each followed by its pin points, its `body` box, and its fields on the sheet:
-    `Value "102k 0.1%" at (40, 40) center box (36, 39.4)-(44, 40.6) horizontal` for a visible field (`at` is
-    the anchor `s.field(at=…)` sets, then the alignment as read), `Footprint "…" hidden` for a hidden one. Look
-    there before wiring to a part of an opened project or moving one of its fields.
-  - `nets` (`REF.PIN` sets), `erc`, and `lint` (the `LINT:` block of a build, for the open project as it is).
-  - `items`: what `symbols` leaves out of one sheet (`sheet`, default the root): `power <ref> <value> (x, y)`
-    for power symbols and flags (the pin point), `wire (x1, y1)-(x2, y2)`, `junction`, `no-connect`,
-    `label 'X' (x, y) right` (also `global`, `hier`), `note (x, y) "text"`, `text box (x0, y0)-(x1, y1) "text"`,
-    `rectangle (x0, y0)-(x1, y1) dash` (a frame), `line (x1, y1)-(x2, y2)` (a graphic line), other shapes
-    (`polygon`, `circle`, …) with their bounding box, `table (x0, y0)-(x1, y1) N columns, M cells`, and child
-    `sheet` boxes. With `net` (a full name as `nets` prints it), only that net's power symbols, pins, wires,
-    junctions and labels on the sheet. Use it instead of reading the `.kicad_sch` files or probing with a batch
-    that raises.
-
-  `sheet` (a file stem) limits `symbols`, `nets`, `erc` and `lint` to one sheet; a net line then lists that
-  sheet's pins and ends with `+N on other sheets`.
-
-  `kicaddy_open` opens an existing project (directory, `.kicad_pro`, or root `.kicad_sch`) for query, render,
-  and edit. When the files were saved by another KiCad release (stable 10.0, say), its output has a
-  `file format:` line and `kicaddy_edit` is refused: KiCad saves only its own format, so the first committed
-  batch would rewrite every sheet in a format that release cannot open. Query and render change nothing. Tell
-  the user, and only when they agree reopen with `upgrade: true`.
-- **Edit** with `kicaddy_edit`: `code` is Python run as one batch against the open project, `s` the sheet
-  (`sheet`: file stem, default the root), `sheets` maps stems to sheets, `project` the project. Before the batch
-  the model is loaded from the document, so `s.pins["R5.1"]` holds every pin, built or opened. See what is on
-  a sheet with `kicaddy_query items` and `symbols` with `refs`, not with a batch that prints and raises. The
-  builder methods work as in `build.py` (`s.symbol`, `s.wire`, `s.label`, `s.power`, ...), except `s.sheet`,
-  `s.net_class`, and `commit()`. Items already in the document can also be changed:
-  - `s.move(ref, at, unit=None)`: translate the symbol so its origin is `at` (no rotation); returns the new
-    pins. A wire ending on a pin follows it (stretched, or with one dog-leg corner); labels and no-connect
-    markers on its pins move with it; a power symbol alone on a pin moves too; any other contact gets a stub
-    wire from the old pin point. Move before wiring new items to its pins in the same batch.
-  - `s.remove(ref, unit=None)`: delete every unit of `ref` on the sheet (or one unit) and the no-connect
-    markers on its pins; its wires and labels stay. `s.move` and `s.remove` also take power symbols and flags
-    (`#PWR0407`, `#FLG0401`). A junction an edit leaves with fewer than three connections is removed at commit.
-  - `s.remove_wire(a, b)`: delete the wires lying on the straight run from `a` to `b` (points or `"REF.PIN"`);
-    a wire reaching past either end is refused, so pass its full extent.
-  - `s.remove_label(text, at=None)`, `s.remove_no_connect(at)`: local or global labels; no-connect markers.
-  - `s.note_text(at, text)`, `s.remove_note(at)`: change the text of, or delete, the note or text box whose
-    anchor `items` prints at `at` (a note's point, a text box's top-left corner); `expect` `{}`.
-  - `s.field(ref, name, text="330")`: change a field's text (not `Reference`; remove and place instead).
-  - `project.rename_net("/VPP_ON", "VPP_EN")`: give the local or global labels naming that net (full name, as
-    `kicaddy_query nets` prints it) the new text. A net named by a power symbol is refused.
-  These work only on items in the document when the batch started; a symbol placed in the batch is placed at
-  its final position instead. `s.flags(ref, dnp=None, exclude_from_bom=None, exclude_from_board=None)`
-  (Methods) works on both; a batch that only changes flags has `expect` `{}`.
-- **`expect`** declares the netlist change of a batch. Always pass it; `{}` for a layout-only change. It is
-  required for projects from `kicaddy_open`; when the change differs, the batch is dropped and the saved files
-  are reopened. Keys, all optional:
-  - `add` `{ref: value}`, `remove` `[ref]`, `values` `{ref: new value}`;
-  - `connect` `{"C8.1": target}`: the pin joins `target`, a `"REF.PIN"`, an existing net name, or a new net
-    name; `disconnect` `["R5.1"]`;
-  - `rename` `{"/VPP_ON": "/VPP_EN"}` (full net names).
-  Pins of added parts left unconnected need not be declared. A new net is named by connecting one of its pins
-  to the full name (a local label `PRE_OUT` on sheet `power_analog` is `/power_analog/PRE_OUT`, a global label
-  or power symbol its bare name) and the others to that pin.
-
-  Inserting a part in series splits a net. `connect` alone declares the pin's whole net joined to the target,
-  so list the pin that leaves under `disconnect` and connect to pins, not net names:
-
-  ```python
-  s.remove_wire("U1.3", "R3.1")          # U1.3 and R3.1 were one net
-  s.symbol("R10", "Device:R", (105, 38), rotation=90, value="100")
-  s.field("R10", "Reference", at=(105, 40))  # clear of the GND symbol's value above it
-  s.wire("U1.3", "R10.1")
-  s.wire("R10.2", "R3.1")
-  ```
-
-  `expect`: `{"add": {"R10": "100"}, "disconnect": ["R3.1"], "connect": {"R10.1": "U1.3", "R10.2": "R3.1"}}`.
-  Without `disconnect` the batch is dropped and a `hint:` line says so.
-- **`strict: true`** drops a batch that adds an ERC violation or a LINT line (`batch dropped: 1 new LINT line`,
-  then the lines) and reopens the saved files, as for an `expect` mismatch.
-- A committed batch saves the files and reports `netlist: …` (component and net changes, or `unchanged`), a
-  `flags: <ref> <flags set, or none>` line per part whose flags changed, `expect: matched`, and the ERC and
-  LINT totals with the issues the batch added. Any exception, or `exit()`, drops the whole batch and leaves the
-  document unchanged. For a project from `kicaddy_build`, a rebuild discards batches, so copy every change you
-  keep into `build.py` (the source of truth), then rebuild once at the end. For a project from `kicaddy_open`,
-  the saved files are the only copy of the batches.
+  - `symbols`, `nets`, `erc`, `lint`, `items`: the open project as it is, each limited to one sheet with
+    `sheet` (a file stem). `symbols` with `refs` prints each part's pin points, `body` box and fields with
+    anchor and box; `lint` the `LINT:` block of a build. Their output lines: `skill://kicaddy/edit.md`.
+- **Open and edit** an existing project, or a built one in place, with `kicaddy_open` and `kicaddy_edit`: read
+  `skill://kicaddy/edit.md` first.
 - While a project is open, `edit`/`write` on its `.kicad_sch`/`.kicad_pro` are blocked, and `kicaddy run` on the
   same directory fails as busy: use the tools.
-- In omp the kicaddy tools are also commands of `bash`; these forms are all a session needs, no `--help`:
+- In omp the kicaddy tools are also commands of `bash`: never `--help`. These forms are all a build needs:
   `kicaddy_build build.py`, `kicaddy_render`, `kicaddy_query -j '{"what": "pins", "lib_ids": ["Device:R",
-  "Device:C"]}'`, `kicaddy_query -j '{"what": "items", "sheet": "usb"}'`, and for a batch a JSON file with
-  `code`, `sheet`, `expect` passed as `kicaddy_edit @batch.json`. Images come back only from a tool call (in
-  eval: `await tool.kicaddy_render({"sheet": "usb"})`); `bash` prints the paths.
+  "Device:C"]}'`; those of `kicaddy_open` and `kicaddy_edit` are in `skill://kicaddy/edit.md`. Images come back
+  only from a tool call (in eval: `await tool.kicaddy_render({"sheet": "usb"})`); `bash` prints the paths.
 
 Without the tools, the CLI workflow below is unchanged.
 
@@ -160,30 +98,8 @@ Without the tools, the CLI workflow below is unchanged.
    - `Connector_Audio:AudioJack3`, `Connector:Barrel_Jack`, `Connector_Generic:Conn_01x02` (`…x03`, …),
      `Switch:SW_SPST`, `Switch:SW_Push`
    - `power:` `GND`, `+5V`, `+9V`, `+12V`, `VCC`, `PWR_FLAG` (through `s.power`)
-2. **Custom symbols.** For a part that `kicaddy pins` leaves out, write a pin table (one symbol per JSON file;
-   example: `skill://kicaddy/examples/daisy_seed3.json`, a 40-pin module) and run
-   `kicaddy symbol table.json … --dir <project dir>`, where the project dir is the `build.py` directory or its
-   `--out` dir. It merges the symbol into `<library>.kicad_sym` there, adds the library to that directory's
-   `sym-lib-table`, loads it through KiCad, and prints its pin offsets as `kicaddy pins` does. Place it as
-   `library:name`; `kicaddy pins --dir <project dir> library:name` reprints the offsets later. Table keys:
-   - `library`, `name` (required): letters, digits, `_ . + -`. A library name already in `sym-lib-table`
-     with another file is refused.
-   - `reference` (default `U`), `value` (default `name`), `footprint`, `datasheet`, `description`, and
-     `fields` (extra hidden fields, e.g. `{"Manufacturer": "..."}`; not the five mandatory names).
-   - `pins` (required): objects `{"numbers": ["1"], "name": "D0", "type": "bidirectional"}` (or
-     `"number": 1`); `base.pinout` from a `datasheets/extracted/<MPN>.json` can be pasted as is. Names have no
-     spaces (`""` for none). Types: `input`, `output`, `bidirectional`, `tri_state`, `passive`,
-     `open_collector`, `open_emitter`, `power_in`, `power_out`, `unspecified`, `free`, `no_connect`
-     (or `not_connected`). Each object is placed at its first number; further numbers are stacked on it,
-     hidden (the same net).
-   - `sides` (optional): `{"top": [...], "bottom": [...], "left": [...], "right": [...]}` of first numbers,
-     each pin object exactly once; `left`/`right` run top to bottom, `top`/`bottom` left to right. Without it
-     the layout is DIP: the first half down the left, the rest up the right (pin 1 top left, the last pin top
-     right). Group by function: power on top, grounds on the bottom, inputs left, outputs right.
-
-   A bad table prints one `error: <file>: <key>: …` line (e.g. `pins[3].numbers`, `sides.left[0]`,
-   `fields.MPN`) with the expected shape and the value found, exits 1, and writes nothing: fix that key and
-   rerun. `KiCad could not load the library: …` means KiCad rejected the written file.
+2. **Custom symbols.** For a part that `kicaddy pins` leaves out, read `skill://kicaddy/custom-symbols.md`: a
+   pin table and `kicaddy symbol` add it to the project's own library, placed as `library:name`.
 3. **Net intent.** Write down the expected nets (sets of `"REF.PIN"`) before any layout. This list is what
    `build()` returns and what the build checks against.
 4. **Layout on the grid.** Pick a page, place symbols so that the pins you connect line up on X or Y, and route
@@ -234,31 +150,8 @@ Without the tools, the CLI workflow below is unchanged.
    LINT passed, no rewording the note, no added decorations, no tighter spacing. These limits apply to your own
    review only: layout changes the user asks for are always made.
 7. **Circuit check.** A build that exits 0 proves the drawing has the declared nets and passes ERC; it says
-   nothing about how the circuit behaves. When the task asks for that too, check it in this order, from the
-   output directory:
-   - With the `kicad` and `spice` skills (kicad-happy) installed, simulate the saved schematic first; its test
-     circuits are built from the drawing itself:
-
-     ```sh
-     python3 "$(realpath skill://kicad)/scripts/analyze_schematic.py" <name>.kicad_sch --analysis-dir analysis/
-     python3 "$(realpath skill://spice)/scripts/simulate_subcircuits.py" --analysis-dir analysis/ --text
-     python3 -c "import json,glob; d=json.load(open(sorted(glob.glob('analysis/*/spice.json'))[-1])); [print(r['subcircuit_type'], r['status'], ' '.join(r['components']), r.get('simulated') or r.get('note', '')) for r in d['simulation_results']]"
-     ```
-
-     The second command prints one summary line; the third prints each subcircuit it recognised, its status,
-     and its measured values. It looks for common blocks in the netlist (RC and LC filters, dividers, op-amp
-     stages, regulators, crystals, transistor stages, decoupling, …), so what it covers depends on the circuit:
-     a block missing from the list was not simulated, a `skip` was not measured, and a detection can be wrong.
-     Check each line against the circuit before citing it. Example, a headphone amp: it measured the RC corners
-     and the bias divider, skipped four RC pairs, reported two bias resistors as a divider, saw only the
-     op-amp's power unit (so no gain stage), and could not simulate the output into the headphones, which are
-     not in the schematic.
-   - Write your own ngspice deck, one in the output directory, only for behaviour the task needs that the list
-     does not cover (or for everything, without kicad-happy). Size the effort to the task. When that behaviour
-     is the purpose of the design (a filter's response, an oscillator's frequency, a regulator's output), get
-     the deck to run and measure it; if it still fails after a few fixes, report it as not simulated. When it
-     only confirms hand calculations, run `ngspice -b` at most twice, then stop.
-   - Report what was simulated, with the numbers, and what was not.
+   nothing about how the circuit behaves. When the task asks for that too, read
+   `skill://kicaddy/circuit-check.md` and follow it from the output directory.
 
 ## Build script contract
 
@@ -363,29 +256,9 @@ Methods on `s`:
 - `s.rectangle(a, b, style="dash")`: a frame from corner `a` to corner `b` around a block; `style` is `solid`,
   `dash`, `dot`, `dashdot`, or `dashdotdot`. LINT ignores frames, also a wire or text crossing the frame line.
 - `s.junction(*points)`: explicit dot for a deliberate four-way connection; T junctions are automatic.
-- `s.sheet(name, build, at, size, pins=None, page=None, title=None)`: child sheet, drawn as a box with its
-  top-left corner at `at` and `size` (w, h) in grid units; returns `{label: (x, y)}` of its sheet pins.
-  - `name`: letters, digits, `_`, `-`; it is also the file name `<name>.kicad_sch`, so it is unique in the
-    project and differs from the project name.
-  - `build(child)` draws the child sheet with the same methods as `s` and returns nothing; the root `build`
-    returns every net in the project. `page` defaults to the project's page; `title` to `name`.
-  - Sheet pins come from the child's `hier_label`s, one per distinct text, with the label's `shape`.
-    Automatic (`pins=None`): `output` labels on the right edge, all others on the left, in the order the
-    labels were created, at offsets 2, 4, 6, … from the top edge; a side with n pins needs height ≥ 2n + 2.
-    Explicit: `pins={label: (side, offset)}` with one entry per label; `side` is `left`, `right`, `top`, or
-    `bottom`; `offset` is an integer counted from the top edge (left, right) or the left edge (top, bottom),
-    strictly inside the edge.
-  - Each pin is addressable on the parent as `"<sheet>.<LABEL>"`, e.g. `s.wire("J1.T", "amp.IN_L")`. The pin
-    text is drawn inside the box; the name is above the box and the file name below it, at `x`.
-  - Child sheets can contain sheets.
-  - A project of several sheets: one module per sheet (`draw(s)` plus its nets), a root that places them, and
-    a bench that builds one sheet alone beside stubs (a global label and test point per net that leaves it,
-    a `PWR_FLAG` where nothing on the sheet drives the net): `skill://kicaddy/examples/multi_sheet/`. Get each
-    sheet clean on its bench, then build the root.
-- `s.hier_label(text, at, spin="right", shape="input")`: hierarchical label on a child sheet (fails on the
-  root): connects the net at `at` to the parent's sheet pin `text`. `spin` and `shape` as for `global_label`.
-  The label text and pin name are the same. A net named by a hierarchical label prints as
-  `<sheet path><text>` (`/amp/IN_L`); a net with several labels takes one of their names.
+- `s.sheet(name, build, at, size, pins=None, page=None, title=None)` and `s.hier_label(text, at, spin="right",
+  shape="input")`: child sheets and their pins. Read `skill://kicaddy/hierarchy.md` before a design of more
+  than one sheet.
 - `s.net_class(name, nets, track_width=None, clearance=None)`: project net class, from any sheet. `nets` is a
   list of net-name patterns matched against full net names: `"+9V"`, `"GND"`, `"/amp/OUT_L"`, with `*`
   wildcards (`"/amp/*"`). `track_width` and `clearance` in mm; unset values inherit from `Default`.
@@ -456,33 +329,13 @@ Methods on `s`:
   from `symbol=`) needs half the two value widths: `CM5_3V3` beside a flag 7 units. Next to `GND` (value below
   the pin) 4 units is enough.
 
-## After a clean build: BOM and handoff
+## After a clean build
 
-- **BOM.** `kicaddy bom <project dir | .kicad_pro | root .kicad_sch> [-o FILE]` writes `<name>_bom.csv` next to
-  the root sheet from the saved files, so it includes `kicaddy_edit` batches and works on projects from
-  `kicaddy_open`. One row per group of parts with the same Value, Footprint, MPN, and DNP state; parts flagged
-  `exclude_from_bom` have no row, `dnp` parts have `DNP` in the last column; columns Reference, Value,
-  Footprint, Qty, MPN, Manufacturer, Datasheet, DNP. It is not part of the build: run it again after any
-  change.
-- **Review, simulation, sourcing.** kicaddy does not review a design. When the user asks for a design review,
-  a SPICE check, or sourcing, and the `kicad`, `spice`, or `bom` skills (kicad-happy) are available, read that
-  skill and run its scripts from the project directory, which already has `analysis/` and `datasheets/` (for a
-  behaviour check within a build task, Workflow step 7 has the commands and what the simulation covers):
-  - `python3 <kicad skill>/scripts/analyze_schematic.py <name>.kicad_sch --analysis-dir analysis/`
-  - `python3 <spice skill>/scripts/simulate_subcircuits.py --analysis-dir analysis/`
-  - `python3 <bom skill>/scripts/bom_manager.py export <name>.kicad_sch -o bom/bom.csv --recursive`
-
-  The analyzer reports the file format as newer than it has tested (`FV-001`, info), and names a net on a
-  child sheet by the sheet's UUID (`/e1a1…/IN_R` for `/amp/IN_R`). Its sourcing checks read the `MPN`,
-  `Manufacturer`, and Datasheet fields set in `build.py`. Always give these scripts a real output path: they
-  also write `analysis/capability_mode.json` under the current directory.
+`kicaddy bom <project dir>` writes the BOM; design review, simulation and sourcing go through the kicad-happy
+skills. Read `skill://kicaddy/bom-handoff.md` for either.
 
 ## Examples
 
 `skill://kicaddy/examples/ne555_blinker.py`: NE555 astable LED blinker on A5 with power flags, automatic T
 junctions, rotation, and a note. Build it with `kicaddy run <path> --out <dir>`. Read it before writing
 `build.py`; you do not need the engine source.
-
-`skill://kicaddy/examples/multi_sheet/`: a two-sheet project (`supply.py`, `indicator.py`) sharing nets by
-name. `kicaddy run <dir>/bench.py supply --out <dir>` builds one sheet beside its stubs;
-`kicaddy run <dir>/build.py --out <dir>` builds the project. Read it before a project of three or more sheets.

@@ -19,8 +19,10 @@ The plugin ships:
   behind the extension).
 - `extension/index.ts`: the omp / pi extension: tools on a KiCad server kept warm per session, a guard on the
   schematic files it holds open, and `/kicaddy`.
-- `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`), worked examples (one sheet; two sheet modules with a bench
-  for each sheet), and an example pin table.
+- `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`: a single-sheet build from stock symbols), five reference
+  files it names and an agent reads when the task needs them (`edit.md`, `custom-symbols.md`, `hierarchy.md`,
+  `circuit-check.md`, `bom-handoff.md`), worked examples (one sheet; two sheet modules with a bench for each
+  sheet), and an example pin table.
 
 ## Prerequisites
 
