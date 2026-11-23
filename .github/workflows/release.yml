@@ -20,7 +20,8 @@ concurrency: release
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: setup-python has no Python 3.9 build for Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
