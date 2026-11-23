@@ -6,7 +6,8 @@ page frame, title block, or empty paper.
 Implementation: [`plugin/engine/kicaddy/crop.py`](../plugin/engine/kicaddy/crop.py) (Pillow), called by
 `plot_cropped()` in [`plugin/engine/kicaddy/schematic.py`](../plugin/engine/kicaddy/schematic.py). Every
 design built with `kicaddy.schematic.run()` (or the extension's `kicaddy_build`) writes `<name>_crop.png`, or tiles
-`<name>_crop_r<row>c<col>.png`; the extension's `kicaddy_render` writes them again and returns them as images.
+`<name>_crop_r<row>c<col>.png`; the extension's `kicaddy_render` writes them again and returns up to 4 of them as
+images (for more, the number per sheet; one sheet or one region is then asked for).
 
 ## Problem
 
