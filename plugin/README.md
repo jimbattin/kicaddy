@@ -42,12 +42,15 @@ The plugin ships:
 
 ## Install
 
-oh-my-pi, from the repository's marketplace catalog (`.omp-plugin/marketplace.json`):
+oh-my-pi, from the marketplace catalog of the GitHub repository (`.omp-plugin/marketplace.json`):
 
 ```sh
-omp plugin marketplace add <clone>
+omp plugin marketplace add jimbattin/kicaddy
 omp plugin install kicaddy@kicaddy
 ```
+
+Below, `<clone>` is a clone of `https://github.com/jimbattin/kicaddy` (`omp plugin marketplace add <clone>` adds
+the catalog from it instead).
 
 or linked to a working copy:
 

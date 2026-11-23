@@ -2,6 +2,16 @@
 __pycache__/
 *.py[cod]
 .ruff_cache/
+.venv/
+
+# Node: the extension imports a package its host provides; an install for type checking leaves this
+node_modules/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
 
 # KiCad per-user and transient project files
 *.kicad_prl
@@ -17,3 +27,19 @@ fp-info-cache
 schematics/**/*.png
 schematics/**/*.svg
 schematics/**/*.pdf
+
+# `kicaddy bom` output, and the directories each build creates for other tools (analysis results, downloaded
+# datasheets)
+schematics/**/*_bom.csv
+schematics/**/analysis/
+schematics/**/datasheets/
+
+# A skill example run without --out builds its project next to the script; the examples ship as scripts only
+plugin/skills/kicaddy/examples/**/*.kicad_*
+plugin/skills/kicaddy/examples/**/*-lib-table
+plugin/skills/kicaddy/examples/**/*.png
+plugin/skills/kicaddy/examples/**/*.svg
+plugin/skills/kicaddy/examples/**/*.pdf
+plugin/skills/kicaddy/examples/**/*.csv
+plugin/skills/kicaddy/examples/**/analysis/
+plugin/skills/kicaddy/examples/**/datasheets/
