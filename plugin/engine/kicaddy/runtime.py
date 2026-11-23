@@ -65,7 +65,9 @@ class Api:
         self.symbols = symbol_database.Default()
         self.deadline = deadline
         self.client_name = client_name
-        self.text_boxes = {}  # GetTextExtents answers by text and attributes (schematic.Schematic._extents)
+        # GetTextExtents answers by text and attributes (schematic.Schematic._extents); server() fills it from
+        # kicaddy's cache and saves what it learned there
+        self.text_boxes = {}
         self.sock = pynng.Req0(dial=f"ipc://{socket_path}", send_timeout=60000, recv_timeout=60000)
 
     def __call__(self, request):
@@ -95,6 +97,30 @@ class Api:
 def project_key(project_dir):
     """A short stable key of a project directory: its lock file and its render cache are named by it."""
     return hashlib.sha256(str(Path(project_dir).resolve()).encode()).hexdigest()[:16]
+
+
+def _extents_file(api):
+    """kicaddy's cache file of GetTextExtents answers (Api.text_boxes) for the running KiCad build: an answer
+    depends on the text, its attributes, and the build only, so it is kept across servers."""
+    version = api(_proto.base.GetVersion()).version.full_version
+    return bootstrap.cache_root() / "text-extents" / f"{hashlib.sha256(version.encode()).hexdigest()[:16]}.json"
+
+
+def _load_extents(path):
+    try:
+        return {bytes.fromhex(k): tuple(v) for k, v in json.loads(path.read_text()).items()}
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {}
+
+
+def _save_extents(path, boxes):
+    """Merge `boxes` into the cache file; another server may have added answers since this one read it."""
+    merged = _load_extents(path)
+    merged.update(boxes)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}")
+    tmp.write_text(json.dumps({k.hex(): list(v) for k, v in merged.items()}))
+    os.replace(tmp, path)
 
 
 def _lock(root, project_dir):
@@ -153,7 +179,15 @@ def server(launcher, config_home, project_dir=None, paths=()):
                 api = Api(socket_path, deadline)
                 api.process = process
                 api.scratch = sock_dir  # the server writes here (Flatpak mounts it), the client reads: raw plots
-                yield api
+                extents = _extents_file(api)
+                api.text_boxes = _load_extents(extents)
+                known = len(api.text_boxes)
+                try:
+                    yield api
+                finally:
+                    if len(api.text_boxes) > known:
+                        with contextlib.suppress(OSError):
+                            _save_extents(extents, api.text_boxes)
             finally:
                 process.send_signal(signal.SIGINT)
                 try:

@@ -5,9 +5,10 @@ through `cwd` and `dir`, the library hint of a build with `--out`, build, query,
 split hint of a series insert) and `strict`, `exit()` in a batch, part flags and the BOM, lookups with body and
 field geometry, queries by sheet, lint and items, field angle and alignment, `s.power(symbol=)`, notes and text
 boxes changed and removed, frames and tables in `items`, the crossing hint, LINT text boxes, `around` regions
-keeping text boxes whole, tables in LINT, power references per sheet, the file-format gate of `open`, and no lock
-file left after shutdown. Everything is written to a temporary directory (region images to kicaddy's render
-cache, removed at the end); one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
+keeping text boxes whole, tables in LINT, a field over its own pin name, power references per sheet, the
+file-format gate of `open`, and no lock file left after shutdown. Everything is written to a temporary directory
+(region images to kicaddy's render cache, removed at the end); one `ok`/`FAIL` line per check, exit status 1 on
+any `FAIL`.
 
     python3 tools/daemon_check.py
 
@@ -334,6 +335,9 @@ def edits(d, tmp):
     r = d.request("edit", code=MOVED, expect=RIGHT, strict=True)
     check("strict: a clean batch commits", r["ok"] and "expect: matched" in r["output"]
           and re.search(r"^LINT: \d+ issue\(s\), 0 new$", r["output"], re.M), r["output"])
+    r = d.request("edit", code='s.field("U1", "Value", at=(87, 42))', expect={}, strict=True)
+    check("LINT: a field over its own pin name", not r["ok"] and "text-own: U1.Value / U1 @" in r["output"],
+          r["output"])
 
     r = d.request("edit", code='s.power("VBAT", "C4.1", symbol="VCC")', expect={"connect": {"C4.1": "VBAT"}})
     q = d.request("query", what="items", net="VBAT")

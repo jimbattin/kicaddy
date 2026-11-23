@@ -134,6 +134,7 @@ class Body(NamedTuple):
     box: tuple  # (x0, y0, x1, y1), normalized
     pins: frozenset  # connection points of this item
     strokes: tuple = ()  # ((x1, y1), (x2, y2)) segments of the item's own drawing (symbols only)
+    texts: tuple = ()  # (x0, y0, x1, y1) boxes of the item's own pin names and numbers (symbols only)
 
 
 class TextBox(NamedTuple):
@@ -218,39 +219,75 @@ def _line(kind, a, b, box, *texts):
     return f"{kind}: {a} / {b} @ ({x:g}, {y:g})" + "".join(map(_extent, texts))
 
 
+CELL = 8  # grid units per cell of the lint index
+
+
+def _cells(box):
+    """The CELL-unit grid cells `box` touches, padded by EPS (a clash needs the boxes to meet)."""
+    x0, y0 = math.floor((box[0] - EPS) / CELL), math.floor((box[1] - EPS) / CELL)
+    x1, y1 = math.floor((box[2] + EPS) / CELL), math.floor((box[3] + EPS) / CELL)
+    return [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+
+
+class _Index:
+    """Boxes by the grid cells they touch: near(box) is a superset of the indices of the boxes that meet `box`,
+    in index order, so a lint over it finds what a lint over every pair finds."""
+
+    def __init__(self, boxes):
+        self.cells = {}
+        for i, box in enumerate(boxes):
+            for cell in _cells(box):
+                self.cells.setdefault(cell, []).append(i)
+
+    def near(self, box):
+        return sorted({i for cell in _cells(box) for i in self.cells.get(cell, ())})
+
+
 def lint(bodies, texts, pins, wires):
     """Layout issues as sorted lines "kind: a / b @ (x, y)", the centre of the clash; a text-* line ends with the
-    box of each text in it (_extent). `wires` are ((x1, y1), (x2, y2)) segments."""
+    box of each text in it (_extent). `wires` are ((x1, y1), (x2, y2)) segments. Each item is checked against
+    the items sharing a cell of the lint index (_Index) with it, and its own symbol."""
     issues = []
     wires = [(tuple(a), tuple(b)) for a, b in wires]
     names = {w: f"wire ({w[0][0]:g}, {w[0][1]:g})-({w[1][0]:g}, {w[1][1]:g})" for w in wires}
     pins = [p for p in pins if p.start != p.end]
+    body_index, text_index = _Index([b.box for b in bodies]), _Index([t.box for t in texts])
+    pin_index, wire_index = _Index([_box(p.start, p.end) for p in pins]), _Index([_box(*w) for w in wires])
+    own = {}
+    for body in bodies:
+        own.setdefault(body.name, []).append(body)
     for i, a in enumerate(bodies):
-        for b in bodies[i + 1:]:
-            if box := _overlap(a.box, b.box):
-                issues.append(_line("body-body", a.name, b.name, box))
+        for j in body_index.near(a.box):
+            if j > i and (box := _overlap(a.box, bodies[j].box)):
+                issues.append(_line("body-body", a.name, bodies[j].name, box))
     for i, a in enumerate(texts):
-        for b in texts[i + 1:]:
-            if box := _overlap(a.box, b.box):
-                issues.append(_line("text-text", a.name, b.name, box, a, b))
-        for body in bodies:
+        for j in text_index.near(a.box):
+            if j > i and (box := _overlap(a.box, texts[j].box)):
+                issues.append(_line("text-text", a.name, texts[j].name, box, a, texts[j]))
+        for k in body_index.near(a.box):
+            body = bodies[k]
             if a.owner != body.name and (box := _overlap(a.box, body.box)):
                 issues.append(_line("text-body", a.name, body.name, box, a))
-            elif a.owner == body.name:
-                hit = next((box for s in body.strokes if (box := _clip(s, a.box))), None)
-                if hit:
-                    issues.append(_line("text-own", a.name, body.name, hit, a))
-        for pin in pins:
+        for body in own.get(a.owner, ()):
+            hit = next((box for s in body.strokes if (box := _clip(s, a.box))), None) or \
+                next((box for t in body.texts if (box := _overlap(t, a.box))), None)
+            if hit:
+                issues.append(_line("text-own", a.name, body.name, hit, a))
+        for k in pin_index.near(a.box):
+            pin = pins[k]
             if box := _hit((pin.start, pin.end), a.box):
                 issues.append(_line("text-pin", a.name, pin.name, box, a))
-        for w in wires:
+        for k in wire_index.near(a.box):
+            w = wires[k]
             if not (a.anchor is not None and _contains(w, a.anchor)) and (box := _hit(w, a.box)):
                 issues.append(_line("text-wire", a.name, names[w], box, a))
     for w in wires:
-        for body in bodies:
+        for k in body_index.near(_box(*w)):
+            body = bodies[k]
             if w[0] not in body.pins and w[1] not in body.pins and (box := _hit(w, body.box)):
                 issues.append(_line("wire-body", names[w], body.name, box))
-        for pin in pins:
+        for k in pin_index.near(_box(*w)):
+            pin = pins[k]
             box = _meet(w, (pin.start, pin.end))
             if box is None:
                 continue

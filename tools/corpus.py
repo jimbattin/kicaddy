@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Rebuild the design corpus (`schematics/*/build.py`) into a temporary directory on a KiCad build, and with
-`--record` add that build to the plugin's tested-builds list. `--latest` downloads the newest KiCad nightly AppImage
-into ~/.cache/kicaddy-nightly and tests it on its own runtime there; the configured KiCad and runtime are untouched.
+"""Rebuild the design corpus (`schematics/*/build.py`, and the skill's multi-sheet example: its project and the
+bench of each sheet) into a temporary directory on a KiCad build, and with `--record` add that build to the
+plugin's tested-builds list. `--latest` downloads the newest KiCad nightly AppImage into ~/.cache/kicaddy-nightly
+and tests it on its own runtime there; the configured KiCad and runtime are untouched.
 
     python3 tools/corpus.py [--latest] [--record]
 
@@ -27,6 +28,10 @@ REPO = Path(__file__).resolve().parents[1]
 PLUGIN = REPO / "plugin"
 BIN = PLUGIN / "bin/kicaddy"
 SYMBOL_TABLES = {"daisy_seed3": [PLUGIN / "skills/kicaddy/examples/daisy_seed3.json"]}
+MULTI_SHEET = PLUGIN / "skills/kicaddy/examples/multi_sheet"
+EXAMPLES = [("multi_sheet", MULTI_SHEET / "build.py", []),  # (design, script, arguments before --out)
+            ("multi_sheet.supply", MULTI_SHEET / "bench.py", ["supply"]),
+            ("multi_sheet.indicator", MULTI_SHEET / "bench.py", ["indicator"])]
 LATEST = "https://kicad-downloads.s3.cern.ch/appimage/latest.json"
 NIGHTLY = "https://kicad-downloads.s3.cern.ch/appimage/nightly/"
 TESTED_BUILDS = PLUGIN / "engine/kicaddy/tested_builds.json"
@@ -99,10 +104,10 @@ def fetch_latest() -> tuple[Path, str]:
     return appimage, sha
 
 
-def build(design: str, script: Path, out: Path) -> tuple[bool, str]:
+def build(design: str, script: Path, out: Path, arguments=()) -> tuple[bool, str]:
     commands = [[sys.executable, str(BIN), "symbol", str(table), "--dir", str(out)]
                 for table in SYMBOL_TABLES.get(design, [])]
-    commands.append([sys.executable, str(BIN), "run", str(script), "--out", str(out)])
+    commands.append([sys.executable, str(BIN), "run", str(script), *arguments, "--out", str(out)])
     log = []
     for command in commands:
         try:
@@ -153,30 +158,30 @@ def main() -> int:
         print(f"error: downloaded {appimage.name} reports {current['full_version']}")
         return 1
 
-    scripts = sorted(REPO.glob("schematics/*/build.py"), key=lambda p: p.parent.name)
+    designs = [(script.parent.name, script, []) for script in sorted(REPO.glob("schematics/*/build.py"),
+                                                                     key=lambda p: p.parent.name)] + EXAMPLES
     tmp = Path(tempfile.mkdtemp(prefix="kicaddy-corpus-"))
     passed = 0
-    for script in scripts:
-        design = script.parent.name
+    for design, script, arguments in designs:
         out = tmp / design
         out.mkdir()
         start = time.monotonic()
-        ok, log = build(design, script, out)
+        ok, log = build(design, script, out, arguments)
         if ok:
             passed += 1
-            print(f"ok    {design:<20} {time.monotonic() - start:.1f} s", flush=True)
+            print(f"ok    {design:<22} {time.monotonic() - start:.1f} s", flush=True)
         else:
             head, _, rest = log.partition("\n")
-            print(f"FAIL  {design:<20} {head}")
+            print(f"FAIL  {design:<22} {head}")
             for line in rest.strip().splitlines()[-25:]:
                 print(f"  {line}")
             sys.stdout.flush()
-    if passed == len(scripts):
+    if passed == len(designs):
         shutil.rmtree(tmp)
     else:
         print(f"kept: {tmp}")
-    print(f"corpus: {passed}/{len(scripts)} on KiCad {current['full_version']}")
-    if passed != len(scripts):
+    print(f"corpus: {passed}/{len(designs)} on KiCad {current['full_version']}")
+    if passed != len(designs):
         return 1
     if args.record:
         record(current)

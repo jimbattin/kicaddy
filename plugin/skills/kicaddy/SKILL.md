@@ -209,7 +209,8 @@ Without the tools, the CLI workflow below is unchanged.
    - `body-body`: two symbol bodies (or sheet boxes) overlap.
    - `text-text`: two texts overlap (fields such as `R1.Value`, labels, notes).
    - `text-body`: a text overlaps another symbol's body.
-   - `text-own`: a symbol's own field crosses a line of its drawing (an LED's arrows, a capacitor's plates).
+   - `text-own`: a symbol's own field crosses a line of its drawing (an LED's arrows, a capacitor's plates) or
+     one of its own pin names or numbers (a Value moved inside an IC's body over its pin names).
      Move the field clear of the symbol.
    - `text-pin`: a pin runs through a text.
    - `text-wire`: a wire runs through a text (a label on its own wire is fine).
@@ -377,6 +378,10 @@ Methods on `s`:
   - Each pin is addressable on the parent as `"<sheet>.<LABEL>"`, e.g. `s.wire("J1.T", "amp.IN_L")`. The pin
     text is drawn inside the box; the name is above the box and the file name below it, at `x`.
   - Child sheets can contain sheets.
+  - A project of several sheets: one module per sheet (`draw(s)` plus its nets), a root that places them, and
+    a bench that builds one sheet alone beside stubs (a global label and test point per net that leaves it,
+    a `PWR_FLAG` where nothing on the sheet drives the net): `skill://kicaddy/examples/multi_sheet/`. Get each
+    sheet clean on its bench, then build the root.
 - `s.hier_label(text, at, spin="right", shape="input")`: hierarchical label on a child sheet (fails on the
   root): connects the net at `at` to the parent's sheet pin `text`. `spin` and `shape` as for `global_label`.
   The label text and pin name are the same. A net named by a hierarchical label prints as
@@ -472,8 +477,12 @@ Methods on `s`:
   `Manufacturer`, and Datasheet fields set in `build.py`. Always give these scripts a real output path: they
   also write `analysis/capability_mode.json` under the current directory.
 
-## Example
+## Examples
 
 `skill://kicaddy/examples/ne555_blinker.py`: NE555 astable LED blinker on A5 with power flags, automatic T
 junctions, rotation, and a note. Build it with `kicaddy run <path> --out <dir>`. Read it before writing
 `build.py`; you do not need the engine source.
+
+`skill://kicaddy/examples/multi_sheet/`: a two-sheet project (`supply.py`, `indicator.py`) sharing nets by
+name. `kicaddy run <dir>/bench.py supply --out <dir>` builds one sheet beside its stubs;
+`kicaddy run <dir>/build.py --out <dir>` builds the project. Read it before a project of three or more sheets.

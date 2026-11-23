@@ -10,7 +10,8 @@ updates, the changed and deleted items, and the new items (a symbol placed insid
 for UpdateItems until that commit ends). An exception in the code drops the first; a failure in the second drops
 it and deletes the placed symbols. The model is loaded from the document before and after each batch; the netlist
 difference is reported, and when the batch declares `expect` (required for opened projects) a difference from it
-drops the batch and reopens the saved files; so does a new ERC or LINT line when the batch is `strict`. `render`
+drops the batch and reopens the saved files; so does a new ERC or LINT line when the batch is `strict`. A batch
+starting on the document a batch last measured (same fingerprint) reuses that netlist, ERC and LINT. `render`
 writes the images of an opened project to kicaddy's cache, never into the project. A project whose root sheet
 was saved by another KiCad release opens for query and render; `edit` is refused until `open` is sent with
 `upgrade`, because a save rewrites every sheet in the running release's file format.
@@ -87,6 +88,9 @@ class Session:
         # The plot jobs draw the files as they were at the first plot after the document was opened, whatever
         # was committed and saved since (docs/02-ipc-protocol.md#export-jobs): reopen before plotting again.
         self.plots_stale = False
+        # (fingerprint, (netlist snapshot, part flags, crossing hints, ERC keys, LINT lines)) of the document as an
+        # edit batch last measured it: the next batch's before-state while the fingerprint is unchanged
+        self.measured = None
         self.notes = []  # lines put before the current op's output
 
     # -- server and documents ------------------------------------------------------------------
@@ -151,6 +155,7 @@ class Session:
         self.batches = 0
         self.plots_stale = False
         self.foreign, self.upgrade = None, False
+        self.measured = None
         if stack is not None:
             stack.close()
 
@@ -452,18 +457,22 @@ class Session:
         code = request.get("code") or ""
         linecache.cache["<batch>"] = (len(code), None, code.splitlines(True), "<batch>")  # source in tracebacks
         project.load()  # the model equals the document at batch start
-        before = netdiff.Snapshot(project.components(), project.netlist())
-        flags_before = project.part_flags()
-        hints_before = set(schematic.crossing_hints(project))
+        fingerprint = self.fingerprint()
+        if self.measured is not None and self.measured[0] == fingerprint:
+            before, flags_before, hints_before, erc_before, lint_before = self.measured[1]
+        else:
+            before = netdiff.Snapshot(project.components(), project.netlist())
+            flags_before = project.part_flags()
+            hints_before = set(schematic.crossing_hints(project))
+            erc_before = {self._erc_key(v) for v in project.erc()}
+            lint_before = set(schematic.lint_issues(project))
+            self.measured = (fingerprint, (before, flags_before, hints_before, erc_before, lint_before))
         if expect is not None:
             try:
                 want = netdiff.expected(before, expect)
             except ValueError as err:
                 raise OpError(f"expect: {err}") from None
-        erc_before = {self._erc_key(v) for v in project.erc()}
-        lint_before = set(schematic.lint_issues(project))
         snapshot = project.snapshot()
-        fingerprint = self.fingerprint()
         hashes = self._hashes()
         header = project.root.header
         buf = io.StringIO()
@@ -513,7 +522,8 @@ class Session:
             report = [f"netlist: {len(after.nets)} nets, {len(changes)} change(s)", *(f"  {c}" for c in changes)]
         else:
             report = ["netlist: unchanged"]
-        report += [f"flags: {ref} {text or 'none'}" for ref, text in sorted(project.part_flags().items())
+        flags_after = project.part_flags()
+        report += [f"flags: {ref} {text or 'none'}" for ref, text in sorted(flags_after.items())
                    if text != flags_before.get(ref, "")]
         if expect is not None:
             mismatch = netdiff.check(want, after, set(expect.get("add", {})))
@@ -541,6 +551,8 @@ class Session:
             raise OpError("\n".join(line for line in lines if line))
 
         api(schematic._proto.project.SaveDocument(document=project.root.document))
+        self.measured = (self.fingerprint(), (after, flags_after, set(schematic.crossing_hints(project)),
+                                              {self._erc_key(v) for v in violations}, set(issues)))
         self.batches = number
         self.plots_stale = True
         lines += [f"batch {number} committed (sheet {target.hier_path})", *report,

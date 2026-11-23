@@ -19,7 +19,8 @@ The plugin ships:
   behind the extension).
 - `extension/index.ts`: the omp / pi extension: tools on a KiCad server kept warm per session, a guard on the
   schematic files it holds open, and `/kicaddy`.
-- `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`), a worked example design, and an example pin table.
+- `skills/kicaddy/`: the `kicaddy` skill (`SKILL.md`), worked examples (one sheet; two sheet modules with a bench
+  for each sheet), and an example pin table.
 
 ## Prerequisites
 
@@ -115,7 +116,7 @@ Locations:
 
 | What | Where |
 |---|---|
-| cache (venv, bindings, isolated KiCad config, `current.json`) | `$KICADDY_CACHE`, else `${XDG_CACHE_HOME:-~/.cache}/kicaddy` |
+| cache (venv, bindings, isolated KiCad config, `current.json`, text sizes for LINT per KiCad build in `text-extents/`, region renders) | `$KICADDY_CACHE`, else `${XDG_CACHE_HOME:-~/.cache}/kicaddy` |
 | server sockets and project locks | `$XDG_RUNTIME_DIR/kicaddy`, else `/tmp/kicaddy-<uid>` |
 | config | `${XDG_CONFIG_HOME:-~/.config}/kicaddy/config.json` |
 

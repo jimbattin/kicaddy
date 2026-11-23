@@ -1359,7 +1359,8 @@ class Schematic:
         glyph box by 1.5 pen widths where the ink reaches 0.5, then adds 17 % of that height. Stock
         symbols stack Reference and Value so that the padded boxes overlap with no ink touching.
         The server takes about 10 ms per text and the box only shifts with the position, so each distinct
-        text and attribute set is asked once per server, at the origin."""
+        text and attribute set is asked once per KiCad build, at the origin (runtime.server keeps the answers in
+        kicaddy's cache)."""
         probe = _proto.types.Text()
         probe.CopyFrom(text)
         probe.ClearField("position")
@@ -1395,6 +1396,63 @@ class Schematic:
         xs = [(origin.x_nm + x) / 1e6 / GRID_MM for x, _ in corners]
         ys = [(origin.y_nm + y) / 1e6 / GRID_MM for _, y in corners]
         return (min(xs), min(ys), max(xs), max(ys))
+
+    PIN_TEXT_GAP = 0.1016 / GRID_MM  # between a pin line and its name or number: 24 mil x text offset ratio 0.15
+    # PIN_LAYOUT_CACHE::transformBoxForPin, by the direction the pin points on the sheet: from the PIN_RIGHT frame
+    PIN_TURN = {(1, 0): lambda x, y: (x, y), (-1, 0): lambda x, y: (-x, y),
+                (0, -1): lambda x, y: (y, -x), (0, 1): lambda x, y: (y, x)}
+    PIN_DIRECTIONS = {"SPO_RIGHT": (1, 0), "SPO_LEFT": (-1, 0), "SPO_UP": (0, -1), "SPO_DOWN": (0, 1)}
+
+    def _pin_texts(self, p, near):
+        """Boxes (x0, y0, x1, y1) on the sheet of the pin names and numbers placement `p` draws, as
+        PIN_LAYOUT_CACHE places them for the pin as it points on the sheet: a name inside the body after the
+        pin's end when the symbol has a pin-name offset, else above the pin line (left of a vertical one); a
+        number above the pin line (left of it), on the other side when the name is there. Only the texts whose
+        rough box (one text height per character, plus one) reaches a box in `near` are measured: the server
+        answers each distinct text once."""
+        d, sch = p.definition, _proto.sch
+        unit = 1e6 * GRID_MM  # nm per grid unit
+        inside = d.pin_name_offset.value_nm / unit if d.show_pin_names else 0
+        gap = self.PIN_TEXT_GAP
+        found = []
+        for child in _unit_items(d, p.unit):
+            if not child.item.Is(sch.SchematicPin.DESCRIPTOR):
+                continue
+            pin = _unpack(child.item, sch.SchematicPin)
+            direction = self.PIN_DIRECTIONS.get(sch.SchematicPinOrientation.Name(pin.orientation))
+            if not pin.visible or direction is None:
+                continue
+            turn = self.PIN_TURN[sch_geometry.orient(*direction, p.rotation, p.mirror)]
+            ox, oy = sch_geometry.orient(pin.position.x_nm / unit, pin.position.y_nm / unit, p.rotation, p.mirror)
+            ox, oy = p.origin[0] + ox, p.origin[1] + oy
+            length = pin.length.value_nm / unit
+            name = "" if pin.name == "~" else pin.name
+            named = bool(d.show_pin_names and pin.name_text_size.value_nm > 0 and name)
+            texts = [(name, pin.name_text_size.value_nm, "name")] if named else []
+            if d.show_pin_numbers and pin.number:
+                texts.append((pin.number, pin.number_text_size.value_nm, "number"))
+            for text, size, kind in texts:
+                if size <= 0:
+                    continue
+
+                def box(w, h):  # w, h in grid units; in the PIN_RIGHT frame, then turned and put on the pin
+                    if kind == "name":
+                        cx, cy = (length + inside + w / 2, 0) if inside > 0 else (length / 2, -(h / 2 + gap))
+                    else:
+                        cx, cy = length / 2, (h / 2 + gap) * (1 if named and inside == 0 else -1)
+                    corners = [turn(x, y) for x in (cx - w / 2, cx + w / 2) for y in (cy - h / 2, cy + h / 2)]
+                    xs, ys = [ox + x for x, _ in corners], [oy + y for _, y in corners]
+                    return (min(xs), min(ys), max(xs), max(ys))
+
+                if not any(sch_geometry._overlap(box((len(text) + 1) * size / unit, size / unit), b) for b in near):
+                    continue
+                probe = _proto.types.Text(text=text)
+                probe.attributes.size.CopyFrom(_proto.types.Vector2(x_nm=size, y_nm=size))
+                probe.attributes.horizontal_alignment = _proto.enums.HA_CENTER
+                probe.attributes.vertical_alignment = _proto.enums.VA_CENTER
+                x0, y0, x1, y1 = self._extents(probe)
+                found.append(box((x1 - x0) / unit, (y1 - y0) / unit))
+        return found
 
     def _note_box(self, note):
         """Box (x0, y0, x1, y1) of a note as drawn; for a text box its frame: KiCad wraps the text inside it."""
@@ -1492,14 +1550,15 @@ class Schematic:
                     start = place(pin.position.x_nm, pin.position.y_nm)
                     end = place(pin.position.x_nm + dx * n, pin.position.y_nm + dy * n)
                     pin_lines.append(g.PinLine(f"pin {p.ref}.{pin.number}", start, end))
+            fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
+            own = [g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None, self._seen(p, field)[0])
+                   for name, field in fields + [(f.name, f) for f in p.instance.user_fields]
+                   if field.visible and field.text.text]
+            texts += own
             box = self.body_box(p)
             if box:
-                bodies.append(g.Body(p.name, box, frozenset(p.pins.values()), tuple(strokes)))
-            fields = [(name, getattr(p.instance, attr)) for name, attr in MANDATORY.items()]
-            for name, field in fields + [(f.name, f) for f in p.instance.user_fields]:
-                if field.visible and field.text.text:
-                    texts.append(g.TextBox(f"{p.name}.{name}", self._field_box(p, field), p.name, None,
-                                           self._seen(p, field)[0]))
+                pin_texts = tuple(self._pin_texts(p, [t.box for t in own]))
+                bodies.append(g.Body(p.name, box, frozenset(p.pins.values()), tuple(strokes), pin_texts))
         for kind, text, anchor, spin, shape in self._labels:
             texts.append(g.TextBox(f"{kind} {text!r}", self._label_box(kind, text, anchor, spin, shape), None, anchor,
                                    spin in ("up", "bottom")))
