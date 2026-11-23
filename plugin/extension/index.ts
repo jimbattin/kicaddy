@@ -342,7 +342,7 @@ export default function kicaddy(pi: HostAPI): void {
 			around: Type.Optional(
 				Type.Array(Type.String(), {
 					description:
-						"references on one sheet: one image of the region around them (12 grid units of margin) instead of the sheet crops",
+						"references on one sheet: one image of the region around them (12 grid units of margin, grown to keep whole the parts, labels, notes, text boxes, tables and sheet boxes at its edge) instead of the sheet crops",
 				}),
 			),
 			box: Type.Optional(

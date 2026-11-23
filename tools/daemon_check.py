@@ -430,8 +430,9 @@ def stable(d, tmp):
 
 
 def annotations(d, tmp):
-    """On the project stable() left open: text boxes and frames, LINT inside a text box, note_text and
-    remove_note on a text box, tables in items, and renders that write nothing into an opened project."""
+    """On the project stable() left open: text boxes and frames, LINT inside a text box, an `around` region that
+    keeps a cut text box whole, note_text and remove_note on a text box, tables in items and in LINT, and renders
+    that write nothing into an opened project."""
     directory = tmp / "stable"
     root = directory / "stable.kicad_sch"
     r = d.request("edit", code=f"s.text_box({TEXT!r}, (20, 80), (80, 12))\ns.rectangle((10, 76), (110, 96))",
