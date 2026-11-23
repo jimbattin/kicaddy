@@ -40,11 +40,11 @@ When the `kicaddy_build` tool is available, the plugin's extension keeps one KiC
 - **Review** with `kicaddy_render` (optional `sheet`: a file stem) instead of reading `<stem>_crop.png`: it
   plots the crops again and returns them as images. With `around` (references on one sheet) or `box`
   (`[x0, y0, x1, y1]` in grid units, on `sheet`, default the root) it returns one image of that region instead:
-  the parts with 12 units around them, grown to keep the parts and labels at its edge whole. Up to about
-  106 × 80 units is drawn at full size, up to 213 × 160 legibly. For a project from `kicaddy_open` the images
-  are written to kicaddy's cache, not into the project: use the printed paths. It also works after a build that
-  exited 1 (the files are saved either way): render the region of a LINT line you cannot resolve from its
-  coordinates.
+  the parts with 12 units around them, grown to keep whole the parts, labels, notes, text boxes, tables and sheet
+  boxes at its edge. Up to about 106 × 80 units is drawn at full size, up to 213 × 160 legibly. For a project
+  from `kicaddy_open` the images are written to kicaddy's cache, not into the project: use the printed paths. It
+  also works after a build that exited 1 (the files are saved either way): render the region of a LINT line you
+  cannot resolve from its coordinates.
 - **Query** with `kicaddy_query`, `what` =
   - `pins` with `lib_ids`: library pin offsets, body boxes and field positions, as `kicaddy pins`; works before
     any project is open: it then reads the `sym-lib-table` of the session directory, or of `dir` (a project
@@ -217,8 +217,9 @@ Without the tools, the CLI workflow below is unchanged.
    - `wire-pin`: a wire runs along a pin or crosses it away from its connection point.
 
    Names in LINT lines: `R1.Value` (a field), `label 'X'`, `global 'X'`, `hier 'X'` (labels), `note (x, y)`,
-   `text box (x, y)` (its frame is the box; nothing else may be inside it), `sheet <name>` (a child sheet's
-   box), `sheet <name>.Sheetname` / `.Sheetfile` (its fields), and `sheet pin <name>.<label>`.
+   `text box (x, y)` (its frame is the box; nothing else may be inside it), `table (x, y)` (a table of an opened
+   project, its outer box; nothing else may be inside it), `sheet <name>` (a child sheet's box),
+   `sheet <name>.Sheetname` / `.Sheetfile` (its fields), and `sheet pin <name>.<label>`.
 6. **Review.** Fix every LINT line in `build.py` and rebuild before looking at any image: move the symbol,
    wire, label, or note, or move a field with `s.field(ref, "Value", at=...)`. Once LINT is 0, read each sheet's
    `<stem>_crop.png` (or the tiles `<stem>_crop_r<r>c<c>.png` for a large drawing) once. LINT 0 already means
@@ -335,6 +336,8 @@ Methods on `s`:
   flags of a placed symbol, on every unit of it; `None` leaves one as it is.
 - `s.power(name, at, rotation=0, symbol=None)`: place `power:<name>` (`GND`, `+5V`, `+9V`, `PWR_FLAG`, …) with
   an automatic `#PWR`/`#FLG` reference; its pin is at `at`, a grid point or `"REF.PIN"`. Returns the reference.
+  The number continues the sheet's own (`#PWR0408` on a sheet whose highest is `#PWR0407`; a sheet with none
+  continues the project's highest), written as KiCad annotates power symbols, with a 0 before it.
   With `symbol="VCC"` (any `power:` symbol) it places that symbol and sets its Value to `name`, which names the
   net: `s.power("CM5_3V3", p, symbol="VCC")`; ERC and `PWR_FLAG` rules are those of `+5V`: on a net no power
   output drives, the power symbol needs a `PWR_FLAG` (a global label does not). A power symbol and a global label
@@ -425,6 +428,14 @@ Methods on `s`:
   consecutive points coincide: a wire between pins that already touch (e.g. a resistor placed with its pin on a
   capacitor's pin), or a corner point equal to the pin the wire starts or ends at. Work out each pin's absolute
   point (Geometry) before choosing corner points.
+- A symbol is placed before the first call that names one of its pins: `"U1.20"` is looked up when `s.wire`,
+  `s.label`, `s.power` or `s.no_connect` runs, and fails with `no 'U1.20': U1 is not placed on sheet /` when
+  `s.symbol("U1", …)` comes later in `build()`. Place all of a sheet's symbols first, then wire.
+- A power symbol's drawing starts at its pin: `GND` fills (−1, 0)-(1, 2) below it, `+5V`, `VCC` and `PWR_FLAG`
+  about (−0.8, −2)-(0.8, 0) above it, turned by `rotation`. A part's body box can reach past its own pin end:
+  `Device:LED` has pin 1 at (−3, 0) and `body (-3.6, -1)-(1, 1.8)` (its arrows), so `s.power("GND", "D1.1")`
+  gives `body-body: D1 / #PWR…` at any rotation. Before placing a power symbol on a pin, compare the two boxes
+  from `kicaddy pins`; when they overlap, wire 2 units out from the pin and put the symbol on the wire's end.
 - A field that collides with a pin, wire, or another text: move it with `s.field(ref, "Value", at=...)`, or
   turn it with `angle=`.
 - Put the part number in `fields={"MPN": ..., "Manufacturer": ...}` and the datasheet URL in `datasheet=`

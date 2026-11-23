@@ -4,9 +4,10 @@ through `cwd` and `dir`, the library hint of a build with `--out`, build, query,
 `around` references and by `box`, nothing written into an opened project), edit batches with `expect` (the
 split hint of a series insert) and `strict`, `exit()` in a batch, part flags and the BOM, lookups with body and
 field geometry, queries by sheet, lint and items, field angle and alignment, `s.power(symbol=)`, notes and text
-boxes changed and removed, frames and tables in `items`, the crossing hint, LINT text boxes, the file-format gate
-of `open`, and no lock file left after shutdown. Everything is written to a temporary directory (region images
-to kicaddy's render cache, removed at the end); one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
+boxes changed and removed, frames and tables in `items`, the crossing hint, LINT text boxes, `around` regions
+keeping text boxes whole, tables in LINT, power references per sheet, the file-format gate of `open`, and no lock
+file left after shutdown. Everything is written to a temporary directory (region images to kicaddy's render
+cache, removed at the end); one `ok`/`FAIL` line per check, exit status 1 on any `FAIL`.
 
     python3 tools/daemon_check.py
 
@@ -382,6 +383,19 @@ def crossing(d, tmp):
           and HINT.format(60, 75) in r["output"] and r["output"].count("hint:") == 1, r["output"])
 
 
+def power_refs(d, tmp):
+    """On the three-sheet corpus design: s.power continues the sheet's own numbers in KiCad's form."""
+    r = d.request("build", script=str(REPO / "schematics/headphone_amp_hier/build.py"), out=str(tmp / "hier"),
+                  cwd=str(tmp))
+    d.request("edit", sheet="amp", code='s.symbol("#PWR0401", "power:GND", (120, 20))', expect={})
+    a = d.request("edit", sheet="amp", code='print(s.power("GND", (126, 20)))', expect={})
+    check("power: the reference continues the sheet's numbers", r["output"].endswith("exit: 0") and a["ok"]
+          and a["output"].startswith("#PWR0402\n"), f'{r["output"][-300:]}\n{a["output"]}')
+    b = d.request("edit", code='print(s.power("GND", (120, 20)))', expect={})
+    m = re.match(r"#PWR0(\d+)\n", b["output"])
+    check("power: another sheet keeps its own numbers", b["ok"] and m and int(m[1]) < 401, b["output"])
+
+
 def stable(d, tmp):
     directory = tmp / "stable"
     directory.mkdir()
@@ -433,6 +447,11 @@ def annotations(d, tmp):
                   's.no_connect("R5.1")\ns.no_connect("R5.2")', expect={"add": {"R5": "1k"}})
     check("LINT: a part inside a text box", r["ok"] and "text-body: text box (20, 80) / R5 @" in r["output"],
           r["output"])
+    r = d.request("render", around=["R5"], sheet="stable")
+    rendered(r, tmp)
+    m = re.match(r"region: \S+ \((-?[\d.]+), (-?[\d.]+)\)-\((-?[\d.]+), (-?[\d.]+)\) on /, ", r["output"])
+    check("render: around keeps a cut text box whole", r["ok"] and m and float(m[1]) <= 20 and float(m[2]) <= 80
+          and float(m[3]) >= 100 and float(m[4]) >= 92, r["output"])
     r = d.request("edit", code='s.note_text((20, 80), "short")', expect={})
     q = d.request("query", what="items")
     check("note_text on a text box", r["ok"] and 'text box (20, 80)-(100, 92) "short"' in q["output"]
@@ -447,6 +466,9 @@ def annotations(d, tmp):
     q = d.request("query", what="items")
     check("items: table", r["ok"] and "table (120, 70)-(160, 78) 2 columns, 4 cells" in q["output"],
           f'{r["output"]}\n{q["output"]}')
+    r = d.request("edit", code='s.symbol("R6", "Device:R", (140, 74), value="1k")\n'
+                  's.no_connect("R6.1")\ns.no_connect("R6.2")', expect={"add": {"R6": "1k"}})
+    check("LINT: a part inside a table", r["ok"] and "text-body: table (120, 70) / R6 @" in r["output"], r["output"])
 
     r = d.request("render")
     images = rendered(r, tmp)
@@ -464,7 +486,7 @@ def main():
     started = time.time()
     d = Daemon(tmp)
     try:
-        for part in (pins, library_hint, built, queries, edits, crossing, stable, annotations):
+        for part in (pins, library_hint, built, queries, edits, crossing, power_refs, stable, annotations):
             part(d, tmp)
     except Failure as e:
         check("the daemon stayed up", False, e)

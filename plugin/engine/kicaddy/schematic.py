@@ -56,8 +56,8 @@ _proto = None  # namespace of generated modules, filled by bind()
 _live = None  # the omp extension's session daemon (daemon.Session): run() builds on its warm server
 
 PROJECT_STATE = ("pin_ids", "units", "auto", "libraries_ready", "net_classes", "files")  # edit-batch rollback
-SHEET_STATE = ("pins", "placements", "_items", "_wires", "_labels", "_notes", "_graphics", "_sheets", "_junctions",
-               "_junctions_created", "_existing", "_no_connects", "_updates", "_deletes", "_touched")
+SHEET_STATE = ("pins", "placements", "_items", "_wires", "_labels", "_notes", "_graphics", "_tables", "_sheets",
+               "_junctions", "_junctions_created", "_existing", "_no_connects", "_updates", "_deletes", "_touched")
 # KiCadObjectType names of the sheet items the model loads and the daemon fingerprints
 ITEM_KINDS = ("KOT_SCH_SYMBOL", "KOT_SCH_LINE", "KOT_SCH_JUNCTION", "KOT_SCH_NO_CONNECT", "KOT_SCH_LABEL",
               "KOT_SCH_GLOBAL_LABEL", "KOT_SCH_HIER_LABEL", "KOT_SCH_TEXT", "KOT_SCH_SHEET", "KOT_SCH_TEXTBOX",
@@ -210,12 +210,19 @@ def _graphic_line(shape):
     return line
 
 
-def _table_line(table):
-    """The `kicaddy_query items` line of a table: the box around its cells, columns, cells."""
+def _table_box(table):
+    """(x0, y0, x1, y1) in grid units around the cells of a table, or None for one without cells."""
     corners = [_point(v) for c in table.cells for v in (c.text_box.textbox.top_left, c.text_box.textbox.bottom_right)]
-    box = (f" {_xy((min(x for x, _ in corners), min(y for _, y in corners)))}-"
-           f"{_xy((max(x for x, _ in corners), max(y for _, y in corners)))}") if corners else ""
-    return f"table{box} {table.column_count} columns, {len(table.cells)} cells"
+    if not corners:
+        return None
+    xs, ys = zip(*corners)
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _table_line(table, box):
+    """The `kicaddy_query items` line of a table: the box around its cells (_table_box), columns, cells."""
+    span = f" {_xy(box[:2])}-{_xy(box[2:])}" if box else ""
+    return f"table{span} {table.column_count} columns, {len(table.cells)} cells"
 
 
 @dataclass
@@ -351,7 +358,7 @@ class Project:
         self.page = page
         self.pin_ids = {}  # pin KIID -> "REF.PIN", every sheet
         self.units = {}  # (ref, unit) -> name of the sheet it is placed on
-        self.auto = {"#PWR": 0, "#FLG": 0}
+        self.auto = {"#PWR": set(), "#FLG": set()}  # numbers of the #PWR/#FLG references in use, every sheet
         self.libraries_ready = set()
         self.net_classes = []  # (NetClass proto, [net-name patterns])
         self.sheets = []  # every Schematic, root first, in creation order
@@ -388,7 +395,7 @@ class Project:
         for s in self.sheets:
             s.load()
         self.pin_ids, self.units = {}, {}
-        self.auto = {"#PWR": 0, "#FLG": 0}
+        self.auto = {"#PWR": set(), "#FLG": set()}
         for s in self.sheets:
             for p in s.placements.values():
                 self.units[(p.ref, p.unit)] = s.name
@@ -398,7 +405,7 @@ class Project:
                         self.pin_ids[pin.id.value] = f"{p.ref}.{pin.number}"
                 m = re.fullmatch(r"#(PWR|FLG)(\d+)", p.ref)
                 if m:
-                    self.auto[f"#{m[1]}"] = max(self.auto[f"#{m[1]}"], int(m[2]))
+                    self.auto[f"#{m[1]}"].add(int(m[2]))
 
     def components(self):
         """{ref: value} of every placed symbol, power symbols and flags excluded."""
@@ -522,6 +529,7 @@ class Schematic:
         self._labels = []  # (kind, text, point, spin, shape)
         self._notes = []  # _Note: texts and text boxes
         self._graphics = []  # kicaddy_query items lines of frames, graphic lines, shapes and tables
+        self._tables = []  # (x0, y0, x1, y1) of each table: one LINT box, never edited
         self._sheets = []  # child sheet boxes (_SheetBox)
         self._junctions = set()  # explicit junction points
         self._junctions_created = set()
@@ -594,7 +602,11 @@ class Schematic:
             elif item.Is(sch.SchematicGraphicShape.DESCRIPTOR):
                 self._graphics.append(_graphic_line(_unpack(item, sch.SchematicGraphicShape).shape))
             elif item.Is(sch.SchematicTable.DESCRIPTOR):
-                self._graphics.append(_table_line(_unpack(item, sch.SchematicTable)))
+                table = _unpack(item, sch.SchematicTable)
+                box = _table_box(table)
+                self._graphics.append(_table_line(table, box))
+                if box:
+                    self._tables.append(box)
             else:
                 kind = next((k for k in existing if item.Is(k.DESCRIPTOR)), None)
                 if kind is None:  # directive labels
@@ -685,7 +697,8 @@ class Schematic:
         pins = sorted(k[len(ref) + 1:] for k in self.pins if k.startswith(f"{ref}."))
         if pins:
             raise ValueError(f"{ref} has no pin {pin!r} on sheet {self.hier_path}; its pins here: {' '.join(pins)}")
-        raise ValueError(f"no {point!r}: {ref} is not placed on sheet {self.hier_path}")
+        raise ValueError(f"no {point!r}: {ref} is not placed on sheet {self.hier_path}; place it before the first call "
+                         "that names its pins")
 
     # -- symbols ----------------------------------------------------------------------------------
     def symbol(self, ref, lib_id, at, value=None, rotation=0, unit=None, footprint=None, mirror=None,
@@ -1043,12 +1056,19 @@ class Schematic:
             self._deletes.add(note.item.id.value)
 
     def power(self, name, at, rotation=0, symbol=None):
-        """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference; its pin lands on
-        `at`, a grid point or "REF.PIN". With `symbol` ("VCC", "+5V", ...) place power:<symbol> with its Value set
-        to `name`: a power symbol's Value names its net, so a rail of any name can be drawn as a power symbol."""
+        """Place power:<name> (GND, +5V, PWR_FLAG, ...) with an automatic #PWR/#FLG reference, one above the highest
+        on this sheet (above the project's highest on a sheet with none), skipping numbers in use on other sheets;
+        its pin lands on `at`, a grid point or "REF.PIN". With `symbol` ("VCC", "+5V", ...) place power:<symbol>
+        with its Value set to `name`: a power symbol's Value names its net, so a rail of any name can be drawn as a
+        power symbol."""
         prefix = "#FLG" if name == "PWR_FLAG" else "#PWR"
-        self.project.auto[prefix] += 1
-        ref = f"{prefix}{self.project.auto[prefix]:02d}"
+        taken = self.project.auto[prefix]
+        here = [int(m[1]) for p in self.placements.values() if (m := re.fullmatch(rf"{prefix}(\d+)", p.ref))]
+        n = max(here or taken or [0]) + 1
+        while n in taken:
+            n += 1
+        taken.add(n)
+        ref = f"{prefix}0{n}"  # as KiCad annotates a power symbol: a 0 before the number
         try:
             self.symbol(ref, f"power:{symbol or name}", self.at(at), value=name if symbol else None, rotation=rotation)
         except RuntimeError as e:
@@ -1376,6 +1396,18 @@ class Schematic:
         ys = [(origin.y_nm + y) / 1e6 / GRID_MM for _, y in corners]
         return (min(xs), min(ys), max(xs), max(ys))
 
+    def _note_box(self, note):
+        """Box (x0, y0, x1, y1) of a note as drawn; for a text box its frame: KiCad wraps the text inside it."""
+        if isinstance(note.item, _proto.sch.SchematicTextBox):
+            (x0, y0), (x1, y1) = _point(note.item.textbox.top_left), _point(note.item.textbox.bottom_right)
+            return (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+        text = _proto.types.Text()
+        text.CopyFrom(note.item.text)
+        text.attributes.multiline = True
+        if text.attributes.vertical_alignment == _proto.enums.VA_UNKNOWN:
+            text.attributes.vertical_alignment = _proto.enums.VA_CENTER  # multi-line notes centre vertically
+        return tuple(v / 1e6 / GRID_MM for v in self._extents(text))
+
     def _label_box(self, kind, text, anchor, spin, shape):
         enums = _proto.enums
         ax, ay = anchor
@@ -1436,7 +1468,7 @@ class Schematic:
     def lint(self):
         """Layout issues: overlapping bodies and text, fields over their own symbol's lines, wires over pins,
         bodies, and text (sch_geometry.lint)."""
-        sch, enums, g = _proto.sch, _proto.enums, sch_geometry
+        sch, g = _proto.sch, sch_geometry
         directions = {sch.SPO_RIGHT: (1, 0), sch.SPO_LEFT: (-1, 0), sch.SPO_UP: (0, -1), sch.SPO_DOWN: (0, 1)}
         bodies, texts, pin_lines = [], [], []
         for p in self.placements.values():
@@ -1481,19 +1513,12 @@ class Schematic:
                 texts.append(g.TextBox(f"sheet pin {b.name}.{label}", self._label_box("hier", label, point, spin, shape),
                                        f"sheet {b.name}", point, spin in ("up", "bottom")))
         for note in self._notes:
-            if isinstance(note.item, sch.SchematicTextBox):  # the frame is the text's box: KiCad wraps inside it
-                box = note.item.textbox
-                (x0, y0), (x1, y1) = _point(box.top_left), _point(box.bottom_right)
-                frame = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
-                texts.append(g.TextBox(f"text box {_xy(note.at)}", frame, None, None, self._upright(box)))
-                continue
-            text = _proto.types.Text()
-            text.CopyFrom(note.item.text)
-            text.attributes.multiline = True
-            if text.attributes.vertical_alignment == enums.VA_UNKNOWN:
-                text.attributes.vertical_alignment = enums.VA_CENTER  # multi-line notes centre vertically
-            box = tuple(v / 1e6 / GRID_MM for v in self._extents(text))
-            texts.append(g.TextBox(f"note ({note.at[0]:g}, {note.at[1]:g})", box, None, None, self._upright(text)))
+            boxed = isinstance(note.item, sch.SchematicTextBox)
+            name = f"text box {_xy(note.at)}" if boxed else f"note ({note.at[0]:g}, {note.at[1]:g})"
+            texts.append(g.TextBox(name, self._note_box(note), None, None,
+                                   self._upright(note.item.textbox if boxed else note.item.text)))
+        for box in self._tables:
+            texts.append(g.TextBox(f"table {_xy(box[:2])}", box, None, None))
         return g.lint(bodies, texts, pin_lines, self._wires)
 
 
@@ -1529,8 +1554,8 @@ def plot_cropped(api, document, output, scratch=None):
 
 def around_box(s, refs):
     """Grid box (x0, y0, x1, y1) for a render around the symbols `refs` of sheet `s`: their extent with
-    REGION_PAD units around it, grown to hold whole each other symbol and label the padded box cuts, smallest
-    first, while the box still fits one legible image; then 1 unit more."""
+    REGION_PAD units around it, grown to hold whole each other symbol, label, note, text box, table and sheet box
+    the padded box cuts, smallest first, while the box still fits one legible image; then 1 unit more."""
     def union(a, b):
         return (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
 
@@ -1542,6 +1567,7 @@ def around_box(s, refs):
     limit = [n / crop.MIN_DPI * 25.4 / GRID_MM for n in crop.MAX_SIZE]  # 213 x 160 units
     others = [s.extent(p) for p in s.placements.values() if p.ref not in refs]
     others += [s._label_box(*label) for label in s._labels]
+    others += [s._note_box(note) for note in s._notes] + s._tables + [b.box for b in s._sheets]
     cut = [b for b in others if sch_geometry._overlap(b, box) and union(b, box) != box]
     for b in sorted(cut, key=lambda b: ((b[2] - b[0]) * (b[3] - b[1]), b)):
         grown = union(box, b)
